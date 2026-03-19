@@ -6,7 +6,7 @@ export default function BannerBlock({ text, link, onClick }) {
   return (
     <div style={{
       background: colors.yellow100, borderRadius: 4, padding: 16,
-      display: 'flex', gap: 12, alignItems: 'flex-start',
+      display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12,
     }}>
       <div style={{ flexShrink: 0 }}><ClockIcon /></div>
       <div style={{ flex: 1, minWidth: 0 }}>

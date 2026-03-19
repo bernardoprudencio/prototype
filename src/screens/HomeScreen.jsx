@@ -64,7 +64,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
                     />
                     <div style={{ display: 'flex', gap: 8 }}>
                       <Button variant="default" style={{ flex: 1 }} onClick={() => onOpenReviewSheet(card)}>Review and complete</Button>
-                      <Button variant="default" icon={<MoreIcon />} onClick={() => onOpenActionSheet(card)} />
+                      <Button variant="default" icon={<MoreIcon size={16} />} onClick={() => onOpenActionSheet(card)} />
                     </div>
                   </div>
                 ))}

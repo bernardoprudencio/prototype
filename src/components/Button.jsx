@@ -3,7 +3,7 @@ import { colors, radius, typography, shadows } from '../tokens'
 
 // Matches Kibble ButtonYPaddingMap + ButtonXPaddingMap
 const SIZES = {
-  small:   { paddingTop: 6,  paddingBottom: 6,  paddingLeft: 16, paddingRight: 16, fontSize: 14 },
+  small:   { paddingTop: 8,  paddingBottom: 8,  paddingLeft: 16, paddingRight: 16, fontSize: 14 },
   default: { paddingTop: 10, paddingBottom: 10, paddingLeft: 24, paddingRight: 24, fontSize: 16 },
   large:   { paddingTop: 18, paddingBottom: 18, paddingLeft: 32, paddingRight: 32, fontSize: 20 },
 }

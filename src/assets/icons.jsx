@@ -10,7 +10,11 @@ const Icon = ({ name, size = 24, color = c.primary, style = {} }) => (
   />
 )
 
-export const BackIcon = () => <Icon name="in-arrow-left" />
+export const BackIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32" fill={c.primary}>
+    <path transform="scale(-1,1) translate(-32,0)" d="M12.32 22.27l5.442-6.35-5.442-6.348a1 1 0 1 1 1.518-1.302l5.722 6.675a1.5 1.5 0 0 1 0 1.952l-5.721 6.675a1 1 0 1 1-1.519-1.302z"/>
+  </svg>
+)
 export const BellIcon = () => <Icon name="in-bell" />
 export const ChevronUpIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32" fill={c.tertiary}>
@@ -27,15 +31,27 @@ export const ChevronRightIcon = () => (
     <path d="M12.32 22.27l5.442-6.35-5.442-6.348a1 1 0 1 1 1.518-1.302l5.722 6.675a1.5 1.5 0 0 1 0 1.952l-5.721 6.675a1 1 0 1 1-1.519-1.302z"/>
   </svg>
 )
-export const EditIcon = () => <Icon name="in-edit" />
-export const ClockIcon = () => <Icon name="in-clock" color="#D59418" />
+export const EditIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 18 18" fill={c.primary}>
+    <path d="M2.52167 14.1271L3.87289 15.4783L5.18225 14.8964L16.4101 3.66853C16.9841 3.09453 16.9841 2.16389 16.4101 1.58988C15.8361 1.01588 14.9055 1.01588 14.3315 1.58988L13.2921 2.62921L14.6213 3.95838L13.8015 4.77818L12.4723 3.44902L3.1036 12.8178L2.52167 14.1271ZM13.5117 0.770077C14.5384 -0.256692 16.2032 -0.256692 17.2299 0.770077C18.2567 1.79685 18.2567 3.46157 17.2299 4.48834L5.964 15.7543C5.88854 15.8297 5.79982 15.8907 5.7023 15.934L1.22291 17.9248C0.998074 18.0248 0.741433 18.0248 0.516601 17.9248C0.07776 17.7298 -0.11988 17.2159 0.075161 16.7771L2.066 12.2977C2.10935 12.2002 2.17027 12.1115 2.24574 12.036L13.5117 0.770077Z"/>
+  </svg>
+)
+export const ClockIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32" fill="#D59418" fillRule="evenodd">
+    <path d="M16 2C8.268 2 2 8.268 2 16 2 23.732 8.268 30 16 30 23.732 30 30 23.732 30 16 30 8.268 23.732 2 16 2ZM16 4C9.383 4 4 9.383 4 16 4 22.617 9.383 28 16 28 22.617 28 28 22.617 28 16 28 9.383 22.617 4 16 4ZM17 9V16.586L21.707 21.293 20.293 22.707 15 17.414V9H17Z"/>
+  </svg>
+)
 export const ImageIcon = () => <Icon name="in-file-image" size={16} color={c.secondary} />
 export const MapIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32" fill={c.primary}>
     <path d="M26 12c0-6.089-4.172-10-10-10S6 5.911 6 12c0 4.193 3.315 10.068 10 17.512C22.685 22.068 26 16.192 26 12zM4 12C4 4.777 9.095 0 16 0s12 4.777 12 12c0 4.905-3.649 11.288-10.89 19.266a1.5 1.5 0 0 1-2.118.103c-.053-.05-.053-.05-.103-.103C7.65 23.288 4 16.906 4 12zm12 4a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
   </svg>
 )
-export const CheckIcon = () => <Icon name="in-check" size={16} color={c.tertiary} />
+export const CheckIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32" fill={c.tertiary}>
+    <path d="M26.191 4.412a1 1 0 1 1 1.618 1.176l-16 22a1 1 0 0 1-1.516.12l-6-6a1 1 0 1 1 1.414-1.415l5.173 5.172L26.19 4.412z"/>
+  </svg>
+)
 export const HomeFilledIcon = ({ color = c.primary }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32" fill={color}>
     <path d="M10 30v-5c0-3.552 2.448-6 6-6s6 2.448 6 6v5h6V13.568l-12-11.2-12 11.2V30h6zm2 2H2V15.435l-.318.296A1 1 0 0 1 .318 14.27L14.977.587a1.5 1.5 0 0 1 2.046 0l14.66 13.682a1 1 0 1 1-1.365 1.462L30 15.435V32H20v-7c0-2.448-1.552-4-4-4s-4 1.552-4 4v7z"/>
@@ -80,8 +96,8 @@ export const PawIcon = () => (
   </svg>
 )
 
-export const MoreIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+export const MoreIcon = ({ size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="5" r="1.5" fill={c.primary}/>
     <circle cx="12" cy="12" r="1.5" fill={c.primary}/>
     <circle cx="12" cy="19" r="1.5" fill={c.primary}/>

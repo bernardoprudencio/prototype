@@ -1,15 +1,28 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { colors, typography, shadows } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon } from '../assets/icons'
 import { peopleImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
 
+const DayDivider = ({ label }) => (
+  <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+    <span style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 14, color: colors.tertiary }}>{label}</span>
+  </div>
+)
+
+const Gap = ({ h = 12 }) => <div style={{ height: h }} />
+
 export default function ConversationScreen({ onBack, conversation }) {
   const { type, card, resolution, timestamp } = conversation || {}
+  const messagesEndRef = useRef(null)
 
   const isToday = type === 'today'
   const clientName = isToday ? 'Owen O.' : card?.client
   const clientImg  = isToday ? peopleImages.owen : peopleImages[card?.clientKey] ?? peopleImages.owen
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+  }, [conversation])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
@@ -30,7 +43,7 @@ export default function ConversationScreen({ onBack, conversation }) {
           </div>
           <div style={{ cursor: 'pointer', flexShrink: 0 }}><MoreIcon /></div>
         </div>
-        <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, paddingTop: 12, overflowX: 'auto' }}>
+        <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, paddingTop: 12, overflowX: 'auto', paddingBottom: 14, marginBottom: -14 }}>
           <Button variant="primary" style={{ boxShadow: shadows.medium, flexShrink: 0 }}>Leave feedback</Button>
           <Button variant="default" style={{ flexShrink: 0 }}>Modify schedule</Button>
           <Button variant="default" style={{ flexShrink: 0 }}>Details</Button>
@@ -39,37 +52,96 @@ export default function ConversationScreen({ onBack, conversation }) {
 
       {/* ─── Messages ─── */}
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>
-        {isToday ? (
+
+        {/* ── Owen · Koni & Burley · Today's walk ── */}
+        {isToday && (
           <>
-            <BannerBlock text="Walk started at 8:18 PM, Mar 15" link="See Rover Card" />
-            <div style={{ height: 12 }} />
-            <ChatBubble message="He ok?" time="08:32 PM" />
-            <ChatBubble message="Yeah he seems pretty mellow to me!" time="08:30 PM" isOwner showCheck />
-            <ChatBubble message="Oh good, thanks for letting me know!" time="08:32 PM" />
-            <div style={{ height: 4 }} />
-            <BannerBlock text="Walk ended at 8:54 PM, Mar 15" link="See Rover Card" />
-            <div style={{ height: 12 }} />
-            <ChatBubble message="Thank you!" time="08:56 PM" />
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
-              <span style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 14, color: colors.tertiary }}>Today</span>
-            </div>
-            <BannerBlock text="Walk from {date at time} was marked as complete at 5:23 PM, Jan 18." />
+            <DayDivider label="Yesterday" />
+            <ChatBubble message="Hey! Are we still on for tomorrow at 9?" time="4:32 PM" />
+            <ChatBubble message="Absolutely! See you then 🐾" time="4:35 PM" isOwner showCheck />
+
+            <DayDivider label="Today" />
+            <ChatBubble message="Morning! Leashes are on the hook by the door. Burley's been a bit hyper today 😄" time="8:52 AM" />
+            <ChatBubble message="On my way! Be there in a few." time="8:55 AM" isOwner showCheck />
+            <Gap />
+            <BannerBlock text="Walk started at 9:04 AM, Mar 19" link="See Rover Card" />
+            <Gap />
+            <ChatBubble message="Both doing great! Koni's leading the way and Burley found a stick he absolutely won't let go of 😂" time="9:28 AM" isOwner showCheck />
+            <ChatBubble message="Haha that's so Burley. Thank you for the update!" time="9:31 AM" />
+            <Gap h={4} />
+            <BannerBlock text="Walk ended at 10:01 AM, Mar 19" link="See Rover Card" />
+            <Gap />
+            <ChatBubble message="They look completely worn out, thank you! 🐾" time="10:05 AM" />
+            <ChatBubble message="Ha! They definitely earned it. See you next week!" time="10:07 AM" isOwner showCheck />
           </>
-        ) : (
+        )}
+
+        {/* ── James · Archie · Yesterday's missed walk ── */}
+        {!isToday && card?.id === 'archie' && (
           <>
-            <ChatBubble message="Hi! Just a heads up about the walk." time="10:02 AM" isOwner showCheck />
-            <ChatBubble message="Oh no, what happened?" time="10:15 AM" />
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
-              <span style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 14, color: colors.tertiary }}>Today</span>
-            </div>
-            {resolution === 'completed' && (
-              <BannerBlock text={`Walk from ${card.dateLabel} was marked as complete on ${timestamp}.`} />
-            )}
-            {resolution === 'cancelled' && (
-              <BannerBlock text={`Walk from ${card.dateLabel} was cancelled on ${timestamp}. A refund of ${card.cost} has been processed.`} />
+            <DayDivider label="Yesterday" />
+            <ChatBubble message="Hey! Are you still on for noon today?" time="11:30 AM" />
+            <ChatBubble message="Yes! Heading over around 11:55." time="11:32 AM" isOwner showCheck />
+            <ChatBubble message="Just a heads up — Archie gets a bit shy with strangers at first" time="11:45 AM" />
+            <ChatBubble message="Good to know, I'll take it slow with him 🐾" time="11:48 AM" isOwner showCheck />
+            <ChatBubble message="He warms up fast once he's outside. The trail behind the building is his favorite" time="11:51 AM" />
+            <Gap h={16} />
+            <BannerBlock text="Walk started at 12:02 PM, Mar 18" link="See Rover Card" />
+            <Gap h={24} />
+            <BannerBlock text="Walk ended at 12:31 PM, Mar 18" link="See Rover Card" />
+            <Gap h={16} />
+            <ChatBubble message="Thanks! How did he do?" time="1:15 PM" />
+            <ChatBubble message="He was great once he warmed up! Really loved sniffing around the trail" time="1:18 PM" isOwner showCheck />
+            <ChatBubble message="Ha, that sounds exactly like him. Thanks again!" time="1:20 PM" />
+            {resolution && (
+              <>
+                <DayDivider label="Today" />
+                {resolution === 'completed' && (
+                  <BannerBlock text={`Walk from ${card.dateLabel} was marked as complete on ${timestamp}.`} />
+                )}
+                {resolution === 'cancelled' && (
+                  <BannerBlock text={`Walk from ${card.dateLabel} was cancelled on ${timestamp}. A refund of ${card.cost} has been processed.`} />
+                )}
+              </>
             )}
           </>
         )}
+
+        {/* ── Sarah · Milo · Overdue walk from Mar 12 ── */}
+        {!isToday && card?.id === 'koni-late' && (
+          <>
+            <DayDivider label="Mar 12" />
+            <ChatBubble message="Hi! Quick note — Milo's leash is in the basket by the front door" time="3:42 PM" />
+            <ChatBubble message="Perfect, heading over now!" time="3:45 PM" isOwner showCheck />
+            <ChatBubble message="He loves the park on Cedar St if you have time 🐾" time="3:47 PM" />
+            <ChatBubble message="We'll definitely head there!" time="3:48 PM" isOwner showCheck />
+            <Gap h={16} />
+            <BannerBlock text="Walk started at 4:03 PM, Mar 12" link="See Rover Card" />
+            <Gap h={24} />
+            <BannerBlock text="Walk ended at 4:33 PM, Mar 12" link="See Rover Card" />
+            <Gap h={16} />
+            <ChatBubble message="Thank you! Was he a good boy?" time="5:01 PM" />
+            <ChatBubble message="He was amazing! Made a few friends at the park 🐾" time="5:04 PM" isOwner showCheck />
+            <ChatBubble message="Oh that makes me so happy, thank you!" time="5:06 PM" />
+
+            <DayDivider label="Mar 13" />
+            <ChatBubble message="Hi! Just checking in — I didn't get a Rover Card notification. Was one started?" time="10:12 AM" />
+
+            {resolution && (
+              <>
+                <DayDivider label="Today" />
+                {resolution === 'completed' && (
+                  <BannerBlock text={`Walk from ${card.dateLabel} was marked as complete on ${timestamp}.`} />
+                )}
+                {resolution === 'cancelled' && (
+                  <BannerBlock text={`Walk from ${card.dateLabel} was cancelled on ${timestamp}. A refund of ${card.cost} has been processed.`} />
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        <div ref={messagesEndRef} />
       </div>
 
       {/* ─── Composer ─── */}

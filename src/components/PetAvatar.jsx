@@ -1,4 +1,5 @@
 import React from 'react'
+import avatarImg from '../assets/avatar.png'
 
 export default function PetAvatar({ size = 48, images = [], style = {} }) {
   const count = images.length || 1
@@ -16,7 +17,7 @@ export default function PetAvatar({ size = 48, images = [], style = {} }) {
           left: count > 1 ? i * 16 : 0,
           zIndex: 5 - i, overflow: 'hidden', background: '#E8D5B7',
         }}>
-          <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <img src={src || avatarImg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         </div>
       ))}
     </div>
