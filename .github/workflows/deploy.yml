@@ -4,40 +4,60 @@ on:
   push:
     branches:
       - main
+      - new-modification
+      - ongoing-relationships
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       - run: npm install
-      - run: npm run build
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Build (main)
+        if: github.ref == 'refs/heads/main'
+        run: npm run build
+
+      - name: Build (new-modification)
+        if: github.ref == 'refs/heads/new-modification'
+        run: VITE_BASE=/prototype/new-modification/ npm run build
+
+      - name: Build (ongoing-relationships)
+        if: github.ref == 'refs/heads/ongoing-relationships'
+        run: VITE_BASE=/prototype/ongoing-relationships/ npm run build
+
+      - name: Deploy main → root
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: dist
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: .
+          keep_files: true
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/deploy-pages@v4
-        id: deployment
+      - name: Deploy new-modification → subdirectory
+        if: github.ref == 'refs/heads/new-modification'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: new-modification
+          keep_files: true
+
+      - name: Deploy ongoing-relationships → subdirectory
+        if: github.ref == 'refs/heads/ongoing-relationships'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: ongoing-relationships
+          keep_files: true
