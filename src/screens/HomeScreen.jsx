@@ -14,7 +14,7 @@ const PROMO_CARDS = [
   { bg: colors.cyan100, title: 'Share more, earn more', desc: 'Earn a $100 reward for every two customers you invite who book.', cta: 'Start Sharing', img: petImages.promo2 },
 ]
 
-export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onOpenTodaySheet, loadTime }) {
+export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onNavigateToCard, onOpenTodaySheet, loadTime }) {
   const [incompleteOpen, setIncompleteOpen] = useState(true)
 
   const visibleCards = INCOMPLETE_CARDS.filter(c => !resolvedCards[c.id])
@@ -64,6 +64,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
                       sublabel={card.sublabel}
                       rightItem={<PetAvatar size={48} images={[petImages[card.petKey]]} />}
                       firstRow
+                      onClick={() => onNavigateToCard(card)}
                     />
                     <div style={{ display: 'flex', gap: 8 }}>
                       <Button variant="flat" style={{ flex: 1 }} onClick={() => onOpenReviewSheet(card)}>Review and complete</Button>
@@ -89,6 +90,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
                   sublabel={`Today · ${walk.timeRange}`}
                   rightItem={<PetAvatar size={48} images={walk.owner.petImages} />}
                   firstRow
+                  onClick={!blocked ? onNavigateConversation : undefined}
                 />
                 <div style={{ display: 'flex', gap: 8 }}>
                   <Button variant={i === 0 ? 'primary' : 'default'} style={{ flex: 1 }} disabled={blocked} onClick={!blocked ? onNavigateConversation : undefined}>

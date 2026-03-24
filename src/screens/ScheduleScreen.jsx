@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { colors, typography, shadows, radius } from '../tokens'
 import { BackIcon } from '../assets/icons'
-import { Button, PetAvatar } from '../components'
+import { Button, PetAvatar, Chip } from '../components'
 import { PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeek } from '../data/owners'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -228,41 +228,6 @@ function TimeDropdown({ times, selectedTime, onSelect }) {
   )
 }
 
-// ── Chip ───────────────────────────────────────────────────────────────────────
-function Chip({ label, isOpen, onOpen, onRemove }) {
-  const [xHover, setXHover] = useState(false)
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 48 }}>
-      <div
-        onMouseDown={onOpen}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          background: isOpen ? '#EBF1FB' : colors.white,
-          border: `2px solid ${isOpen ? colors.link : colors.borderInteractive}`,
-          borderRadius: radius.primary, padding: '8px 12px', minWidth: 88,
-          cursor: onOpen ? 'pointer' : 'default',
-          userSelect: 'none', transition: 'border-color 0.1s, background 0.1s',
-        }}
-      >
-        <span style={{ ...tx(14, 600, colors.secondary), whiteSpace: 'nowrap' }}>{label}</span>
-        {onRemove && (
-          <button
-            onMouseDown={e => { e.stopPropagation(); onRemove() }}
-            onMouseEnter={() => setXHover(true)}
-            onMouseLeave={() => setXHover(false)}
-            style={{
-              background: xHover ? colors.bgTertiary : 'none', border: 'none',
-              padding: 2, cursor: 'pointer', display: 'flex', alignItems: 'center',
-              flexShrink: 0, borderRadius: 4, transition: 'background 0.1s',
-            }}
-          >
-            <CloseSmIcon hover={xHover} />
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
 
 // ── Day card ───────────────────────────────────────────────────────────────────
 function DayCard({ dayData, activeSlotId, onOpenDropdown, onRemoveDay, onRemoveSlot, onSelectTime }) {
@@ -316,15 +281,15 @@ function DayCard({ dayData, activeSlotId, onOpenDropdown, onRemoveDay, onRemoveS
           <Chip
             key={slot.id}
             label={slot.time}
-            isOpen={activeSlotId === slot.id}
-            onOpen={e => toggle(slot.id, e.currentTarget.getBoundingClientRect())}
+            selected={activeSlotId === slot.id}
+            onClick={e => toggle(slot.id, e.currentTarget.getBoundingClientRect())}
             onRemove={() => onRemoveSlot(slot.id)}
           />
         ))}
         <Chip
           label="Add time"
-          isOpen={activeSlotId === 'add'}
-          onOpen={e => toggle('add', e.currentTarget.getBoundingClientRect())}
+          selected={activeSlotId === 'add'}
+          onClick={e => toggle('add', e.currentTarget.getBoundingClientRect())}
         />
       </div>
 
@@ -355,7 +320,7 @@ function WeekGroup({ week, openDropdown, onOpenDropdown, onRemoveDay, onRemoveSl
             No walks this week
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0 8px' }}>
-            <Chip label="Reset to default schedule" onOpen={() => onResetWeek(week.id)} />
+            <Chip label="Reset to default schedule" onClick={() => onResetWeek(week.id)} />
           </div>
         </div>
       ) : (

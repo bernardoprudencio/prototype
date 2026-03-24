@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
-import { colors, typography, shadows, radius } from '../tokens'
+import { colors, typography, shadows } from '../tokens'
 import { petImages } from '../assets/images'
 import PetAvatar from './PetAvatar'
 import Button from './Button'
 import Row from './Row'
+import Chip from './Chip'
 
 export default function ReviewSheet({ visible, card, onClose, onComplete, onCancelRefund }) {
   const [answer, setAnswer] = useState('no')
@@ -40,31 +41,15 @@ export default function ReviewSheet({ visible, card, onClose, onComplete, onCanc
 
         {/* No / Yes toggle — Kibble Chip pattern */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {['no', 'yes'].map((opt) => {
-            const selected = answer === opt
-            return (
-              <button
-                key={opt}
-                onClick={() => setAnswer(opt)}
-                style={{
-                  minWidth: 88, padding: '10px 16px',
-                  border: `2px solid ${selected ? colors.link : colors.border}`,
-                  borderRadius: radius.primary,
-                  background: selected ? '#ECF1FB' : colors.white,
-                  fontFamily: typography.fontFamily, fontWeight: 600, fontSize: 14,
-                  color: selected ? colors.primary : colors.tertiary,
-                  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}
-              >
-                {selected && (
-                  <svg width="16" height="16" viewBox="0 0 32 32" fill={colors.link}>
-                    <path d="M26.191 4.412a1 1 0 1 1 1.618 1.176l-16 22a1 1 0 0 1-1.516.12l-6-6a1 1 0 1 1 1.414-1.415l5.173 5.172L26.19 4.412z"/>
-                  </svg>
-                )}
-                {opt.charAt(0).toUpperCase() + opt.slice(1)}
-              </button>
-            )
-          })}
+          {['no', 'yes'].map((opt) => (
+            <Chip
+              key={opt}
+              label={opt.charAt(0).toUpperCase() + opt.slice(1)}
+              selected={answer === opt}
+              checkmark
+              onClick={() => setAnswer(opt)}
+            />
+          ))}
         </div>
 
         <p style={{ fontFamily: typography.fontFamily, fontSize: 14, lineHeight: 1.5, color: colors.tertiary, margin: '0 0 20px' }}>
