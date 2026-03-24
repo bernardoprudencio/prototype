@@ -4,7 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Rover – Incomplete Cards Prototype** — An interactive React prototype for user testing the "Decrease Missed Rover Cards" UX flow. Figma source: [UX2-7159](https://www.figma.com/design/xqBd8IpIkViuhZ9BcPvnid/-UX2-7159--Decrease-missed-Rover-Cards?node-id=16783-5188).
+**Rover – Sitter Tooling Prototype** — An interactive React prototype for user-testing Rover sitter workflows, including incomplete card resolution, conversation management, and recurring schedule management. Deployed via GitHub Pages from `bernardoprudencio/prototype`.
+
+## Repo & Branches
+
+| Branch | Purpose | Live URL |
+|---|---|---|
+| `main` | Baseline prototype | https://bernardoprudencio.github.io/prototype/ |
+| `new-modification` | Active iteration — schedule modification flow + EditTemplateScreen | https://bernardoprudencio.github.io/prototype/new-modification/ |
+| `ongoing-relationships` | Separate UX exploration — ongoing sitter–owner relationships | https://bernardoprudencio.github.io/prototype/ongoing-relationships/ |
+
+Deployments trigger automatically on push via GitHub Actions (`.github/workflows/deploy.yml`). Each branch builds to its own subdirectory on the `gh-pages` branch.
+
+## Figma Source
+
+Original: [UX2-7159 – Decrease Missed Rover Cards](https://www.figma.com/design/xqBd8IpIkViuhZ9BcPvnid/-UX2-7159--Decrease-missed-Rover-Cards?node-id=16783-5188)
 
 ## Commands
 
