@@ -24,7 +24,7 @@ const CheckSmIcon = () => (
  *   onRemove   {fn}       If provided, shows an × button that calls this on press.
  *   checkmark  {boolean}  If true, shows a checkmark icon when selected (radio-style).
  */
-export default function Chip({ label, selected, onClick, onRemove, checkmark }) {
+export default function Chip({ label, selected, onClick, onRemove, checkmark, style }) {
   const [xHover, setXHover] = useState(false)
 
   return (
@@ -38,11 +38,12 @@ export default function Chip({ label, selected, onClick, onRemove, checkmark }) 
           borderRadius: radius.primary, padding: '8px 12px', minWidth: 88,
           cursor: onClick ? 'pointer' : 'default',
           userSelect: 'none', transition: 'border-color 0.1s, background 0.1s',
+          ...style,
         }}
       >
         {checkmark && selected && <CheckSmIcon />}
         <span style={{
-          fontFamily: typography.fontFamily, fontWeight: 600, fontSize: 14,
+          fontFamily: typography.fontFamily, fontWeight: 600, fontSize: 14, lineHeight: '20px',
           color: selected ? colors.primary : colors.secondary, whiteSpace: 'nowrap',
         }}>
           {label}

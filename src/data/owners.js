@@ -113,17 +113,28 @@ export const getOwnerUpcomingWeeks = (owner) => {
   firstMonday.setDate(PROTO_TODAY.getDate() + daysUntilMonday)
   firstMonday.setHours(0, 0, 0, 0)
 
+  // Group template entries by day so multiple times on the same day share one row
+  const grouped = []
+  owner.template.forEach(({ day, time }) => {
+    const existing = grouped.find(g => g.day === day)
+    if (existing) existing.times.push(time)
+    else grouped.push({ day, times: [time] })
+  })
+
   return Array.from({ length: 5 }, (_, w) => {
     const monday = new Date(firstMonday)
     monday.setDate(firstMonday.getDate() + w * 7)
-    const days = owner.template.map((entry, di) => {
+    const days = grouped.map((group, di) => {
       const date = new Date(monday)
-      date.setDate(monday.getDate() + DAY_OFFSET[entry.day])
+      date.setDate(monday.getDate() + DAY_OFFSET[group.day])
       return {
         id: `${owner.id}-w${w + 1}-d${di + 1}`,
-        day: entry.day,
+        day: group.day,
         date: fmt(date),
-        slots: [{ id: `${owner.id}-w${w + 1}-d${di + 1}-s1`, time: entry.time }],
+        slots: group.times.map((time, si) => ({
+          id: `${owner.id}-w${w + 1}-d${di + 1}-s${si + 1}`,
+          time,
+        })),
       }
     })
     return { id: `${owner.id}-w${w + 1}`, label: fmt(monday), days }

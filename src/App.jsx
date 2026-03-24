@@ -3,14 +3,22 @@ import { colors, typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen } from './screens'
-import { OWNERS } from './data/owners'
+import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen } from './screens'
+import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks } from './data/owners'
 import { petImages } from './assets/images'
 
-const getOwner = (conv) => {
-  if (!conv || conv.type === 'today') return OWNERS.owen
-  return OWNERS[conv.card?.clientKey] ?? OWNERS.owen
+const DAYS_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+
+const nextMonday = () => {
+  const d = new Date(PROTO_TODAY)
+  const daysUntil = (1 - d.getDay() + 7) % 7 || 7
+  d.setDate(d.getDate() + daysUntil + 7)
+  return d
 }
+
+// Template changes fully override upcoming weeks — regenerate from scratch
+const applyTemplateToWeeks = (newTemplate, owner) =>
+  getOwnerUpcomingWeeks({ ...owner, template: newTemplate })
 
 export default function App() {
   const [screen, setScreen]         = useState('home')
@@ -21,6 +29,23 @@ export default function App() {
   const [transition, setTransition] = useState(false)
   const [direction, setDirection]   = useState('forward')
   const loadTime = useLoadTime()
+
+  // Per-owner template overrides and persisted upcoming weeks
+  const [ownerTemplates, setOwnerTemplates]       = useState({})  // { ownerId: [{day, time}] }
+  const [ownerWeeks, setOwnerWeeks]               = useState({})  // { ownerId: weeks[] }
+  const [ownerSameSchedule, setOwnerSameSchedule] = useState({})  // { ownerId: bool }
+
+  const getEffectiveOwner = (owner) => {
+    const tpl = ownerTemplates[owner.id]
+    return tpl ? { ...owner, template: tpl } : owner
+  }
+
+  const getOwner = (conv) => {
+    const base = (!conv || conv.type === 'today')
+      ? OWNERS.owen
+      : (OWNERS[conv.card?.clientKey] ?? OWNERS.owen)
+    return getEffectiveOwner(base)
+  }
 
   const navigateTo = (target, dir = 'forward') => {
     setDirection(dir)
@@ -45,6 +70,33 @@ export default function App() {
     setReviewSheetCard(null)
     setConversation({ type: 'incomplete', card, resolution: 'cancelled', timestamp: ts })
     setTimeout(() => navigateTo('conversation', 'forward'), 200)
+  }
+
+  const handleTemplateSave = (ownerId, { selectedDays, daySchedules, sameSchedule }) => {
+    const sortedDays = [...selectedDays].sort((a, b) => DAYS_ORDER.indexOf(a) - DAYS_ORDER.indexOf(b))
+    const newTemplate = sortedDays.flatMap(day =>
+      (daySchedules[day] || []).map(time => ({ day, time }))
+    )
+
+    const owner = OWNERS[ownerId]
+    const oldTemplate = ownerTemplates[ownerId] || owner.template
+
+    // Compute diff for conversation message
+    const allDays = [...new Set([...oldTemplate.map(t => t.day), ...sortedDays])]
+    const templateChanges = allDays.flatMap(day => {
+      const oldTimes = oldTemplate.filter(t => t.day === day).map(t => t.time)
+      const newTimes = selectedDays.includes(day) ? (daySchedules[day] || []) : []
+      const removed = oldTimes.filter(t => !newTimes.includes(t))
+      const added   = newTimes.filter(t => !oldTimes.includes(t))
+      return (removed.length || added.length) ? [{ day, removed, added }] : []
+    })
+
+    const mergedWeeks = applyTemplateToWeeks(newTemplate, owner)
+
+    setOwnerTemplates(prev => ({ ...prev, [ownerId]: newTemplate }))
+    setOwnerWeeks(prev => ({ ...prev, [ownerId]: mergedWeeks }))
+    setOwnerSameSchedule(prev => ({ ...prev, [ownerId]: sameSchedule }))
+    setConversation(prev => prev ? { ...prev, templateChanges: [...(prev.templateChanges || []), templateChanges] } : prev)
   }
 
   const openIncompleteSheet = (card) => setSheetItem({
@@ -101,12 +153,30 @@ export default function App() {
         {screen === 'schedule' && (
           <ScheduleScreen
             owner={getOwner(conversation)}
+            initialWeeks={ownerWeeks[getOwner(conversation).id]}
+            onWeeksChange={(currentWeeks) => {
+              const ownerId = getOwner(conversation).id
+              setOwnerWeeks(prev => ({ ...prev, [ownerId]: currentWeeks }))
+            }}
             onBack={(savedChanges) => {
               if (savedChanges?.length) {
                 setConversation(prev => ({ ...prev, scheduleChanges: savedChanges }))
               }
               navigateTo('conversation', 'back')
             }}
+            onEditTemplate={() => navigateTo('edit-template', 'forward')}
+          />
+        )}
+        {screen === 'edit-template' && (
+          <EditTemplateScreen
+            owner={getOwner(conversation)}
+            initialSameSchedule={ownerSameSchedule[getOwner(conversation).id] ?? false}
+            startDate={nextMonday()}
+            sublabel="Changes here affect all future weeks."
+            onSave={(templateData) => {
+              handleTemplateSave(getOwner(conversation).id, templateData)
+            }}
+            onBack={() => navigateTo('schedule', 'back')}
           />
         )}
       </div>

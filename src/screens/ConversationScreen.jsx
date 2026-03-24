@@ -13,7 +13,7 @@ const DayDivider = ({ label }) => (
 const Gap = ({ h = 12 }) => <div style={{ height: h }} />
 
 export default function ConversationScreen({ onBack, onModifySchedule, conversation }) {
-  const { type, card, resolution, timestamp, scheduleChanges } = conversation || {}
+  const { type, card, resolution, timestamp, scheduleChanges, templateChanges } = conversation || {}
   const messagesEndRef = useRef(null)
   const [text, setText] = useState('')
   const [sentMessages, setSentMessages] = useState([])
@@ -159,6 +159,26 @@ export default function ConversationScreen({ onBack, onModifySchedule, conversat
             showCheck
           />
         )}
+
+        {templateChanges?.length > 0 && !scheduleChanges?.length && !resolution && <DayDivider label="Today" />}
+        {templateChanges?.map((changes, i) => (
+          <ChatBubble
+            key={i}
+            message={[
+              'I updated the weekly schedule template. Here\'s a summary:',
+              ...changes.map(c => {
+                const parts = []
+                c.removed.forEach(t => parts.push(`${c.day}: removed ${t}`))
+                c.added.forEach(t => parts.push(`${c.day}: added ${t}`))
+                if (!c.removed.length && !c.added.length) parts.push(`${c.day}: removed`)
+                return parts.join('\n')
+              }),
+            ].join('\n')}
+            time="Just now"
+            isOwner
+            showCheck
+          />
+        ))}
 
         {sentMessages.map(msg => (
           <ChatBubble key={msg.id} message={msg.text} time={msg.time} isOwner showCheck />
