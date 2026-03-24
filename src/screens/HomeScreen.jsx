@@ -3,15 +3,18 @@ import { colors, typography, shadows } from '../tokens'
 import { BellIcon, ChevronUpIcon, ChevronDownIcon, EditIcon, MoreIcon } from '../assets/icons'
 import { petImages } from '../assets/images'
 import { formatHeaderDate } from '../hooks/useDate'
-import { Button, PetAvatar, UserAvatar, TabBar, HomeCard, Row } from '../components'
+import { Button, PetAvatar, UserAvatar, TabBar, Row } from '../components'
 import { INCOMPLETE_CARDS } from '../data/bookings'
+import { getTodayWalks } from '../data/owners'
+
+const TODAY_WALKS = getTodayWalks()
 
 const PROMO_CARDS = [
   { bg: colors.yellow100, title: 'Promote your profile', desc: 'Invite new pet parents and grow your business.', cta: 'Learn how', img: petImages.promo1 },
   { bg: colors.cyan100, title: 'Share more, earn more', desc: 'Earn a $100 reward for every two customers you invite who book.', cta: 'Start Sharing', img: petImages.promo2 },
 ]
 
-export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, loadTime }) {
+export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onNavigateToCard, onOpenTodaySheet, loadTime }) {
   const [incompleteOpen, setIncompleteOpen] = useState(true)
 
   const visibleCards = INCOMPLETE_CARDS.filter(c => !resolvedCards[c.id])
@@ -61,6 +64,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
                       sublabel={card.sublabel}
                       rightItem={<PetAvatar size={48} images={[petImages[card.petKey]]} />}
                       firstRow
+                      onClick={() => onNavigateToCard(card)}
                     />
                     <div style={{ display: 'flex', gap: 8 }}>
                       <Button variant="default" style={{ flex: 1 }} onClick={() => onOpenReviewSheet(card)}>Review and complete</Button>
@@ -77,19 +81,26 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
         <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 20, lineHeight: 1.25, color: colors.primary, margin: '24px 0 8px' }}>Today</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <HomeCard
-            time="9:00 – 10:00 AM" service="Dog walking"
-            address="123 Fourth Ave, Seattle, WA" petNames="Koni, Burley"
-            petImages={[petImages.koni, petImages.burley]}
-            buttonLabel="Start Rover Card"
-            onClick={onNavigateConversation}
-          />
-          <HomeCard
-            time="5:00 PM – 5:30 PM" service="Dog walking"
-            address="123 Fourth Ave, Seattle, WA" petNames="Koni, Burley"
-            petImages={[petImages.koni, petImages.burley]}
-            buttonLabel="Start Rover Card" disabled
-          />
+          {TODAY_WALKS.map((walk, i) => {
+            const blocked = TODAY_WALKS.slice(0, i).some(w => w.owner.id === walk.owner.id)
+            return (
+              <div key={`${walk.owner.id}-${i}`} style={{ border: `1px solid ${colors.border}`, borderRadius: 8, padding: '0 16px 16px', background: colors.white }}>
+                <Row
+                  label={`Dog Walking: ${walk.owner.petNames}`}
+                  sublabel={`Today · ${walk.timeRange}`}
+                  rightItem={<PetAvatar size={48} images={walk.owner.petImages} />}
+                  firstRow
+                  onClick={!blocked ? onNavigateConversation : undefined}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button variant={i === 0 ? 'primary' : 'default'} style={{ flex: 1 }} disabled={blocked} onClick={!blocked ? onNavigateConversation : undefined}>
+                    Start Rover Card
+                  </Button>
+                  <Button variant="default" icon={<MoreIcon size={16} />} onClick={() => onOpenTodaySheet(walk)} />
+                </div>
+              </div>
+            )
+          })}
           <div style={{ background: colors.white, borderRadius: 8, boxShadow: shadows.low, padding: 20, display: 'flex', gap: 12, alignItems: 'center' }}>
             <div style={{ flexShrink: 0 }}><EditIcon /></div>
             <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 14, color: colors.primary, margin: 0, flex: 1 }}>Manage weekly care for this week</p>

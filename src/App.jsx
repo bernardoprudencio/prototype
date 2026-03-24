@@ -61,6 +61,10 @@ export default function App() {
               setConversation({ type: 'today' })
               navigateTo('conversation', 'forward')
             }}
+            onNavigateToCard={(card) => {
+              setConversation({ type: 'incomplete', card })
+              navigateTo('conversation', 'forward')
+            }}
           />
         )}
         {screen === 'conversation' && (
