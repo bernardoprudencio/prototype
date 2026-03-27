@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - new-modification
+      - incomplete-cards-user-tested
 
 permissions:
   contents: write
@@ -30,6 +31,10 @@ jobs:
         if: github.ref == 'refs/heads/new-modification'
         run: VITE_BASE=/prototype/new-modification/ npm run build
 
+      - name: Build (incomplete-cards-user-tested)
+        if: github.ref == 'refs/heads/incomplete-cards-user-tested'
+        run: VITE_BASE=/prototype/incomplete-cards-user-tested/ npm run build
+
       - name: Deploy main → root
         if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4
@@ -46,4 +51,13 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           destination_dir: new-modification
+          keep_files: true
+
+      - name: Deploy incomplete-cards-user-tested → subdirectory
+        if: github.ref == 'refs/heads/incomplete-cards-user-tested'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: incomplete-cards-user-tested
           keep_files: true
