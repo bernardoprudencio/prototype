@@ -13,7 +13,7 @@ const TABS = [
   { id: 'more',     label: 'MORE',     Icon: MoreTabIcon },
 ]
 
-export default function TabBar({ activeTab = 'home' }) {
+export default function TabBar({ activeTab = 'home', onTabChange }) {
   return (
     <div style={{
       display: 'flex', borderTop: `1px solid ${colors.border}`,
@@ -23,7 +23,7 @@ export default function TabBar({ activeTab = 'home' }) {
         const isActive = activeTab === id
         const iconColor = isActive ? colors.primary : colors.tertiary
         return (
-          <div key={id} style={{
+          <div key={id} onClick={() => onTabChange?.(id)} style={{
             flex: 1, display: 'flex', flexDirection: 'column',
             alignItems: 'center', padding: '5px 0 4px', cursor: 'pointer',
           }}>

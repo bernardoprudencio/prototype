@@ -12,7 +12,7 @@ const PROMO_CARDS = [
   { bg: colors.cyan100, title: 'Share more, earn more', desc: 'Earn a $100 reward for every two customers you invite who book.', cta: 'Start Sharing', img: petImages.promo2 },
 ]
 
-export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onNavigateToCard, onOpenTodaySheet, loadTime, ownerCurrentWeeks }) {
+export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onNavigateToCard, onOpenTodaySheet, loadTime, ownerCurrentWeeks, onTabChange }) {
   const [incompleteOpen, setIncompleteOpen] = useState(true)
 
   const todayWalks = getTodayWalks(ownerCurrentWeeks)
@@ -125,7 +125,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
         </div>
       </div>
 
-      <TabBar activeTab="home" />
+      <TabBar activeTab="home" onTabChange={onTabChange} />
     </div>
   )
 }

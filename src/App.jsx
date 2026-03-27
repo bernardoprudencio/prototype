@@ -3,7 +3,8 @@ import { colors, typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen } from './screens'
+import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, CalendarScreen, AvailabilityScreen } from './screens'
+import GoogleCalendarFlow from './screens/GoogleCalendarFlow'
 import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeekSlots, getFullCurrentWeekSlots } from './data/owners'
 import { petImages } from './assets/images'
 
@@ -36,6 +37,10 @@ export default function App() {
   const [ownerWeeks, setOwnerWeeks]               = useState({})  // { ownerId: weeks[] }
   const [ownerSameSchedule, setOwnerSameSchedule] = useState({})  // { ownerId: bool }
   const [ownerCurrentWeeks, setOwnerCurrentWeeks] = useState({})  // { ownerId: days[] }
+
+  const [gcalFlow, setGcalFlow]         = useState(null)   // null | 'sheet' | 'oauth' | 'picker' | 'success'
+  const [gcalConnected, setGcalConnected] = useState(false)
+  const [gcalCalendar, setGcalCalendar]   = useState('Personal')
 
   const getEffectiveOwner = (owner) => {
     const tpl = ownerTemplates[owner.id]
@@ -169,6 +174,22 @@ export default function App() {
               setConversation({ type: 'incomplete', card })
               navigateTo('conversation', 'forward')
             }}
+            onTabChange={(tab) => { if (tab === 'calendar') navigateTo('calendar', 'forward') }}
+          />
+        )}
+        {screen === 'calendar' && (
+          <CalendarScreen
+            onTabChange={(tab) => { if (tab === 'home') navigateTo('home', 'back') }}
+            onOpenAvailability={() => navigateTo('availability', 'forward')}
+          />
+        )}
+        {screen === 'availability' && (
+          <AvailabilityScreen
+            onBack={() => goBack()}
+            onGoogleCalendar={() => setGcalFlow('sheet')}
+            gcalConnected={gcalConnected}
+            gcalCalendar={gcalCalendar}
+            onDisconnect={() => { setGcalConnected(false); setGcalCalendar('Personal') }}
           />
         )}
         {screen === 'conversation' && (
@@ -261,6 +282,14 @@ export default function App() {
         onClose={() => setReviewSheetCard(null)}
         onComplete={() => handleComplete(reviewSheetCard)}
         onCancelRefund={() => handleCancelRefund(reviewSheetCard)}
+      />
+
+      <GoogleCalendarFlow
+        step={gcalFlow}
+        selectedCalendar={gcalCalendar}
+        onSelectCalendar={setGcalCalendar}
+        onDismiss={(nextStep) => setGcalFlow(nextStep)}
+        onComplete={() => { setGcalConnected(true); setGcalFlow(null) }}
       />
     </div>
   )
