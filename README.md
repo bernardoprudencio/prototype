@@ -47,3 +47,11 @@ src/
 ## Design Source
 
 [Figma – UX2-7159 Decrease Missed Rover Cards](https://www.figma.com/design/xqBd8IpIkViuhZ9BcPvnid/-UX2-7159--Decrease-missed-Rover-Cards?node-id=16783-5188)
+
+## Documentation
+
+[Confluence – Design explorations Q2 2026 initiatives (Help sitters get paid on time – M1)](https://roverdotcom.atlassian.net/wiki/spaces/PSD/pages/5686886688/Design+explorations+Q2+2026+initiatives#Recurring-%C2%B7-Help-sitters-get-paid-on-time-m1-ready-for-user-testing)
+
+## User Testing
+
+[Confluence – User Testing Results: M1 Incomplete Cards](https://roverdotcom.atlassian.net/wiki/spaces/PSD/pages/5896012309/User+testing+Results+-+M1+incomplete+cards)
