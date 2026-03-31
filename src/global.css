@@ -121,6 +121,10 @@ img {
 }
 
 /* ─── Animations ─── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes slideUp {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }

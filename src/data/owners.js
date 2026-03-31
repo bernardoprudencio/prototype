@@ -1,6 +1,6 @@
 import { peopleImages, petImages } from '../assets/images'
 
-export const PROTO_TODAY = new Date(2026, 2, 20) // Friday, Mar 20, 2026
+export const PROTO_TODAY = new Date()
 
 const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const DAY_NAMES    = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
@@ -109,7 +109,49 @@ export const getOwnerRelUnit = (owner, petIds = []) => {
     everyNWeeks: 1,
     skippedKeys: [],
     overrides: {},
+    cost: 20,
   }
+}
+
+// ── Incomplete cards ──────────────────────────────────────────────────────────
+
+// Last occurrence of last week for each owner — drives both Home dash and Schedule screen
+export const getIncompleteCards = () => {
+  const dow = PROTO_TODAY.getDay()
+  const thisMonday = new Date(PROTO_TODAY)
+  thisMonday.setDate(PROTO_TODAY.getDate() - (dow === 0 ? 6 : dow - 1))
+  thisMonday.setHours(0, 0, 0, 0)
+  const lastMonday = new Date(thisMonday)
+  lastMonday.setDate(thisMonday.getDate() - 7)
+
+  return Object.values(OWNERS).flatMap(owner => {
+    const lastWeekOccs = owner.template
+      .map(t => {
+        const date = new Date(lastMonday)
+        date.setDate(lastMonday.getDate() + DAY_OFFSET[t.day])
+        date.setHours(0, 0, 0, 0)
+        return { ...t, date }
+      })
+      .filter(t => t.date >= lastMonday && t.date < thisMonday)
+      .sort((a, b) => a.date - b.date)
+
+    if (!lastWeekOccs.length) return []
+    const last = lastWeekOccs[lastWeekOccs.length - 1]
+    const dateStr = fmt(last.date)
+    const petKey = owner.petNames.split(',')[0].trim().toLowerCase()
+
+    return [{
+      id:        `${owner.id}-incomplete`,
+      label:     `Dog Walking: ${owner.petNames}`,
+      sublabel:  `${dateStr} · ${formatTimeRange(last.time, owner.serviceDuration)}`,
+      dateLabel: `${dateStr} at ${last.time}`,
+      client:    owner.name,
+      clientKey: owner.id,
+      petKey,
+      petImgs:   owner.petImages,
+      cost:      '$20.00',
+    }]
+  })
 }
 
 // ── Derived helpers ────────────────────────────────────────────────────────────

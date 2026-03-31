@@ -1,7 +1,7 @@
 import React from 'react'
 import { colors, typography } from '../tokens'
 
-export default function Row({ label, sublabel, leftItem, rightItem, onClick, firstRow = false }) {
+export default function Row({ label, sublabel, sublabel2, leftItem, rightItem, onClick, firstRow = false }) {
   return (
     <div
       onClick={onClick}
@@ -29,6 +29,12 @@ export default function Row({ label, sublabel, leftItem, rightItem, onClick, fir
               fontFamily: typography.fontFamily, fontSize: 14,
               lineHeight: 1.25, color: colors.tertiary, margin: 0,
             }}>{sublabel}</p>
+          )}
+          {sublabel2 && (
+            <p style={{
+              fontFamily: typography.fontFamily, fontSize: 14,
+              lineHeight: 1.25, color: colors.tertiary, margin: 0,
+            }}>{sublabel2}</p>
           )}
         </div>
       </div>

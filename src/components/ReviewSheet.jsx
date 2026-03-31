@@ -31,7 +31,7 @@ export default function ReviewSheet({ visible, card, onClose, onComplete, onCanc
         <Row
           label={card.label}
           sublabel={card.sublabel}
-          rightItem={<PetAvatar size={48} images={[petImages[card.petKey]]} />}
+          rightItem={<PetAvatar size={48} images={card.images || [petImages[card.petKey]]} />}
           firstRow
         />
 

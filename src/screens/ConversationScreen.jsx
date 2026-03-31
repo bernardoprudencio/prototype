@@ -34,9 +34,9 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
   const clientName = isToday ? 'Owen O.' : card?.client
   const clientImg  = isToday ? peopleImages.owen : peopleImages[card?.clientKey] ?? peopleImages.owen
 
-  const conversationPets = isToday
+  const conversationPets = isToday || card?.clientKey === 'owen'
     ? [{ id: 1, name: 'Koni', emoji: '🐕', img: petImages.koni }, { id: 2, name: 'Burley', emoji: '🐕', img: petImages.burley }]
-    : card?.id === 'archie'
+    : card?.clientKey === 'james'
       ? [{ id: 1, name: 'Archie', emoji: '🐕', img: petImages.archie }]
       : [{ id: 1, name: 'Milo', emoji: '🐕', img: petImages.milo }]
 
@@ -93,7 +93,7 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
       {tab === 'messages' && <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>
 
         {/* ── Owen · Koni & Burley · Today's walk ── */}
-        {isToday && (
+        {(isToday || card?.clientKey === 'owen') && (
           <>
             <DayDivider label="Yesterday" />
             <ChatBubble message="Hey! Are we still on for tomorrow at 9?" time="4:32 PM" />
@@ -116,7 +116,7 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
         )}
 
         {/* ── James · Archie · Yesterday's missed walk ── */}
-        {!isToday && card?.id === 'archie' && (
+        {!isToday && card?.clientKey === 'james' && (
           <>
             <DayDivider label="Yesterday" />
             <ChatBubble message="Hey! Are you still on for noon today?" time="11:30 AM" />
@@ -136,7 +136,7 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
         )}
 
         {/* ── Sarah · Milo · Overdue walk from Mar 12 ── */}
-        {!isToday && card?.id === 'koni-late' && (
+        {!isToday && card?.clientKey === 'sarah' && (
           <>
             <DayDivider label="Mar 12" />
             <ChatBubble message="Hi! Quick note — Milo's leash is in the basket by the front door" time="3:42 PM" />

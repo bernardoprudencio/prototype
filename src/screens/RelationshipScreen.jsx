@@ -1,9 +1,11 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { PROTO_TODAY } from '../data/owners'
 import { colors, typography } from '../tokens'
 import Button from '../components/Button'
 import Row from '../components/Row'
 import PetAvatar from '../components/PetAvatar'
-import { ChevronRightIcon } from '../assets/icons'
+import { CancelIcon, ChevronRightIcon, DropdownIcon, MoreIcon } from '../assets/icons'
+import ReviewSheet from '../components/ReviewSheet'
 import boardingIcon   from '../assets/boarding.svg'
 import sittingIcon    from '../assets/sitting.svg'
 import daycareIcon    from '../assets/daycare.svg'
@@ -76,7 +78,24 @@ function isToday(d)    { const t=new Date(); return d.getFullYear()===t.getFullY
 function isYesterday(d){ const y=addDays(new Date(new Date().setHours(0,0,0,0)),-1); return d.getFullYear()===y.getFullYear()&&d.getMonth()===y.getMonth()&&d.getDate()===y.getDate() }
 function fmtRelDate(d) { if(isToday(d))return"Today"; if(isYesterday(d))return"Yesterday"; return fmtDate(d) }
 function isPast(d)     { return d<new Date(new Date().setHours(0,0,0,0)) }
+function ruleLabel(unit){
+  if(unit.frequency==="once") return"Doesn't repeat"
+  const DAY_NAMES_FULL=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+  const dayStr=(unit.weekDays||[]).length>0?" on "+(unit.weekDays.slice().sort((a,b)=>a-b).map(d=>DAY_NAMES_FULL[d]).join(" and ")):""
+  if(unit.frequency==="weekly") return unit.everyNWeeks>1?`Every ${unit.everyNWeeks} weeks${dayStr}`:`Weekly${dayStr}`
+  if(unit.frequency==="monthly") return`Monthly${dayStr}`
+  return""
+}
 function durLabel(svc,mins){ const opts=(svc&&svc.id==="doggy_daycare")?DURATION_DAYCARE:DURATION_SHORT; const f=opts.find(d=>d.mins===mins); return f?f.label:(mins+"min") }
+function shortRuleLabel(unit){
+  if(unit.frequency==="once") return"Doesn't repeat"
+  const SHORT=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+  const days=(unit.weekDays||[]).slice().sort((a,b)=>a-b).map(d=>SHORT[d])
+  const dayStr=days.length===0?"":days.length===1?days[0]:days.slice(0,-1).join(", ")+" and "+days[days.length-1]
+  if(unit.frequency==="weekly") return unit.everyNWeeks>1?`Every ${unit.everyNWeeks} weeks${dayStr?" on "+dayStr:""}`:dayStr
+  if(unit.frequency==="monthly") return`Monthly${dayStr?" on "+dayStr:""}`
+  return""
+}
 
 // ─── Billing helpers ──────────────────────────────────────────────────────────
 function getWeekMonday(d){ const r=new Date(d); r.setHours(0,0,0,0); const day=r.getDay(); const diff=day===0?-6:1-day; r.setDate(r.getDate()+diff); return r }
@@ -89,7 +108,7 @@ let _nextId=100
 function newId(){ return ++_nextId }
 function defaultUnit(serviceId, overrides={}){
   const svc=SERVICES.find(s=>s.id===serviceId)
-  return { id:newId(), serviceId, startDate:"", endDate:"", repeatEndDate:"", startTime:"09:00", durationMins:(svc&&svc.id)==="doggy_daycare"?480:60, petIds:[], frequency:"once", weekDays:[], everyNWeeks:1, skippedKeys:[], overrides:{}, ...overrides }
+  return { id:newId(), serviceId, startDate:"", endDate:"", repeatEndDate:"", startTime:"09:00", durationMins:(svc&&svc.id)==="doggy_daycare"?480:60, petIds:[], frequency:"once", weekDays:[], everyNWeeks:1, skippedKeys:[], overrides:{}, cost:20, ...overrides }
 }
 function cloneUnit(u, newServiceId){
   const targetId=newServiceId||u.serviceId
@@ -103,9 +122,11 @@ function cloneUnit(u, newServiceId){
 function overlaps(units,u){
   const svc=SERVICES.find(s=>s.id===u.serviceId)
   if(!svc||!u.startDate) return false
+  const uOccs=expandUnit(u)
   return units.filter(x=>{ if(x.id===u.id) return false; const xSvc=SERVICES.find(s=>s.id===x.serviceId); return xSvc?.type===svc.type }).some(x=>{
     if(!x.startDate) return false
-    return u.startDate<=( x.endDate||x.startDate)&&(u.endDate||u.startDate)>=x.startDate
+    const xOccs=expandUnit(x)
+    return uOccs.some(uo=>xOccs.some(xo=>dateKey(uo.start)===dateKey(xo.start)&&uo.unit.startTime===xo.unit.startTime))
   })
 }
 function overnightCanRepeat(u){ const svc=SERVICES.find(s=>s.id===u.serviceId); if((svc&&svc.type)!=="overnight") return true; return nightCount(u)<7 }
@@ -140,7 +161,7 @@ function expandUnit(unit){
 
 // ─── Build agenda ─────────────────────────────────────────────────────────────
 function buildAgenda(units,relEndDate){
-  let all=units.flatMap(u=>expandUnit(u))
+  let all=units.flatMap(u=>expandUnit(u)).filter(o=>!o.skipped)
   if(relEndDate){ const cap=parseDate(relEndDate); all=all.filter(o=>o.start<=cap) }
   all.sort((a,b)=>a.start-b.start)
   const byDay={}
@@ -203,10 +224,9 @@ function CalInput({value, onChange, minDate, placeholder}){
   const label=sel?fmtDateLong(sel):(placeholder||"Select date…")
   return(
     <div ref={ref} style={{position:"relative"}}>
-      <button onClick={handleToggle} style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${open?R.blue:R.border}`,borderRadius:8,fontSize:13,fontFamily,color:sel?R.navy:R.grayLight,background:"#fff",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,boxSizing:"border-box"}}>
-        <span style={{fontSize:14}}>📅</span>
-        <span style={{flex:1,fontWeight:sel?600:400}}>{label}</span>
-        <span style={{color:R.grayLight,fontSize:10}}>{open?"▲":"▼"}</span>
+      <button onClick={handleToggle} style={{width:"100%",padding:"12px 8px 12px 12px",border:`2px solid ${open?R.blue:"#C9CFD4"}`,borderRadius:4,fontSize:16,fontFamily,color:sel?R.navy:R.grayLight,background:"#fff",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",minHeight:48,boxSizing:"border-box"}}>
+        <span style={{flex:1,fontWeight:400,lineHeight:1.5}}>{label}</span>
+        <DropdownIcon/>
       </button>
       {open&&(
         <div style={{position:"absolute",top:"calc(100% + 6px)",left:alignRight?"auto":0,right:alignRight?0:"auto",zIndex:900,background:"#fff",borderRadius:8,boxShadow:"0 8px 32px rgba(0,0,0,0.15)",border:`1.5px solid ${R.border}`,width:276,padding:"14px 12px"}}>
@@ -252,10 +272,9 @@ function TimeInput({value, onChange, placeholder}){
   const fH=h=>`${h%12||12} ${h>=12?"PM":"AM"}`
   return(
     <div ref={ref} style={{position:"relative"}}>
-      <button onClick={()=>setOpen(!open)} style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${open?R.blue:R.border}`,borderRadius:8,fontSize:13,fontFamily,color:value?R.navy:R.grayLight,background:"#fff",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,boxSizing:"border-box"}}>
-        <span style={{fontSize:14}}>🕐</span>
-        <span style={{flex:1,fontWeight:value?600:400}}>{value?fmtTime(value):(placeholder||"Select time…")}</span>
-        <span style={{color:R.grayLight,fontSize:10}}>{open?"▲":"▼"}</span>
+      <button onClick={()=>setOpen(!open)} style={{width:"100%",padding:"12px 8px 12px 12px",border:`2px solid ${open?R.blue:"#C9CFD4"}`,borderRadius:4,fontSize:16,fontFamily,color:value?R.navy:R.grayLight,background:"#fff",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",minHeight:48,boxSizing:"border-box"}}>
+        <span style={{flex:1,fontWeight:400,lineHeight:1.5}}>{value?fmtTime(value):(placeholder||"Select time…")}</span>
+        <DropdownIcon/>
       </button>
       {open&&(
         <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,zIndex:900,background:"#fff",borderRadius:8,boxShadow:"0 8px 32px rgba(0,0,0,0.15)",border:`1.5px solid ${R.border}`,width:240,padding:"12px"}}>
@@ -362,7 +381,7 @@ function PetPanel({pets, setPets, selectedIds, setSelectedIds, unitList, setUnit
 }
 
 // ─── Unit editor ─────────────────────────────────────────────────────────────
-function UnitEditor({unit, onChange, onRemove, onDuplicate, allUnits, allPets, showRemove=true, showChangeType=false, onChangeType}){
+function UnitEditor({unit, onChange, onRemove, onDuplicate, allUnits, allPets, showRemove=true, showChangeType=false, onChangeType, simplified=false, timeOnly=false}){
   const svc=SERVICES.find(s=>s.id===unit.serviceId)
   const overnight=(svc&&svc.type)==="overnight"
   const isDaycare=(svc&&svc.id)==="doggy_daycare"
@@ -374,6 +393,16 @@ function UnitEditor({unit, onChange, onRemove, onDuplicate, allUnits, allPets, s
   const pets=allPets||PETS_SEED
   const togglePet=id=>{ const ids=unit.petIds.includes(id)?unit.petIds.filter(i=>i!==id):[...unit.petIds,id]; if(ids.length) onChange({...unit,petIds:ids,petOverride:true}) }
   const toggleWeekDay=d=>{ const days=unit.weekDays||[]; onChange({...unit,weekDays:days.includes(d)?days.filter(x=>x!==d):[...days,d]}) }
+  if(timeOnly) return(
+    <div style={{marginBottom:12}}>
+      <div style={{marginBottom:20}}>
+        <label style={labelSt}>Start time</label>
+        <TimeInput value={unit.startTime} onChange={v=>onChange({...unit,startTime:v})} placeholder="Select time…"/>
+        {unit.startTime&&unit.durationMins&&<div style={{fontSize:14,color:R.gray,marginTop:4,lineHeight:1.5}}>Ends at {fmtTime(endTimeFromDuration(unit.startTime,unit.durationMins))}</div>}
+      </div>
+    </div>
+  )
+
   return(
     <div style={{marginBottom:12}}>
       {conflict&&<div style={{fontSize:12,background:R.redLight,color:R.red,fontWeight:600,padding:"8px 12px",borderRadius:8,marginBottom:10}}>⚠ Conflict with another service</div>}
@@ -383,14 +412,14 @@ function UnitEditor({unit, onChange, onRemove, onDuplicate, allUnits, allPets, s
           <div><label style={labelSt}>Check-out</label><CalInput value={unit.endDate} onChange={v=>onChange({...unit,endDate:v})} minDate={unit.startDate} placeholder="Check-out date"/></div>
         </div>
       ):(
-        <div style={{marginBottom:14}}>
-          <div style={{marginBottom:10}}><label style={labelSt}>Date</label><CalInput value={unit.startDate} onChange={v=>{ const updated={...unit,startDate:v}; if(isWeekly) updated.weekDays=[parseDate(v).getDay()]; onChange(updated) }} placeholder="Select date"/></div>
+        <div style={{marginBottom:20}}>
+          <div style={{marginBottom:20}}><label style={labelSt}>Date</label><CalInput value={unit.startDate} onChange={v=>{ const updated={...unit,startDate:v}; if(isWeekly) updated.weekDays=[parseDate(v).getDay()]; onChange(updated) }} placeholder="Select date"/></div>
           <div><label style={labelSt}>Start time</label><TimeInput value={unit.startTime} onChange={v=>onChange({...unit,startTime:v})} placeholder="Select time"/>
-            {unit.startTime&&unit.durationMins&&<div style={{fontSize:11,color:R.gray,marginTop:4}}>Ends at {fmtTime(endTimeFromDuration(unit.startTime,unit.durationMins))}</div>}
+            {unit.startTime&&unit.durationMins&&<div style={{fontSize:14,color:R.gray,marginTop:4,lineHeight:1.5}}>Ends at {fmtTime(endTimeFromDuration(unit.startTime,unit.durationMins))}</div>}
           </div>
         </div>
       )}
-      {!overnight&&(
+      {!overnight&&!simplified&&(
         <div style={{marginBottom:12}}>
           <label style={labelSt}>{isDaycare?"Hours":"Duration"}</label>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -398,7 +427,7 @@ function UnitEditor({unit, onChange, onRemove, onDuplicate, allUnits, allPets, s
           </div>
         </div>
       )}
-      <div style={{marginBottom:isWeekly&&!overnight?0:12}}>
+      {!simplified&&<div style={{marginBottom:isWeekly&&!overnight?0:12}}>
         <label style={labelSt}>Frequency</label>
         {overnight?(
           canRepeat?(
@@ -416,7 +445,7 @@ function UnitEditor({unit, onChange, onRemove, onDuplicate, allUnits, allPets, s
             {FREQ.map(f=><Chip key={f.id} label={f.label} active={unit.frequency===f.id} onClick={()=>{ const wd=f.id==="weekly"?((unit.weekDays&&unit.weekDays.length)>0?unit.weekDays:[unit.startDate?parseDate(unit.startDate).getDay():new Date().getDay()]):[]; onChange({...unit,frequency:f.id,repeatEndDate:f.id==="once"?"":unit.repeatEndDate,weekDays:wd,everyNWeeks:unit.everyNWeeks||1}) }}/>)}
           </div>
         )}
-      </div>
+      </div>}
       {isWeekly&&overnight&&(
         <div style={{background:R.bg,borderRadius:10,padding:"12px 14px",margin:"10px 0 12px",border:`1px solid ${R.border}`}}>
           <label style={{...labelSt,marginBottom:7}}>Every</label>
@@ -425,7 +454,23 @@ function UnitEditor({unit, onChange, onRemove, onDuplicate, allUnits, allPets, s
           </div>
         </div>
       )}
-      {isWeekly&&!overnight&&(
+      {isWeekly&&!overnight&&simplified&&(
+        <div style={{marginBottom:14}}>
+          <label style={labelSt}>Repeats on</label>
+          <div style={{display:"flex",gap:8}}>
+            {["M","T","W","T","F","S","S"].map((d,i)=>{
+              const jsDay=[1,2,3,4,5,6,0][i]
+              const active=(unit.weekDays||[]).includes(jsDay)
+              return(
+                <button key={i} onClick={()=>toggleWeekDay(jsDay)} style={{flex:1,minHeight:40,border:`2px solid ${active?"#2E67D1":"#C9CFD4"}`,borderRadius:8,background:active?"#ECF1FB":"#fff",color:R.navy,fontSize:16,fontFamily,fontWeight:400,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:"8px 12px",boxSizing:"border-box"}}>
+                  {d}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+      {isWeekly&&!overnight&&!simplified&&(
         <div style={{background:R.bg,borderRadius:10,padding:"12px 14px",margin:"10px 0 12px",border:`1px solid ${R.border}`}}>
           <div style={{marginBottom:10}}>
             <label style={{...labelSt,marginBottom:7}}>Repeat on</label>
@@ -446,18 +491,18 @@ function UnitEditor({unit, onChange, onRemove, onDuplicate, allUnits, allPets, s
           </div>
         </div>
       )}
-      {repeats&&(
+      {!simplified&&repeats&&(
         <div style={{marginBottom:12,background:R.bg,borderRadius:8,padding:"10px 12px",border:`1px solid ${R.border}`}}>
           <label style={{...labelSt,marginBottom:5}}>Series ends <span style={{fontWeight:400,color:R.gray}}>(optional)</span></label>
           <CalInput value={unit.repeatEndDate||""} onChange={v=>onChange({...unit,repeatEndDate:v})} minDate={unit.startDate} placeholder="No end date"/>
           <div style={{fontSize:11,color:R.gray,marginTop:5}}>{unit.repeatEndDate?`Stops after ${fmtDate(parseDate(unit.repeatEndDate))}`:"No end — continues until relationship ends"}</div>
         </div>
       )}
-      <div>
+      {!simplified&&<div>
         <label style={labelSt}>For which pets?</label>
         <PetSelector pets={pets} selectedIds={unit.petIds} onChange={ids=>onChange({...unit,petIds:ids,petOverride:true})}/>
         {unit.petOverride&&<div style={{fontSize:10,color:R.gray,marginTop:5}}>Custom pet selection</div>}
-      </div>
+      </div>}
     </div>
   )
 }
@@ -467,7 +512,7 @@ function ChangeTypeSheet({unit, onConfirm, onClose}){
   const [targetId,setTargetId]=useState(unit.serviceId)
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(10,18,30,0.5)",zIndex:400,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:R.bg,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,maxHeight:"80vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:R.bg,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:"100%",maxHeight:"80vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
         <div style={{background:"#fff",padding:"18px 20px 14px",borderRadius:"20px 20px 0 0",borderBottom:`1px solid ${R.border}`,position:"sticky",top:0}}>
           <div style={{width:36,height:4,borderRadius:99,background:R.border,margin:"0 auto 14px"}}/>
           <h3 style={{margin:0,fontSize:17,fontWeight:600,color:R.navy,fontFamily}}>Change service type</h3>
@@ -492,67 +537,58 @@ function ChangeTypeSheet({unit, onConfirm, onClose}){
 }
 
 // ─── Add-service sheet ────────────────────────────────────────────────────────
-function AddSheet({onAdd, onClose, existing, allPets}){
-  const [step,setStep]=useState("pick")
-  const [svc,setSvc]=useState(null)
-  const [unit,setUnit]=useState(null)
-  const conflict=unit?overlaps(existing,unit):false
-  const canAdd=unit&&unit.startDate&&!conflict&&unit.petIds.length>0
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(10,18,30,0.5)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:R.white,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
-        <div style={{background:R.white,padding:"18px 16px 8px",borderRadius:"20px 20px 0 0",position:"sticky",top:0,zIndex:1}}>
-          <div style={{width:36,height:4,borderRadius:99,background:R.border,margin:"0 auto 24px"}}/>
-          <h3 style={{margin:0,fontSize:18,fontWeight:600,color:R.navy,fontFamily}}>{step==="pick"?"Add a service":`${svc&&svc.label}`}</h3>
-        </div>
-        <div style={{padding:"8px 16px 36px"}}>
-          {step==="pick"&&SERVICES.map(s=>(
-            <Row
-              key={s.id}
-              label={s.label}
-              sublabel={s.desc}
-              leftItem={SERVICE_ICONS[s.id]}
-              rightItem={<ChevronRightIcon />}
-              onClick={()=>{setSvc(s);setUnit(defaultUnit(s.id,{petIds:(allPets||PETS_SEED).map(p=>p.id)}));setStep("configure")}}
-            />
-          ))}
-          {step==="configure"&&unit&&<>
-            <UnitEditor unit={unit} onChange={setUnit} onRemove={onClose} allUnits={existing} allPets={allPets} showRemove={false}/>
-            <Button variant="primary" size="small" fullWidth disabled={!canAdd} onClick={()=>canAdd&&onAdd(unit)}>
-              {conflict?"Fix conflict first":!unit.startDate?"Set a date to continue":"Add to request"}
-            </Button>
-            <Button variant="default" size="small" fullWidth onClick={()=>{setStep("pick");setSvc(null);setUnit(null)}} style={{marginTop:12}}>Go back</Button>
-          </>}
-        </div>
-      </div>
-    </div>
-  )
-}
+function AddSheet({onAdd, onClose, existing, allPets, defaultServiceId}){
+  const initialSvc=defaultServiceId?SERVICES.find(s=>s.id===defaultServiceId):null
+  const pets=allPets||PETS_SEED
+  const makeInitUnit=(svcObj)=>{
+    const today=new Date()
+    return {...defaultUnit(svcObj.id,{petIds:pets.map(p=>p.id)}),frequency:"weekly",weekDays:[today.getDay()],startDate:dateKey(today)}
+  }
+  const [addView,setAddView]=useState(initialSvc?"form":"pick")
+  const [svc,setSvc]=useState(initialSvc)
+  const [unit,setUnit]=useState(initialSvc?makeInitUnit(initialSvc):null)
+  const [scopeChoice,setScopeChoice]=useState("this")
 
-// ─── Occurrence action sheet ──────────────────────────────────────────────────
-function OccActionSheet({occ, allUnits, allPets, onSaveUnit, onSkip, onOverride, onOverrideFromDate, onCancel, onClose}){
-  const [view,setView]=useState("actions")
-  const [draft,setDraft]=useState({...occ.unit})
-  const isRecurring=(occ.parentUnit||occ.unit).frequency!=="once"
-  const overnight=occ.svc.type==="overnight"
-  const endT=!overnight?endTimeFromDuration(occ.unit.startTime,occ.unit.durationMins):null
-  const occPets=allPets.filter(p=>occ.unit.petIds.includes(p.id))
-  const dateLabel=overnight
-    ?`${fmtDate(occ.start)} to ${fmtDate(occ.end)} · ${occ.totalNights||nightCount(occ.unit)} night${(occ.totalNights||nightCount(occ.unit))!==1?"s":""}`
-    :`${fmtRelDate(occ.start)} · ${fmtTime(occ.unit.startTime)} to ${fmtTime(endT)}`
+  const handleUnitChange=(updated)=>{
+    // If weekDays changed to a single day that doesn't match the current startDate's day,
+    // advance startDate to the next occurrence of that day (today if it matches, else next week)
+    const prev=unit
+    const prevDays=(prev?.weekDays||[]).slice().sort((a,b)=>a-b).join(",")
+    const nextDays=(updated.weekDays||[]).slice().sort((a,b)=>a-b).join(",")
+    if(prevDays!==nextDays&&(updated.weekDays||[]).length===1&&updated.startDate){
+      const targetDow=updated.weekDays[0]
+      const base=parseDate(updated.startDate)
+      const diff=((targetDow-base.getDay())+7)%7
+      if(diff!==0){
+        updated={...updated,startDate:dateKey(addDays(base,diff))}
+      }
+    }
+    setUnit(updated)
+  }
 
-  const headerRow=(
-    <Row
-      label={`${occ.svc.label}${occPets.length>0?`: ${occPets.map(p=>p.name).join(", ")}`:""}` }
-      sublabel={dateLabel}
-      rightItem={<PetAvatar size={48} images={occPets.map(p=>p.img)}/>}
-      firstRow
-    />
-  )
+  const draftDate=unit?.startDate?parseDate(unit.startDate):null
+  const draftEndT=unit?.startTime&&unit?.durationMins?endTimeFromDuration(unit.startTime,unit.durationMins):null
+  const dateTimeLabel=draftDate&&unit?.startTime
+    ?`${fmtDate(draftDate)} · ${fmtTime(unit.startTime)} to ${fmtTime(draftEndT)}`
+    :draftDate?fmtDate(draftDate):"Today — default"
+  const isCurrWeek=draftDate?dateKey(getWeekMonday(draftDate))===dateKey(getWeekMonday(PROTO_TODAY)):false
+  const isMultiDay=(unit?.weekDays||[]).length>1
+  const cost=unit?.cost||20
+  const svcName=svc?shortSvcName(svc):""
+  const currWeekSunday=draftDate?getWeekSunday(getWeekMonday(PROTO_TODAY)):null
+  const currWeekOccs=unit&&draftDate?expandUnit({...unit,frequency:"weekly"}).filter(o=>o.start>=draftDate&&currWeekSunday&&o.start<=currWeekSunday).length:0
+  const currWeekTotal=currWeekOccs*cost
+
+  const handleSave=()=>{
+    if(!unit?.startDate) return
+    if(isCurrWeek){ setAddView("chargeConfirm") }
+    else if(isMultiDay){ onAdd({...unit,frequency:"weekly"}); onClose() }
+    else { setScopeChoice("this"); setAddView("scopePicker") }
+  }
 
   const simpleSheet=(content)=>(
-    <div style={{position:"fixed",inset:0,background:"rgba(10,18,30,0.5)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"8px 8px 0 0",width:"100%",maxWidth:480,boxShadow:"0 -8px 40px rgba(0,0,0,0.18)",padding:"0 16px 24px"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,18,30,0.5)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"8px 8px 0 0",width:"100%",maxWidth:"100%",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)",padding:"0 16px 24px"}}>
         <div style={{display:"flex",justifyContent:"center",paddingTop:8,marginBottom:24}}>
           <div style={{width:36,height:5,borderRadius:35,background:R.border}}/>
         </div>
@@ -561,79 +597,222 @@ function OccActionSheet({occ, allUnits, allPets, onSaveUnit, onSkip, onOverride,
     </div>
   )
 
-  const scopeRow=(label,sublabel,onClick,danger)=>(
-    <div onClick={onClick} style={{display:"flex",alignItems:"center",gap:12,minHeight:56,paddingTop:8,paddingBottom:8,cursor:"pointer"}}>
+  const sheetHeader=(label,sublabel)=>(
+    <Row label={label} sublabel={sublabel} rightItem={<PetAvatar size={48} images={pets.map(p=>p.img)}/>} firstRow/>
+  )
+
+  const radioRow=(label,value)=>(
+    <div onClick={()=>setScopeChoice(value)} style={{display:"flex",alignItems:"center",gap:8,minHeight:56,paddingTop:8,paddingBottom:8,cursor:"pointer"}}>
       <div style={{flex:1,minWidth:0}}>
-        <p style={{fontFamily,fontWeight:700,fontSize:16,color:danger?R.red:R.navy,margin:0,lineHeight:1.5}}>{label}</p>
-        <p style={{fontFamily,fontSize:14,color:R.gray,margin:0,lineHeight:1.25}}>{sublabel}</p>
+        <p style={{fontFamily,fontWeight:400,fontSize:16,color:R.navy,margin:0,lineHeight:1.5}}>{label}</p>
       </div>
-      <ChevronRightIcon/>
+      <div style={{width:20,height:20,borderRadius:"50%",border:`2px solid ${scopeChoice===value?"#2E67D1":"#C9CFD4"}`,background:"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {scopeChoice===value&&<div style={{width:10,height:10,borderRadius:"50%",background:"#2E67D1"}}/>}
+      </div>
     </div>
   )
 
-  const handleCancelFromDate=()=>{
+  // ── Pick service ──
+  if(addView==="pick") return(
+    <div style={{position:"fixed",inset:0,background:"rgba(10,18,30,0.5)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:R.white,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:"100%",maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+        <div style={{background:R.white,padding:"18px 16px 8px",borderRadius:"20px 20px 0 0",position:"sticky",top:0,zIndex:1}}>
+          <div style={{width:36,height:4,borderRadius:99,background:R.border,margin:"0 auto 24px"}}/>
+          <h3 style={{margin:0,fontSize:18,fontWeight:600,color:R.navy,fontFamily}}>Add a service</h3>
+        </div>
+        <div style={{padding:"8px 16px 36px"}}>
+          {SERVICES.map(s=>(
+            <Row key={s.id} label={s.label} sublabel={s.desc} leftItem={SERVICE_ICONS[s.id]} rightItem={<ChevronRightIcon/>}
+              onClick={()=>{setSvc(s);setUnit(makeInitUnit(s));setAddView("form")}}/>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
+  // ── Add form ──
+  if(addView==="form") return simpleSheet(<>
+    {sheetHeader(`Add ${svcName}`, draftDate?fmtDateLong(draftDate):"Today — default")}
+    <div style={{marginBottom:8}}/>
+    <UnitEditor unit={unit} onChange={handleUnitChange} onRemove={()=>{}} allUnits={existing} allPets={pets} showRemove={false} simplified/>
+    {isCurrWeek&&<p style={{fontFamily,fontSize:14,color:R.gray,margin:"-8px 0 16px",lineHeight:1.5}}>${currWeekTotal}.00 will be charged</p>}
+    <Button variant="primary" size="small" fullWidth disabled={!unit?.startDate} onClick={handleSave}>Save changes</Button>
+    <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
+  </>)
+
+  // ── Scope picker (future week, single day) ──
+  if(addView==="scopePicker") return simpleSheet(<>
+    {sheetHeader(`Add ${svcName}`, dateTimeLabel)}
+    {radioRow(`This ${svcName} only`,"this")}
+    {radioRow(`This and following ${svcName}s`,"following")}
+    <div style={{marginTop:8}}>
+      <Button variant="primary" size="small" fullWidth onClick={()=>{
+        scopeChoice==="this"?onAdd({...unit,frequency:"once",weekDays:[]}):onAdd({...unit,frequency:"weekly"})
+        onClose()
+      }}>Save changes</Button>
+      <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={()=>setAddView("form")}>Close</Button></div>
+    </div>
+  </>)
+
+  // ── Charge confirmation (current week) ──
+  if(addView==="chargeConfirm") return simpleSheet(<>
+    {sheetHeader("Add and charge", dateTimeLabel)}
+    <p style={{fontFamily,fontSize:14,color:R.gray,lineHeight:1.6,margin:"8px 0 20px"}}>
+      {`Are you sure you want to add the ${svcName} and charge $${currWeekTotal}.00 to their original payment method?`}
+    </p>
+    <Button variant="primary" size="small" fullWidth onClick={()=>{
+      onAdd({...unit,frequency:isMultiDay?"weekly":"once",weekDays:isMultiDay?unit.weekDays:[]})
+      onClose()
+    }}>Confirm and charge</Button>
+    <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={()=>setAddView("form")}>Close</Button></div>
+  </>)
+
+  return null
+}
+
+// ─── Occurrence action sheet ──────────────────────────────────────────────────
+const SVC_SHORT={dog_walking:"walk",doggy_daycare:"daycare",overnight_boarding:"stay",overnight_traveling:"stay",drop_in:"drop-in",grooming:"grooming"}
+function shortSvcName(svc){ return SVC_SHORT[svc.id]||svc.label.toLowerCase() }
+
+function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOverride, onOverrideFromDate, onCancelDayFromDate, onCancel, onClose}){
+  const [view,setView]=useState("editForm")
+  const [draft,setDraft]=useState({...occ.unit,startDate:dateKey(occ.start)})
+  const [scope,setScope]=useState("this")
+  const isRecurring=(occ.parentUnit||occ.unit).frequency!=="once"
+  const overnight=occ.svc.type==="overnight"
+  const occWeekMonday=getWeekMonday(occ.start)
+  const todayWeekMonday=getWeekMonday(PROTO_TODAY)
+  const isCurrentWeek=dateKey(occWeekMonday)===dateKey(todayWeekMonday)
+  const endT=!overnight?endTimeFromDuration(occ.unit.startTime,occ.unit.durationMins):null
+  const occPets=allPets.filter(p=>occ.unit.petIds.includes(p.id))
+  const dateLabel=overnight
+    ?`${fmtDate(occ.start)} to ${fmtDate(occ.end)} · ${occ.totalNights||nightCount(occ.unit)} night${(occ.totalNights||nightCount(occ.unit))!==1?"s":""}`
+    :`${fmtDateLong(occ.start)} · ${fmtTime(occ.unit.startTime)} to ${fmtTime(endT)}`
+  const svcName=shortSvcName(occ.svc)
+
+  const headerRow=(label)=>(
+    <Row
+      label={label}
+      sublabel={dateLabel}
+      rightItem={<PetAvatar size={48} images={occPets.map(p=>p.img)}/>}
+      firstRow
+    />
+  )
+
+  const simpleSheet=(content)=>(
+    <div style={{position:"fixed",inset:0,background:"rgba(10,18,30,0.5)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"8px 8px 0 0",width:"100%",maxWidth:"100%",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)",padding:"0 16px 24px"}}>
+        <div style={{display:"flex",justifyContent:"center",paddingTop:8,marginBottom:24}}>
+          <div style={{width:36,height:5,borderRadius:35,background:R.border}}/>
+        </div>
+        {content}
+      </div>
+    </div>
+  )
+
+  const radioRow=(label,value)=>(
+    <div onClick={()=>setScope(value)} style={{display:"flex",alignItems:"center",gap:8,minHeight:56,paddingTop:8,paddingBottom:8,cursor:"pointer"}}>
+      <div style={{flex:1,minWidth:0}}>
+        <p style={{fontFamily,fontWeight:400,fontSize:16,color:R.navy,margin:0,lineHeight:1.5}}>{label}</p>
+      </div>
+      <div style={{width:20,height:20,borderRadius:"50%",border:`2px solid ${scope===value?"#2E67D1":"#C9CFD4"}`,background:scope===value?"#fff":"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {scope===value&&<div style={{width:10,height:10,borderRadius:"50%",background:"#2E67D1"}}/>}
+      </div>
+    </div>
+  )
+
+  const endRuleFromDate=()=>{
     const baseUnit=occ.parentUnit||occ.unit
     if(dateKey(occ.start)===baseUnit.startDate){ onCancel(baseUnit) }
     else { onSaveUnit({...baseUnit,repeatEndDate:dateKey(addDays(occ.start,-1))}) ; onClose() }
   }
 
+  const applyRemoveFollowing=()=>{
+    const parentUnit=occ.parentUnit||occ.unit
+    if((parentUnit.weekDays||[]).length>1){ onCancelDayFromDate(occ) }
+    else { endRuleFromDate() }
+  }
+
   // ── Edit form ──
-  if(view==="editForm") return(
-    <div style={{position:"fixed",inset:0,background:"rgba(10,18,30,0.5)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:R.white,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
-        <div style={{background:R.white,padding:"18px 16px 8px",borderRadius:"20px 20px 0 0",position:"sticky",top:0,zIndex:1}}>
-          <div style={{width:36,height:4,borderRadius:99,background:R.border,margin:"0 auto 24px"}}/>
-          <h3 style={{margin:0,fontSize:18,fontWeight:600,color:R.navy,fontFamily}}>Edit service</h3>
-        </div>
-        <div style={{padding:"8px 16px 36px"}}>
-          <UnitEditor unit={draft} onChange={setDraft} onRemove={()=>{}} allUnits={allUnits.filter(u=>u.id!==draft.id)} allPets={allPets} showRemove={false}/>
-          <Button variant="primary" size="small" fullWidth onClick={()=>isRecurring?setView("editScope"):(onSaveUnit(draft),onClose())}>Save changes</Button>
-          <Button variant="default" size="small" fullWidth onClick={()=>setView("actions")} style={{marginTop:12}}>Go back</Button>
-        </div>
+  if(view==="editForm"){
+    const timeChanged=draft.startTime!==occ.unit.startTime
+    const handleSave=()=>{
+      if(!timeChanged){ onClose(); return }
+      if(isRecurring){ setScope("this"); setView("editScope") }
+      else { onSaveUnit(draft); onClose() }
+    }
+    const handleRemove=()=>{
+      if(isRecurring){ setScope("this"); setView("removeScope") }
+      else if(isCurrentWeek){ setScope("this"); setView("cancelRefund") }
+      else { onCancel(occ.unit); onClose() }
+    }
+    return simpleSheet(<>
+      {headerRow(`Edit ${svcName}`)}
+      <div style={{marginBottom:8}}/>
+      <UnitEditor unit={draft} onChange={setDraft} onRemove={()=>{}} allUnits={[]} allPets={allPets} showRemove={false} timeOnly/>
+      <div onClick={handleRemove} style={{display:"flex",alignItems:"center",gap:10,minHeight:48,paddingTop:4,paddingBottom:12,cursor:"pointer"}}>
+        <CancelIcon color={R.red}/>
+        <p style={{fontFamily,fontWeight:400,fontSize:16,color:R.red,margin:0,lineHeight:1.5}}>Remove {svcName}</p>
       </div>
-    </div>
-  )
+      <Button variant="primary" size="small" fullWidth onClick={handleSave}>Save changes</Button>
+      <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
+    </>)
+  }
 
-  // ── Edit scope picker — shown after editing, for recurring only ──
+  // ── Edit scope picker ──
   if(view==="editScope") return simpleSheet(<>
-    {headerRow}
-    {scopeRow("This occurrence only",`Apply changes to ${fmtRelDate(occ.start)} only — series continues unchanged`,()=>{onOverride(occ,draft);onClose()})}
-    {scopeRow("From this date onwards",`Update the rule starting ${fmtRelDate(occ.start)}`,()=>{onOverrideFromDate(occ,draft);onClose()})}
-    <div style={{marginTop:8}}><Button variant="default" size="small" fullWidth onClick={()=>setView("editForm")}>Go back</Button></div>
+    {headerRow(`Edit ${svcName}`)}
+    {radioRow("This one","this")}
+    {radioRow("All future ones","following")}
+    <div style={{marginTop:8}}>
+      <Button variant="primary" size="small" fullWidth onClick={()=>{scope==="this"?onOverride(occ,draft):onOverrideFromDate(occ,draft);onClose()}}>Save changes</Button>
+      <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={()=>setView("editForm")}>Close</Button></div>
+    </div>
   </>)
 
-  // ── Remove scope picker (recurring only) ──
-  if(view==="removeScope") return simpleSheet(<>
-    {headerRow}
-    {scopeRow("Skip this occurrence",`Only ${fmtRelDate(occ.start)} is skipped — series continues`,()=>{onSkip(occ.key,true);onClose()})}
-    {scopeRow("Cancel from this date onwards",`End the rule starting ${fmtRelDate(occ.start)}`,handleCancelFromDate,true)}
-    <div style={{marginTop:8}}><Button variant="default" size="small" fullWidth onClick={()=>setView("actions")}>Go back</Button></div>
-  </>)
+  // ── Remove scope picker ──
+  if(view==="removeScope"){
+    const followingLabel=`This and following ${svcName}s`
+    const handleConfirm=()=>{
+      if(scope==="this"){
+        if(isCurrentWeek){ setView("cancelRefund") }
+        else { onSkip(occ.key,true); onClose() }
+      } else {
+        if(isCurrentWeek){ setView("cancelRefund") }
+        else { applyRemoveFollowing(); onClose() }
+      }
+    }
+    return simpleSheet(<>
+      {headerRow(`Remove ${svcName}`)}
+      {radioRow(`This ${svcName} only`,"this")}
+      {radioRow(followingLabel,"following")}
+      <div style={{marginTop:8}}>
+        <Button variant="primary" size="small" fullWidth onClick={handleConfirm}>Save changes</Button>
+        <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={()=>setView("editForm")}>Close</Button></div>
+      </div>
+    </>)
+  }
 
-  // ── Main actions ──
-  return simpleSheet(<>
-    {headerRow}
-    <div onClick={()=>setView("editForm")} style={{display:"flex",alignItems:"center",gap:12,minHeight:56,paddingTop:8,paddingBottom:8,cursor:"pointer"}}>
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill={R.navy} style={{flexShrink:0}}>
-        <path d="M2.52167 14.1271L3.87289 15.4783L5.18225 14.8964L16.4101 3.66853C16.9841 3.09453 16.9841 2.16389 16.4101 1.58988C15.8361 1.01588 14.9055 1.01588 14.3315 1.58988L13.2921 2.62921L14.6213 3.95838L13.8015 4.77818L12.4723 3.44902L3.1036 12.8178L2.52167 14.1271ZM13.5117 0.770077C14.5384-0.256692 16.2032-0.256692 17.2299 0.770077C18.2567 1.79685 18.2567 3.46157 17.2299 4.48834L5.964 15.7543C5.88854 15.8297 5.79982 15.8907 5.7023 15.934L1.22291 17.9248C0.998074 18.0248 0.741433 18.0248 0.516601 17.9248C0.07776 17.7298-0.11988 17.2159 0.075161 16.7771L2.066 12.2977C2.10935 12.2002 2.17027 12.1115 2.24574 12.036L13.5117 0.770077Z"/>
-      </svg>
-      <div style={{flex:1,minWidth:0}}>
-        <p style={{fontFamily,fontWeight:700,fontSize:16,color:R.navy,margin:0,lineHeight:1.5}}>{isRecurring?"Edit service":"Edit service"}</p>
-        <p style={{fontFamily,fontSize:14,color:R.gray,margin:0,lineHeight:1.25}}>{isRecurring?"Change schedule, pets or frequency":"Update date, time or pets"}</p>
-      </div>
-      <ChevronRightIcon/>
-    </div>
-    <div onClick={()=>isRecurring?setView("removeScope"):(onCancel(occ.unit),onClose())} style={{display:"flex",alignItems:"center",gap:12,minHeight:56,paddingTop:8,paddingBottom:8,cursor:"pointer"}}>
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 32 32" fill={R.red} style={{flexShrink:0}}>
-        <path d="M13 2a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1v20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6h1a1 1 0 1 0 0-2h-7V3a1 1 0 0 0-1-1h-6zm-1 6a1 1 0 0 1 1 1v14a1 1 0 1 1-2 0V9a1 1 0 0 1 1-1zm6 0a1 1 0 0 1 1 1v14a1 1 0 1 1-2 0V9a1 1 0 0 1 1-1z"/>
-      </svg>
-      <div style={{flex:1,minWidth:0}}>
-        <p style={{fontFamily,fontWeight:700,fontSize:16,color:R.red,margin:0,lineHeight:1.5}}>Cancel service</p>
-        <p style={{fontFamily,fontSize:14,color:R.gray,margin:0,lineHeight:1.25}}>{isRecurring?"Remove one or all occurrences":"Remove and refund this booking"}</p>
-      </div>
-    </div>
-    <div style={{marginTop:8}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
-  </>)
+  // ── Cancel and refund confirmation ──
+  if(view==="cancelRefund"){
+    const handleConfirmRefund=()=>{
+      if(scope==="this"){
+        if(isRecurring){ onSkip(occ.key,true) }
+        else { onCancel(occ.unit) }
+      } else { applyRemoveFollowing() }
+      onClose()
+    }
+    return simpleSheet(<>
+      {headerRow("Cancel and refund")}
+      <p style={{fontFamily,fontSize:14,color:R.gray,lineHeight:1.6,margin:"8px 0 20px"}}>
+        {`Are you sure you want to cancel and refund the ${svcName} of ${fmtDate(occ.start)}? A refund of $${occ.unit.cost||0}.00 will automatically be processed.`}
+      </p>
+      <Button variant="destructive" size="small" fullWidth onClick={handleConfirmRefund}>Cancel and refund</Button>
+      <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={()=>setView("removeScope")}>Close</Button></div>
+    </>)
+  }
+
+  return null
 }
 
 // ─── Delete confirmation dialog ───────────────────────────────────────────────
@@ -649,7 +828,7 @@ function DeleteConfirmDialog({unit, units, onDelete, onDeleteKeepPaid, onRefundA
 
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(10,18,30,0.5)",zIndex:500,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:R.white,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:R.white,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:"100%",maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
         <div style={{background:R.white,padding:"18px 16px 8px",borderRadius:"20px 20px 0 0",position:"sticky",top:0,zIndex:1}}>
           <div style={{width:36,height:4,borderRadius:99,background:R.border,margin:"0 auto 24px"}}/>
           <h3 style={{margin:0,fontSize:18,fontWeight:600,color:R.navy,fontFamily}}>Cancel service</h3>
@@ -750,7 +929,7 @@ function ManageSheet({units, pets, relEndDate, onUnitsChange, onRelEndDateChange
 
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(10,18,30,0.5)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:R.bg,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:R.bg,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:"100%",maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
         <div style={{background:"#fff",padding:"18px 20px 14px",borderRadius:"20px 20px 0 0",borderBottom:`1px solid ${R.border}`,position:"sticky",top:0,zIndex:10}}>
           <div style={{width:36,height:4,borderRadius:99,background:R.border,margin:"0 auto 14px"}}/>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -801,7 +980,7 @@ function ManageSheet({units, pets, relEndDate, onUnitsChange, onRelEndDateChange
         </div>
         {editingUnit&&(
           <div style={{position:"fixed",inset:0,background:"rgba(10,18,30,0.5)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setEditingUnit(null)}>
-            <div onClick={e=>e.stopPropagation()} style={{background:R.bg,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:R.bg,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:"100%",maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
               <div style={{background:"#fff",padding:"18px 20px 14px",borderRadius:"20px 20px 0 0",borderBottom:`1px solid ${R.border}`,position:"sticky",top:0,zIndex:1}}>
                 <div style={{width:36,height:4,borderRadius:99,background:R.border,margin:"0 auto 14px"}}/>
                 <button onClick={()=>setEditingUnit(null)} style={{...btnGhost,padding:"6px 12px",fontSize:12,marginBottom:12}}>← Back</button>
@@ -815,7 +994,7 @@ function ManageSheet({units, pets, relEndDate, onUnitsChange, onRelEndDateChange
           </div>
         )}
         {changeTypeFor&&<ChangeTypeSheet unit={changeTypeFor} onConfirm={id=>dupWithType(changeTypeFor,id)} onClose={()=>setChangeTypeFor(null)}/>}
-        {showAdd&&<AddSheet onAdd={u=>{onUnitsChange([...units,u]);setShowAdd(false)}} onClose={()=>setShowAdd(false)} existing={units} allPets={pets}/>}
+        {showAdd&&<AddSheet onAdd={u=>{onUnitsChange([...units,u]);setShowAdd(false)}} onClose={()=>setShowAdd(false)} existing={units} allPets={pets} defaultServiceId={units[0]?.serviceId}/>}
         {confirmDelete&&<DeleteConfirmDialog unit={confirmDelete} units={units} onDelete={id=>{removeUnit(id)}} onDeleteKeepPaid={deleteKeepPaid} onRefundAndDelete={refundAndDelete} onClose={()=>setConfirmDelete(null)}/>}
       </div>
     </div>
@@ -823,115 +1002,107 @@ function ManageSheet({units, pets, relEndDate, onUnitsChange, onRelEndDateChange
 }
 
 // ─── Agenda view ──────────────────────────────────────────────────────────────
-function AgendaView({agenda, pets, relEndDate, paidThruSunday, onTap}){
-  const byMonth=[]
+function AgendaView({agenda, upcomingRef, currentWeekRef, firstUpcomingKey, pets, relEndDate, paidThruSunday, incompleteKey, onTap, onReview}){
+  if(agenda.length===0) return(
+    <div style={{textAlign:"center",padding:"48px 20px",color:R.grayLight}}>
+      <div style={{fontSize:32,marginBottom:8}}>📅</div>
+      <div style={{fontSize:14,fontWeight:600,fontFamily}}>No upcoming services</div>
+    </div>
+  )
+
+  // Group entries by month → week
+  const monthGroups=[]
+  let _lastMo=null, _lastWk=null
+  const todayMid=new Date(PROTO_TODAY); todayMid.setHours(0,0,0,0)
   agenda.forEach(([dayKey,occs])=>{
     const d=parseDate(dayKey)
-    const mk=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`
-    const last=byMonth[byMonth.length-1]
-    if(!last||last.mk!==mk) byMonth.push({mk,label:fmtMonthYear(d),entries:[]})
-    byMonth[byMonth.length-1].entries.push([dayKey,occs])
+    const monday=getWeekMonday(d)
+    const sunday=addDays(monday,6)
+    const mo=`${sunday.getFullYear()}-${sunday.getMonth()}`
+    const wk=dateKey(monday)
+    if(mo!==_lastMo){monthGroups.push({mo,label:fmtMonthYear(sunday),weeks:[]});_lastMo=mo;_lastWk=null}
+    const curMonth=monthGroups[monthGroups.length-1]
+    if(wk!==_lastWk){curMonth.weeks.push({monday,wk,entries:[]});_lastWk=wk}
+    curMonth.weeks[curMonth.weeks.length-1].entries.push([dayKey,occs])
   })
-  let lastBillingWeek=null
+
+  const totalWeeks=monthGroups.reduce((n,m)=>n+m.weeks.length,0)
+  let wkIdxGlobal=0
+
   return(
     <div>
+      {monthGroups.map(({mo,label,weeks})=>(
+        <div key={mo}>
+          {/* Sticky month header */}
+          <div style={{position:"sticky",top:0,zIndex:2,background:R.white,paddingTop:24,paddingBottom:16,borderBottom:`1px solid ${R.separator}`}}>
+            <p style={{fontFamily,fontWeight:600,fontSize:20,color:R.navy,margin:0,lineHeight:1.25}}>{label}</p>
+          </div>
 
-      {agenda.length===0&&(
-        <div style={{textAlign:"center",padding:"48px 20px",color:R.grayLight}}>
-          <div style={{fontSize:32,marginBottom:8}}>📅</div>
-          <div style={{fontSize:14,fontWeight:600,fontFamily}}>No upcoming services</div>
-        </div>
-      )}
-      {byMonth.map(({mk,label,entries})=>{
-        const total=entries.reduce((n,[,o])=>n+o.length,0)
-        return(
-          <div key={mk} style={{marginBottom:28}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-              <span style={{fontWeight:700,fontSize:13,color:R.navyMid,letterSpacing:0.3,fontFamily}}>{label}</span>
-              <div style={{flex:1,height:1,background:R.border}}/>
-              <span style={{fontSize:11,color:R.gray,fontWeight:600,fontFamily}}>{total} event{total!==1?"s":""}</span>
-            </div>
-            {entries.map(([dayKey,occs],groupIdx)=>{
-              const d=parseDate(dayKey)
-              const today=isToday(d), past=isPast(d)
-              const isLastEntry=groupIdx===entries.length-1&&mk===byMonth[byMonth.length-1].mk
-              const showEndMarker=relEndDate&&isLastEntry
-              const thisWeekMon=getWeekMonday(d)
-              const thisWeekKey=dateKey(thisWeekMon)
-              let showBillingDivider=false, showPaidDivider=false
-              if(thisWeekKey!==lastBillingWeek){ const todayMid=new Date(new Date().setHours(0,0,0,0)); if(thisWeekMon<=todayMid) showPaidDivider=true; else showBillingDivider=true; lastBillingWeek=thisWeekKey }
-              return(
-                <div key={dayKey} style={{marginBottom:16,opacity:past?0.55:1}}>
-                  {showPaidDivider&&(
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-                      <div style={{flex:1,height:1,background:R.greenLight,borderTop:`1px dashed ${R.brand}`}}/>
-                      <div style={{display:"flex",alignItems:"center",gap:5,background:R.greenLight,border:`1px solid ${R.brand}`,borderRadius:99,padding:"4px 12px",whiteSpace:"nowrap"}}>
-                        <span style={{fontSize:11}}>✓</span>
-                        <span style={{fontSize:11,fontWeight:600,color:R.brand,fontFamily}}>Paid on {fmtDate(thisWeekMon)}</span>
-                      </div>
-                      <div style={{flex:1,height:1,background:R.greenLight,borderTop:`1px dashed ${R.brand}`}}/>
-                    </div>
-                  )}
-                  {showBillingDivider&&(
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-                      <div style={{flex:1,height:1,background:R.purpleLight,borderTop:`1px dashed #C4B5FD`}}/>
-                      <div style={{display:"flex",alignItems:"center",gap:5,background:R.purpleLight,border:`1px solid #C4B5FD`,borderRadius:99,padding:"4px 12px",whiteSpace:"nowrap"}}>
-                        <span style={{fontSize:11}}>💳</span>
-                        <span style={{fontSize:11,fontWeight:600,color:R.purple,fontFamily}}>Charged on {fmtDate(thisWeekMon)}</span>
-                      </div>
-                      <div style={{flex:1,height:1,background:R.purpleLight,borderTop:`1px dashed #C4B5FD`}}/>
-                    </div>
-                  )}
+          {weeks.map(({monday,wk,entries})=>{
+            const wkIdx=wkIdxGlobal++
+            const isPaid=monday<=todayMid
+            const weekTotal=entries.reduce((sum,[,occs])=>sum+occs.reduce((s,occ)=>s+(occ.unit.cost||0),0),0)
+            const fmtMoney=n=>`$${n.toFixed(2)}`
+            const paymentLabel=isPaid?`Paid ${fmtMoney(weekTotal)}`:`Will be charged ${fmtMoney(weekTotal)}`
+            const isLastWeek=wkIdx===totalWeeks-1
+            const isCurrentWk=dateKey(monday)===dateKey(getWeekMonday(todayMid))
+            return(
+              <div key={wk}>
+                {/* Week header */}
+                <div ref={isCurrentWk?currentWeekRef:null} style={{paddingTop:16,paddingBottom:8}}>
+                  <p style={{fontFamily,fontWeight:600,fontSize:16,color:R.navy,margin:0,lineHeight:1.25}}>Week of {fmtDate(monday)}</p>
+                  <p style={{fontFamily,fontSize:14,color:R.gray,margin:"4px 0 0",lineHeight:1.25}}>{paymentLabel}</p>
+                </div>
+
+                {entries.map(([dayKey,occs],entryIdx)=>{
+                  const d=parseDate(dayKey)
+                  const today=isToday(d), past=isPast(d)
+                  const isLastEntry=isLastWeek&&entryIdx===entries.length-1
+                  const showEndMarker=relEndDate&&isLastEntry
+                  const DAY_NAMES_FULL=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+                  return(
+                    <div key={dayKey} ref={dayKey===firstUpcomingKey?upcomingRef:null} style={{marginBottom:16}}>
+
+                  {/* Day row: date tile + weekday name only */}
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                    <div style={{width:46,height:54,borderRadius:8,flexShrink:0,background:today?R.navy:past?R.bg:R.white,border:`1.5px solid ${today?R.navy:R.cardBorder}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",boxShadow:today?"0 2px 10px rgba(26,35,50,0.18)":"none"}}>
-                      <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,lineHeight:1,color:today?"#fff":R.gray,fontFamily}}>{DAYS_S[d.getDay()]}</div>
-                      <div style={{fontSize:20,fontWeight:700,lineHeight:1.2,color:today?"#fff":R.navy,fontFamily}}>{d.getDate()}</div>
+                    <div style={{width:44,height:44,borderRadius:8,flexShrink:0,background:"#FFECBD",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      <span style={{fontSize:13,fontWeight:600,color:R.navy,fontFamily}}>{d.getDate()}</span>
                     </div>
-                    <div>
-                      <div style={{fontWeight:600,fontSize:13,color:R.navy,fontFamily}}>
-                        {fmtDateLong(d)}
-                        {today&&<span style={{marginLeft:6,fontSize:10,background:R.blue,color:"#fff",padding:"1px 7px",borderRadius:99,fontWeight:600}}>Today</span>}
-                      </div>
-                      <div style={{fontSize:11,color:R.gray,marginTop:1,fontFamily}}>{occs.length} service{occs.length!==1?"s":""}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <p style={{fontFamily,fontWeight:600,fontSize:16,color:R.navy,margin:0,lineHeight:1.25}}>{DAY_NAMES_FULL[d.getDay()]}</p>
                     </div>
                   </div>
-                  {occs.map(occ=>{
-                    const isSkipped=occ.skipped, overnight=occ.svc.type==="overnight"
-                    const endT=!overnight?endTimeFromDuration(occ.unit.startTime,occ.unit.durationMins):null
-                    const occPets=pets.filter(p=>occ.unit.petIds.includes(p.id))
+
+                  {/* Service cards: time + recurrence rule, no avatars */}
+                  {occs.map((occ,occIdx)=>{
+                    const isOccToday=today&&!past
+                    const isBlocked=isOccToday&&occIdx>0
+                    const showReviewBtn=occ.key===incompleteKey
+                    const overnight=occ.svc.type==="overnight"
+                    const timeLabel=overnight?`${fmtDate(occ.start)} – ${fmtDate(occ.end)}`:fmtTime(occ.unit.startTime)
                     return(
-                      <div key={`${occ.key}-${occ.nightIndex||0}`} onClick={()=>onTap(occ)} style={{background:isSkipped?R.disabled:R.white,borderRadius:8,marginBottom:8,cursor:"pointer",boxShadow:"0px 1px 4px 0px rgba(27,31,35,0.24)",overflow:"hidden",opacity:isSkipped?0.6:1}}>
-                        <div style={{padding:"16px"}}>
-                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontWeight:700,fontSize:16,color:isSkipped?R.disabledText:R.navy,fontFamily,lineHeight:1.5}}>
-                                {occ.svc.label}{occPets.length>0&&`: ${occPets.map(p=>p.name).join(", ")}`}
-                              </div>
-                              <div style={{fontSize:14,color:R.gray,fontFamily,lineHeight:1.4}}>
-                                {overnight
-                                  ?`${fmtDate(occ.start)} to ${fmtDate(occ.end)} · ${occ.nightIndex} of ${occ.totalNights} night${occ.totalNights!==1?"s":""}`
-                                  :`${fmtRelDate(occ.start)} · ${fmtTime(occ.unit.startTime)} to ${fmtTime(endT)}`}
-                              </div>
-                            </div>
-                            <PetAvatar size={48} images={occPets.map(p=>p.img)} />
+                      <div key={`${occ.key}-${occ.nightIndex||0}`} style={{border:`2px solid #D7DCE0`,borderRadius:8,padding:"0 16px",background:R.white,marginBottom:8}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:16,paddingBottom:isOccToday||showReviewBtn?8:16}}>
+                          <div style={{flex:1}}>
+                            <p style={{fontFamily,fontWeight:600,fontSize:16,color:R.navy,margin:"0 0 4px",lineHeight:1.5}}>{timeLabel}</p>
+                            <p style={{fontFamily,fontSize:14,color:R.gray,margin:0,lineHeight:1.25}}>{shortRuleLabel(occ.unit)}</p>
                           </div>
-                          {(isSkipped||occ.isOverride||(()=>{const pu=occ.parentUnit||occ.unit;return pu.frequency!=="once"})())&&(
-                            <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",marginTop:8}}>
-                              {isSkipped&&<span style={{fontSize:10,background:"#DDD",color:"#888",fontWeight:600,padding:"2px 7px",borderRadius:99}}>Skipped</span>}
-                              {occ.isOverride&&!isSkipped&&<span style={{fontSize:10,background:R.amberLight,color:"#7A5800",fontWeight:600,padding:"2px 7px",borderRadius:99}}>✦ Override</span>}
-                              {(()=>{
-                                const pu=occ.parentUnit||occ.unit
-                                if(pu.frequency==="once") return null
-                                const overnight2=occ.svc.type==="overnight"
-                                const wdLabel=!overnight2&&pu.frequency==="weekly"&&(pu.weekDays||[]).length>0?pu.weekDays.slice().sort((a,b)=>a-b).map(dd=>WEEKDAYS[dd]).join(", "):null
-                                return <span style={{fontSize:10,background:isSkipped?"#EEE":R.blueLight,color:isSkipped?R.gray:R.blue,fontWeight:600,padding:"2px 8px",borderRadius:99}}>↻ {pu.frequency}{pu.everyNWeeks>1?` ×${pu.everyNWeeks}`:""}{wdLabel?` · ${wdLabel}`:""}</span>
-                              })()}
-                            </div>
-                          )}
+                          {(!past||showReviewBtn)&&<Button variant="default" icon={<MoreIcon size={16}/>} onClick={e=>{e.stopPropagation();onTap(occ)}}/>}
                         </div>
+                        {isOccToday&&(
+                          <div style={{display:"flex",gap:8,paddingTop:8,paddingBottom:16}}>
+                            <Button variant="primary" style={{flex:1}} disabled={isBlocked}>Start Rover Card</Button>
+                          </div>
+                        )}
+                        {showReviewBtn&&(
+                          <div style={{display:"flex",gap:8,paddingBottom:8}}>
+                            <Button variant="flat" style={{flex:1}} onClick={e=>{e.stopPropagation();onReview(occ)}}>Review and complete</Button>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
+
                   {showEndMarker&&(
                     <div style={{display:"flex",alignItems:"center",gap:12,marginTop:8}}>
                       <div style={{flex:1,height:1,background:R.amberBorder}}/>
@@ -942,12 +1113,14 @@ function AgendaView({agenda, pets, relEndDate, paidThruSunday, onTap}){
                       <div style={{flex:1,height:1,background:R.amberBorder}}/>
                     </div>
                   )}
-                </div>
-              )
-            })}
-          </div>
-        )
-      })}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      ))}
       <div style={{height:80}}/>
     </div>
   )
@@ -961,6 +1134,7 @@ export default function RelationshipScreen({ initialPets, initialUnits }){
   const [showAdd,    setShowAdd]    = useState(false)
   const [showManage, setShowManage] = useState(false)
   const [activeOcc,  setActiveOcc]  = useState(null)
+  const [reviewOcc,  setReviewOcc]  = useState(null)
   const [cancelUnit,       setCancelUnit]       = useState(null)
   const [pastWeeksVisible,  setPastWeeksVisible]  = useState(0)
   const [currentWeekHidden, setCurrentWeekHidden] = useState(false)
@@ -969,6 +1143,10 @@ export default function RelationshipScreen({ initialPets, initialUnits }){
   const WEEK_HEIGHT = 150  // px — approximate height of one week's entries
   const scrollRef   = useRef(null)
   const upcomingRef = useRef(null)
+  const currentWeekRef = useRef(null)
+  const [isLoadingPast, setIsLoadingPast] = useState(false)
+  const prevScrollHeightRef = useRef(null)
+  const hiddenPastWeeksRef = useRef(0)
 
   const checkScrollPosition=()=>{
     if(!scrollRef.current||!upcomingRef.current) return
@@ -978,11 +1156,67 @@ export default function RelationshipScreen({ initialPets, initialUnits }){
     setCurrentWeekHidden(aTop<cRect.top-WEEK_HEIGHT||aTop>cRect.bottom)
   }
 
+  const triggerLoadPast=()=>{
+    if(isLoadingPast||hiddenPastWeeksRef.current<=0) return
+    setIsLoadingPast(true)
+    prevScrollHeightRef.current=scrollRef.current?.scrollHeight??null
+  }
+
   useEffect(()=>{
     checkScrollPosition()
     window.addEventListener('resize', checkScrollPosition)
     return ()=>window.removeEventListener('resize', checkScrollPosition)
   },[pastWeeksVisible, units])
+
+  // Wheel: fire when user scrolls up while already at the top
+  useEffect(()=>{
+    const el=scrollRef.current
+    if(!el) return
+    const onWheel=(e)=>{
+      if(el.scrollTop===0&&e.deltaY<0) triggerLoadPast()
+    }
+    el.addEventListener('wheel', onWheel, {passive:true})
+    return ()=>el.removeEventListener('wheel', onWheel)
+  },[isLoadingPast])
+
+  // Touch: fire when user pulls down from the top edge
+  useEffect(()=>{
+    const el=scrollRef.current
+    if(!el) return
+    let touchStartY=0
+    const onTouchStart=(e)=>{ touchStartY=e.touches[0].clientY }
+    const onTouchEnd=(e)=>{
+      const deltaY=e.changedTouches[0].clientY-touchStartY
+      if(el.scrollTop===0&&deltaY>30) triggerLoadPast()
+    }
+    el.addEventListener('touchstart', onTouchStart, {passive:true})
+    el.addEventListener('touchend', onTouchEnd, {passive:true})
+    return ()=>{ el.removeEventListener('touchstart', onTouchStart); el.removeEventListener('touchend', onTouchEnd) }
+  },[isLoadingPast])
+
+  useEffect(()=>{
+    if(currentWeekRef.current&&scrollRef.current){
+      const containerTop=scrollRef.current.getBoundingClientRect().top
+      const elTop=currentWeekRef.current.getBoundingClientRect().top
+      const stickyHeight=72 // month header: paddingTop 24 + text ~24 + paddingBottom 16 + border ~1
+      scrollRef.current.scrollTop+=(elTop-containerTop)-stickyHeight
+    }
+  },[])
+
+  useEffect(()=>{
+    if(!isLoadingPast) return
+    const t=setTimeout(()=>{
+      setPastWeeksVisible(v=>v+PAST_PAGE)
+      setIsLoadingPast(false)
+    },600)
+    return ()=>clearTimeout(t)
+  },[isLoadingPast])
+
+  useEffect(()=>{
+    if(prevScrollHeightRef.current==null||!scrollRef.current) return
+    scrollRef.current.scrollTop=scrollRef.current.scrollHeight-prevScrollHeightRef.current
+    prevScrollHeightRef.current=null
+  },[pastWeeksVisible])
 
   const updateUnit=u=>setUnits(prev=>prev.map(x=>x.id===u.id?u:x))
 
@@ -1005,6 +1239,29 @@ export default function RelationshipScreen({ initialPets, initialUnits }){
       overrides[dk]={serviceId:draft.serviceId,startTime:draft.startTime,durationMins:draft.durationMins,petIds:draft.petIds}
       return {...u,overrides}
     }))
+  }
+
+  const cancelDayFromDate=(occ)=>{
+    const parentUnit=occ.parentUnit||occ.unit
+    const occDow=occ.start.getDay()
+    const newWeekDays=(parentUnit.weekDays||[]).filter(d=>d!==occDow)
+    const dk=dateKey(occ.start)
+    setUnits(prev=>{
+      const updated=prev.map(u=>u.id!==parentUnit.id?u:{...u,repeatEndDate:dateKey(addDays(occ.start,-1))})
+      const newUnit={
+        ...defaultUnit(parentUnit.serviceId,{
+          petIds:parentUnit.petIds,
+          startDate:dk,
+          startTime:parentUnit.startTime,
+          durationMins:parentUnit.durationMins,
+          frequency:parentUnit.frequency,
+          weekDays:newWeekDays,
+          everyNWeeks:parentUnit.everyNWeeks,
+        }),
+        repeatEndDate:parentUnit.repeatEndDate||"",
+      }
+      return [...updated,newUnit]
+    })
   }
 
   const overrideFromDate=(occ,draft)=>{
@@ -1035,6 +1292,13 @@ export default function RelationshipScreen({ initialPets, initialUnits }){
 
   const paidThruSunday=getPaidThruSunday(units)
   const agenda=buildAgenda(units,relEndDate)
+  const incompleteKey=useMemo(()=>{
+    const thisMonday=getWeekMonday(PROTO_TODAY)
+    const lastMonday=addDays(thisMonday,-7)
+    const lastWeekOccs=agenda.flatMap(([,occs])=>occs).filter(occ=>occ.start>=lastMonday&&occ.start<thisMonday)
+    if(!lastWeekOccs.length) return null
+    return lastWeekOccs.reduce((max,occ)=>occ.start>max.start?occ:max).key
+  },[agenda])
   const totalOccs=agenda.reduce((a,[,o])=>a+o.length,0)
   const allPastEntries=agenda.filter(([dk])=>isPast(parseDate(dk)))
   const allUpcoming=agenda.filter(([dk])=>!isPast(parseDate(dk)))
@@ -1042,42 +1306,45 @@ export default function RelationshipScreen({ initialPets, initialUnits }){
   allPastEntries.forEach(entry=>{ const wk=dateKey(getWeekMonday(parseDate(entry[0]))); if(wk!==_lastWk){pastWeekGroups.push([]);_lastWk=wk}; pastWeekGroups[pastWeekGroups.length-1].push(entry) })
   const totalPastWeeks=pastWeekGroups.length
   const hiddenPastWeeks=Math.max(0,totalPastWeeks-pastWeeksVisible)
+  hiddenPastWeeksRef.current=hiddenPastWeeks
   const visiblePastEntries=pastWeeksVisible>0?pastWeekGroups.slice(-pastWeeksVisible).flat():[]
 
   return(
-    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:R.bg,position:"relative"}}>
-      <div ref={scrollRef} onScroll={checkScrollPosition} className="hide-scrollbar" style={{flex:1,overflowY:"auto",padding:"16px 16px 0"}}>
-        {hiddenPastWeeks>0&&(
-          <Button variant="flat" onClick={()=>setPastWeeksVisible(v=>v+PAST_PAGE)} style={{width:"100%",marginBottom:12}}>
-            Show {Math.min(hiddenPastWeeks,PAST_PAGE)} older week{Math.min(hiddenPastWeeks,PAST_PAGE)!==1?"s":""}
-          </Button>
+    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:R.white,position:"relative"}}>
+      <div ref={scrollRef} onScroll={checkScrollPosition} className="hide-scrollbar" style={{flex:1,overflowY:"auto",padding:"0 16px 0"}}>
+        {(isLoadingPast||hiddenPastWeeksRef.current>0)&&(
+          <div style={{height:44,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {isLoadingPast&&<div style={{width:18,height:18,border:`2px solid ${R.border}`,borderTopColor:R.blue,borderRadius:"50%",animation:"spin 0.7s linear infinite"}}/>}
+          </div>
         )}
-        {visiblePastEntries.length>0&&(
-          <AgendaView agenda={visiblePastEntries} pets={pets} relEndDate={relEndDate} paidThruSunday={paidThruSunday} onTap={setActiveOcc}/>
-        )}
-        <div ref={upcomingRef}/>
-        <AgendaView agenda={allUpcoming} pets={pets} relEndDate={relEndDate} paidThruSunday={paidThruSunday} onTap={setActiveOcc}/>
+        <AgendaView agenda={[...visiblePastEntries, ...allUpcoming]} upcomingRef={upcomingRef} currentWeekRef={currentWeekRef} firstUpcomingKey={allUpcoming[0]?.[0]} pets={pets} relEndDate={relEndDate} paidThruSunday={paidThruSunday} incompleteKey={incompleteKey} onTap={setActiveOcc} onReview={setReviewOcc}/>
       </div>
       {currentWeekHidden&&(
-        <div style={{position:"absolute",bottom:80,left:"50%",transform:"translateX(-50%)",zIndex:10,pointerEvents:"auto"}}>
-          <Button variant="default" size="small" onClick={()=>upcomingRef.current?.scrollIntoView({behavior:"smooth",block:"start"})}>{isBelowToday?"Current week ↑":"Current week ↓"}</Button>
+        <div style={{position:"absolute",bottom:72,left:"50%",transform:"translateX(-50%)",zIndex:10,pointerEvents:"auto"}}>
+          <button
+            onClick={()=>upcomingRef.current?.scrollIntoView({behavior:"smooth",block:"start"})}
+            style={{background:R.navy,color:"#fff",border:"none",borderRadius:99,padding:"8px 20px",fontFamily,fontWeight:600,fontSize:14,cursor:"pointer",boxShadow:"0px 2px 12px -1px rgba(27,31,35,0.32)",whiteSpace:"nowrap"}}
+          >
+            {isBelowToday?"↑ Current week":"↓ Current week"}
+          </button>
         </div>
       )}
 
-      <div style={{padding:"12px 16px 20px",background:`linear-gradient(to top,${R.bg} 60%,transparent)`,flexShrink:0}}>
+      <div style={{padding:"10px 16px 12px",background:R.white,borderTop:`1px solid ${R.separator}`,flexShrink:0}}>
         <div style={{display:"flex",gap:12}}>
           <Button variant="primary" size="small" onClick={()=>setShowAdd(true)} style={{flex:2}}>Add a service</Button>
           <Button variant="default" size="small" onClick={()=>setShowManage(true)} style={{flex:1}}>Manage</Button>
         </div>
       </div>
 
-      {showAdd&&<AddSheet onAdd={u=>{setUnits(prev=>[...prev,{...u,petIds:u.petIds.length?u.petIds:pets.map(p=>p.id)}]);setShowAdd(false)}} onClose={()=>setShowAdd(false)} existing={units} allPets={pets}/>}
+      {showAdd&&<AddSheet onAdd={u=>{setUnits(prev=>[...prev,{...u,petIds:u.petIds.length?u.petIds:pets.map(p=>p.id)}]);setShowAdd(false)}} onClose={()=>setShowAdd(false)} existing={units} allPets={pets} defaultServiceId={units[0]?.serviceId}/>}
       {showManage&&<ManageSheet units={units} pets={pets} relEndDate={relEndDate} onUnitsChange={setUnits} onRelEndDateChange={setRelEndDate} onPetsChange={setPets} onUnitListChange={setUnits} onClose={()=>setShowManage(false)}/>}
-      {activeOcc&&<OccActionSheet occ={activeOcc} allUnits={units} allPets={pets}
+      {activeOcc&&<OccActionSheet occ={activeOcc} allPets={pets}
         onSaveUnit={u=>{updateUnit(u);setActiveOcc(null)}}
         onSkip={skipOccurrence}
         onOverride={overrideOccurrence}
         onOverrideFromDate={overrideFromDate}
+        onCancelDayFromDate={cancelDayFromDate}
         onCancel={u=>{setActiveOcc(null);setCancelUnit(u)}}
         onClose={()=>setActiveOcc(null)}/>}
       {cancelUnit&&<DeleteConfirmDialog unit={cancelUnit} units={units}
@@ -1091,6 +1358,17 @@ export default function RelationshipScreen({ initialPets, initialUnits }){
         }}
         onRefundAndDelete={id=>{setUnits(prev=>prev.filter(x=>x.id!==id))}}
         onClose={()=>setCancelUnit(null)}/>}
+      {reviewOcc&&(()=>{
+        const occPets=pets.filter(p=>reviewOcc.unit.petIds.includes(p.id))
+        const endT=endTimeFromDuration(reviewOcc.unit.startTime,reviewOcc.unit.durationMins)
+        const card={
+          label:`${reviewOcc.svc.label}${occPets.length>0?`: ${occPets.map(p=>p.name).join(", ")}` :""}`,
+          sublabel:`${fmtRelDate(reviewOcc.start)} · ${fmtTime(reviewOcc.unit.startTime)} to ${fmtTime(endT)}`,
+          images:occPets.map(p=>p.img),
+          cost:"",
+        }
+        return <ReviewSheet visible card={card} onClose={()=>setReviewOcc(null)} onComplete={()=>setReviewOcc(null)} onCancelRefund={()=>setReviewOcc(null)}/>
+      })()}
     </div>
   )
 }

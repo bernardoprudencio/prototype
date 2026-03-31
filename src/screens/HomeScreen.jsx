@@ -4,10 +4,10 @@ import { BellIcon, ChevronUpIcon, ChevronDownIcon, EditIcon, MoreIcon } from '..
 import { petImages } from '../assets/images'
 import { formatHeaderDate } from '../hooks/useDate'
 import { Button, PetAvatar, UserAvatar, TabBar, Row } from '../components'
-import { INCOMPLETE_CARDS } from '../data/bookings'
-import { getTodayWalks } from '../data/owners'
+import { getTodayWalks, getIncompleteCards } from '../data/owners'
 
 const TODAY_WALKS = getTodayWalks()
+const INCOMPLETE_CARDS = getIncompleteCards()
 
 const PROMO_CARDS = [
   { bg: colors.yellow100, title: 'Promote your profile', desc: 'Invite new pet parents and grow your business.', cta: 'Learn how', img: petImages.promo1 },
@@ -62,7 +62,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
                     <Row
                       label={card.label}
                       sublabel={card.sublabel}
-                      rightItem={<PetAvatar size={48} images={[petImages[card.petKey]]} />}
+                      rightItem={<PetAvatar size={48} images={card.petImgs || [petImages[card.petKey]]} />}
                       firstRow
                       onClick={() => onNavigateToCard(card)}
                     />
