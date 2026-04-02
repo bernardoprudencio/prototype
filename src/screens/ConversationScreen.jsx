@@ -14,7 +14,7 @@ const DayDivider = ({ label }) => (
 
 const Gap = ({ h = 12 }) => <div style={{ height: h }} />
 
-export default function ConversationScreen({ onBack, conversation, owner, liveEvents = [], onLiveEvent }) {
+export default function ConversationScreen({ onBack, conversation, owner, liveEvents = [], onLiveEvent, onResolveIncomplete }) {
   const { type, card } = conversation || {}
   const messagesEndRef = useRef(null)
   const [tab, setTab] = useState('messages')
@@ -31,14 +31,15 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
   }
 
   const isToday = type === 'today'
-  const clientName = isToday ? 'Owen O.' : card?.client
-  const clientImg  = isToday ? peopleImages.owen : peopleImages[card?.clientKey] ?? peopleImages.owen
+  const ownerId = owner?.id
+  const clientName = owner?.name ?? card?.client
+  const clientImg  = peopleImages[ownerId] ?? peopleImages.owen
 
-  const conversationPets = isToday || card?.clientKey === 'owen'
-    ? [{ id: 1, name: 'Koni', emoji: '🐕', img: petImages.koni }, { id: 2, name: 'Burley', emoji: '🐕', img: petImages.burley }]
-    : card?.clientKey === 'james'
-      ? [{ id: 1, name: 'Archie', emoji: '🐕', img: petImages.archie }]
-      : [{ id: 1, name: 'Milo', emoji: '🐕', img: petImages.milo }]
+  const conversationPets = ownerId === 'james'
+    ? [{ id: 1, name: 'Archie', emoji: '🐕', img: petImages.archie }]
+    : ownerId === 'sarah'
+      ? [{ id: 1, name: 'Milo', emoji: '🐕', img: petImages.milo }]
+      : [{ id: 1, name: 'Koni', emoji: '🐕', img: petImages.koni }, { id: 2, name: 'Burley', emoji: '🐕', img: petImages.burley }]
 
   const relUnits = owner ? [getOwnerRelUnit(owner, conversationPets.map(p => p.id))] : []
 
@@ -87,13 +88,13 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
       </div>
 
       {/* ─── Schedule tab ─── */}
-      {tab === 'schedule' && <RelationshipScreen initialPets={conversationPets} initialUnits={relUnits} />}
+      {tab === 'schedule' && <RelationshipScreen initialPets={conversationPets} initialUnits={relUnits} onResolveIncomplete={onResolveIncomplete} />}
 
       {/* ─── Messages ─── */}
       {tab === 'messages' && <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>
 
         {/* ── Owen · Koni & Burley · Today's walk ── */}
-        {(isToday || card?.clientKey === 'owen') && (
+        {(!ownerId || ownerId === 'owen') && (
           <>
             <DayDivider label="Yesterday" />
             <ChatBubble message="Hey! Are we still on for tomorrow at 9?" time="4:32 PM" />
@@ -116,7 +117,7 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
         )}
 
         {/* ── James · Archie · Yesterday's missed walk ── */}
-        {!isToday && card?.clientKey === 'james' && (
+        {ownerId === 'james' && (
           <>
             <DayDivider label="Yesterday" />
             <ChatBubble message="Hey! Are you still on for noon today?" time="11:30 AM" />
@@ -136,7 +137,7 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
         )}
 
         {/* ── Sarah · Milo · Overdue walk from Mar 12 ── */}
-        {!isToday && card?.clientKey === 'sarah' && (
+        {ownerId === 'sarah' && (
           <>
             <DayDivider label="Mar 12" />
             <ChatBubble message="Hi! Quick note — Milo's leash is in the basket by the front door" time="3:42 PM" />

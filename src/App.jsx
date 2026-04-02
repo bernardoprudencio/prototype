@@ -10,7 +10,8 @@ import { petImages } from './assets/images'
 const TRANSITION_MS = 200
 
 const getOwner = (conv) => {
-  if (!conv || conv.type === 'today') return OWNERS.owen
+  if (!conv) return OWNERS.owen
+  if (conv.type === 'today') return OWNERS[conv.clientKey] ?? OWNERS.owen
   return OWNERS[conv.card?.clientKey] ?? OWNERS.owen
 }
 
@@ -20,7 +21,7 @@ export default function App() {
   const [reviewSheetCard, setReviewSheetCard] = useState(null)
   const [resolvedCards, setResolvedCards] = useState({})
   const [conversation, setConversation]   = useState(null)
-  const [liveEvents, setLiveEvents]       = useState([])
+  const [liveEvents, setLiveEvents]       = useState({})
   const [transition, setTransition] = useState(false)
   const [direction, setDirection]   = useState('forward')
   const loadTime = useLoadTime()
@@ -34,11 +35,14 @@ export default function App() {
     }, TRANSITION_MS)
   }
 
+  const addLiveEvent = (ownerKey, event) =>
+    setLiveEvents(prev => ({ ...prev, [ownerKey]: [...(prev[ownerKey] ?? []), event] }))
+
   const handleResolveCard = (card, resolution) => {
     const ts = formatActionTimestamp()
     setResolvedCards(prev => ({ ...prev, [card.id]: { resolution, timestamp: ts } }))
     setReviewSheetCard(null)
-    setLiveEvents(prev => [...prev, { id: Date.now(), type: 'resolution', resolution, timestamp: ts, card }])
+    addLiveEvent(card.clientKey, { id: Date.now(), type: 'resolution', resolution, timestamp: ts, card })
     setConversation({ type: 'incomplete', card })
     setTimeout(() => navigateTo('conversation', 'forward'), TRANSITION_MS)
   }
@@ -58,6 +62,7 @@ export default function App() {
     sublabel: `Today · ${walk.timeRange}`,
     petImages: walk.owner.petImages,
     firstName: walk.owner.name.split(' ')[0],
+    ownerKey: walk.owner.id,
   })
 
   return (
@@ -77,8 +82,8 @@ export default function App() {
             onOpenActionSheet={openIncompleteSheet}
             onOpenReviewSheet={(card) => setReviewSheetCard(card)}
             onOpenTodaySheet={openTodaySheet}
-            onNavigateConversation={() => {
-              setConversation({ type: 'today' })
+            onNavigateConversation={(walk) => {
+              setConversation({ type: 'today', clientKey: walk?.owner?.id })
               navigateTo('conversation', 'forward')
             }}
             onNavigateToCard={(card) => {
@@ -91,8 +96,15 @@ export default function App() {
           <ConversationScreen
             conversation={conversation}
             owner={getOwner(conversation)}
-            liveEvents={liveEvents}
-            onLiveEvent={(event) => setLiveEvents(prev => [...prev, event])}
+            liveEvents={liveEvents[getOwner(conversation).id] ?? []}
+            onLiveEvent={(event) => addLiveEvent(getOwner(conversation).id, event)}
+            onResolveIncomplete={(resolution, cardInfo) => {
+              const owner = getOwner(conversation)
+              const ts = formatActionTimestamp()
+              const card = { id: `${owner.id}-incomplete`, clientKey: owner.id, ...cardInfo }
+              setResolvedCards(prev => ({ ...prev, [card.id]: { resolution, timestamp: ts } }))
+              addLiveEvent(owner.id, { id: Date.now(), type: 'resolution', resolution, timestamp: ts, card })
+            }}
             onBack={() => navigateTo('home', 'back')}
           />
         )}
@@ -101,7 +113,7 @@ export default function App() {
             owner={getOwner(conversation)}
             onBack={(savedChanges) => {
               if (savedChanges?.length) {
-                setLiveEvents(prev => [...prev, { id: Date.now(), type: 'scheduleChange', changes: savedChanges }])
+                addLiveEvent(getOwner(conversation).id, { id: Date.now(), type: 'scheduleChange', changes: savedChanges })
               }
               navigateTo('conversation', 'back')
             }}
@@ -123,7 +135,7 @@ export default function App() {
           if (item.type === 'incomplete') {
             setConversation({ type: 'incomplete', card: item.card })
           } else {
-            setConversation({ type: 'today' })
+            setConversation({ type: 'today', clientKey: item.ownerKey })
           }
           setTimeout(() => navigateTo('conversation', 'forward'), TRANSITION_MS)
         }}

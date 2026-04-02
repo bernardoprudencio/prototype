@@ -1,8 +1,9 @@
+import { useMemo } from 'react'
 import { R, fontFamily, labelSt } from './theme'
 import { SERVICES, DURATION_SHORT, DURATION_DAYCARE, FREQ, WEEKDAYS } from '../../data/services'
 import { PETS_SEED } from '../../data/owners'
 import { parseDate, dateKey, fmtDate, fmtDateLong, fmtTime, addDays, endTimeFromDuration } from '../../lib/dateUtils'
-import { overlaps, overnightCanRepeat } from '../../lib/scheduleHelpers'
+import { overlaps, overnightCanRepeat, expandUnit } from '../../lib/scheduleHelpers'
 import CalInput from '../../components/CalInput'
 import TimeInput from '../../components/TimeInput'
 
@@ -53,6 +54,15 @@ export default function UnitEditor({unit, onChange, allUnits, allPets, simplifie
   const pets         = allPets || PETS_SEED
   const toggleWeekDay = d => { const days = unit.weekDays || []; onChange({...unit, weekDays: days.includes(d) ? days.filter(x => x !== d) : [...days, d]}) }
 
+  const bookedDates = useMemo(() => {
+    if (!allUnits || allUnits.length === 0) return []
+    const dates = new Set()
+    allUnits.filter(u => u.id !== unit.id).forEach(u => {
+      expandUnit(u).forEach(occ => dates.add(dateKey(occ.start)))
+    })
+    return [...dates]
+  }, [allUnits, unit.id])
+
   if(timeOnly) return (
     <div style={{marginBottom:12}}>
       <div style={{marginBottom:20}}>
@@ -68,12 +78,12 @@ export default function UnitEditor({unit, onChange, allUnits, allPets, simplifie
       {conflict && <div style={{fontSize:12,background:R.redLight,color:R.red,fontWeight:600,padding:"8px 12px",borderRadius:8,marginBottom:10}}>⚠ Conflict with another service</div>}
       {overnight ? (
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-          <div><label style={labelSt}>Check-in</label><CalInput value={unit.startDate} onChange={v => onChange({...unit,startDate:v})} placeholder="Check-in date"/></div>
+          <div><label style={labelSt}>Check-in</label><CalInput value={unit.startDate} onChange={v => onChange({...unit,startDate:v})} placeholder="Check-in date" bookedDates={bookedDates}/></div>
           <div><label style={labelSt}>Check-out</label><CalInput value={unit.endDate} onChange={v => onChange({...unit,endDate:v})} minDate={unit.startDate} placeholder="Check-out date"/></div>
         </div>
       ) : (
         <div style={{marginBottom:20}}>
-          <div style={{marginBottom:20}}><label style={labelSt}>Date</label><CalInput value={unit.startDate} onChange={v => { const updated = {...unit,startDate:v}; if(isWeekly) updated.weekDays = [parseDate(v).getDay()]; onChange(updated) }} placeholder="Select date"/></div>
+          <div style={{marginBottom:20}}><label style={labelSt}>Date</label><CalInput value={unit.startDate} onChange={v => { const updated = {...unit,startDate:v}; if(isWeekly) updated.weekDays = [parseDate(v).getDay()]; onChange(updated) }} placeholder="Select date" bookedDates={bookedDates}/></div>
           <div><label style={labelSt}>Start time</label><TimeInput value={unit.startTime} onChange={v => onChange({...unit,startTime:v})} placeholder="Select time"/>
             {unit.startTime && unit.durationMins && <div style={{fontSize:14,color:R.gray,marginTop:4,lineHeight:1.5}}>Ends at {fmtTime(endTimeFromDuration(unit.startTime, unit.durationMins))}</div>}
           </div>

@@ -1,20 +1,39 @@
 import { useState, useRef, useEffect } from 'react'
 import { colors, typography } from '../tokens'
-import { DropdownIcon } from '../assets/icons'
+import { DropdownIcon, CheckIcon } from '../assets/icons'
 
 const fontFamily = typography.fontFamily
-const HOURS = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
-const MINS  = [0,15,30,45]
+
+// 6:00 AM – 9:00 PM in 30-min steps
+const ALL_TIMES = (() => {
+  const times = []
+  for (let h = 6; h <= 21; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      if (h === 21 && m === 30) break
+      const h12 = h === 12 ? 12 : h > 12 ? h - 12 : h
+      const period = h >= 12 ? 'PM' : 'AM'
+      times.push(`${h12}:${m === 0 ? '00' : '30'} ${period}`)
+    }
+  }
+  return times
+})()
+
+function toHHMM(label) {
+  const [time, period] = label.split(' ')
+  let [h, m] = time.split(':').map(Number)
+  if (period === 'PM' && h !== 12) h += 12
+  if (period === 'AM' && h === 12) h = 0
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
 
 function fmtTime(t) {
   if (!t) return ''
   const [h, m] = t.split(':').map(Number)
-  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
 }
-function fmtHour(h) { return `${h % 12 || 12} ${h >= 12 ? 'PM' : 'AM'}` }
 
 /**
- * TimeInput — time picker dropdown (6 AM – 8 PM, 15-min intervals).
+ * TimeInput — time picker dropdown (6 AM – 9 PM, 30-min intervals).
  *
  * Props:
  *   value       "HH:MM" string or ""
@@ -22,77 +41,95 @@ function fmtHour(h) { return `${h % 12 || 12} ${h >= 12 ? 'PM' : 'AM'}` }
  *   placeholder string
  */
 export default function TimeInput({ value, onChange, placeholder }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+  const [open, setOpen]       = useState(false)
+  const [dropPos, setDropPos] = useState(null)
+  const btnRef  = useRef(null)
+  const listRef = useRef(null)
+
+  const handleOpen = () => {
+    if (open) { setOpen(false); return }
+    const rect       = btnRef.current.getBoundingClientRect()
+    const dropHeight = 224
+    const spaceBelow = window.innerHeight - rect.bottom
+    const showAbove  = spaceBelow < dropHeight + 10 && rect.top > dropHeight
+    setDropPos({
+      position: 'fixed',
+      left:  rect.left,
+      width: rect.width,
+      zIndex: 900,
+      ...(showAbove
+        ? { bottom: window.innerHeight - rect.top + 6 }
+        : { top: rect.bottom + 6 }),
+    })
+    setOpen(true)
+  }
 
   useEffect(() => {
     if (!open) return
-    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    if (value && listRef.current) {
+      const el = listRef.current.querySelector('[data-selected="true"]')
+      if (el) el.scrollIntoView({ block: 'nearest' })
+    }
+    const h = e => { if (btnRef.current && !btnRef.current.closest('[data-timeinput]').contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [open])
 
-  const selH = value ? parseInt(value.split(':')[0], 10) : null
-  const selM = value ? parseInt(value.split(':')[1], 10) : null
-  const pick = (h, m) => { onChange(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0')); setOpen(false) }
+  const displayValue = value ? fmtTime(value) : null
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div data-timeinput style={{ position: 'relative' }}>
       <button
-        onClick={() => setOpen(!open)}
+        ref={btnRef}
+        onClick={handleOpen}
         style={{
           width: '100%', padding: '12px 8px 12px 12px',
           border: `2px solid ${open ? colors.link : colors.borderInteractive}`,
           borderRadius: 4, fontSize: 16, fontFamily,
-          color: value ? colors.primary : colors.disabledText,
+          color: displayValue ? colors.primary : colors.disabledText,
           background: '#fff', cursor: 'pointer', textAlign: 'left',
           display: 'flex', alignItems: 'center', minHeight: 48, boxSizing: 'border-box',
         }}
       >
-        <span style={{ flex: 1, fontWeight: 400, lineHeight: 1.5 }}>{value ? fmtTime(value) : (placeholder || 'Select time…')}</span>
+        <span style={{ flex: 1, fontWeight: 400, lineHeight: 1.5 }}>
+          {displayValue || (placeholder || 'Select time…')}
+        </span>
         <DropdownIcon />
       </button>
 
-      {open && (
+      {open && dropPos && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0,
-          zIndex: 900, background: '#fff', borderRadius: 8,
+          ...dropPos,
+          background: '#fff', borderRadius: 8,
           boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
           border: `1.5px solid ${colors.border}`,
-          width: 240, padding: '12px',
         }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: colors.tertiary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Select time</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1, maxHeight: 196, overflowY: 'auto' }}>
-              <div style={{ fontSize: 10, color: colors.disabledText, marginBottom: 4, textAlign: 'center', fontWeight: 600 }}>Hour</div>
-              {HOURS.map(h => (
-                <button key={h} onClick={() => pick(h, selM !== null ? selM : 0)}
+          <div ref={listRef} className="hide-scrollbar" style={{ maxHeight: 224, overflowY: 'auto' }}>
+            {ALL_TIMES.map(time => {
+              const selected = displayValue === time
+              return (
+                <div
+                  key={time}
+                  data-selected={selected}
+                  onMouseDown={() => { onChange(toHHMM(time)); setOpen(false) }}
                   style={{
-                    width: '100%', padding: '6px', borderRadius: 7, border: 'none', cursor: 'pointer',
-                    fontSize: 11, fontWeight: selH === h ? 700 : 400,
-                    background: selH === h ? colors.link : 'transparent',
-                    color: selH === h ? '#fff' : colors.primary,
-                    fontFamily, textAlign: 'center', marginBottom: 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 16px', cursor: 'pointer',
+                    background: selected ? '#EBF1FB' : 'transparent',
+                    transition: 'background 0.08s',
+                  }}
+                >
+                  <span style={{
+                    fontFamily, fontSize: 14,
+                    fontWeight: selected ? 600 : 400,
+                    color: selected ? colors.link : colors.primary,
                   }}>
-                  {fmtHour(h)}
-                </button>
-              ))}
-            </div>
-            <div style={{ width: 58 }}>
-              <div style={{ fontSize: 10, color: colors.disabledText, marginBottom: 4, textAlign: 'center', fontWeight: 600 }}>Min</div>
-              {MINS.map(m => (
-                <button key={m} onClick={() => pick(selH !== null ? selH : 9, m)}
-                  style={{
-                    width: '100%', padding: '6px', borderRadius: 7, border: 'none', cursor: 'pointer',
-                    fontSize: 11, fontWeight: selM === m ? 700 : 400,
-                    background: selM === m ? colors.link : 'transparent',
-                    color: selM === m ? '#fff' : colors.primary,
-                    fontFamily, textAlign: 'center', marginBottom: 1,
-                  }}>
-                  {String(m).padStart(2,'0')}
-                </button>
-              ))}
-            </div>
+                    {time}
+                  </span>
+                  {selected && <CheckIcon />}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

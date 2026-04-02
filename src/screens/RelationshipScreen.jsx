@@ -212,6 +212,12 @@ function UnitEditor({unit, onChange, allUnits, allPets, simplified=false, timeOn
   const durationOpts=isDaycare?DURATION_DAYCARE:DURATION_SHORT
   const pets=allPets||PETS_SEED
   const toggleWeekDay=d=>{ const days=unit.weekDays||[]; onChange({...unit,weekDays:days.includes(d)?days.filter(x=>x!==d):[...days,d]}) }
+  const bookedDates=useMemo(()=>{
+    if(!allUnits||allUnits.length===0) return []
+    const dates=new Set()
+    allUnits.filter(u=>u.id!==unit.id).forEach(u=>expandUnit(u).forEach(occ=>dates.add(dateKey(occ.start))))
+    return [...dates]
+  },[allUnits,unit.id])
   if(timeOnly) return(
     <div style={{marginBottom:12}}>
       <div style={{marginBottom:20}}>
@@ -227,12 +233,12 @@ function UnitEditor({unit, onChange, allUnits, allPets, simplified=false, timeOn
       {conflict&&<div style={{fontSize:12,background:R.redLight,color:R.red,fontWeight:600,padding:"8px 12px",borderRadius:8,marginBottom:10}}>⚠ Conflict with another service</div>}
       {overnight?(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-          <div><label style={labelSt}>Check-in</label><CalInput value={unit.startDate} onChange={v=>onChange({...unit,startDate:v})} placeholder="Check-in date"/></div>
+          <div><label style={labelSt}>Check-in</label><CalInput value={unit.startDate} onChange={v=>onChange({...unit,startDate:v})} placeholder="Check-in date" bookedDates={bookedDates}/></div>
           <div><label style={labelSt}>Check-out</label><CalInput value={unit.endDate} onChange={v=>onChange({...unit,endDate:v})} minDate={unit.startDate} placeholder="Check-out date"/></div>
         </div>
       ):(
         <div style={{marginBottom:20}}>
-          <div style={{marginBottom:20}}><label style={labelSt}>Date</label><CalInput value={unit.startDate} onChange={v=>{ const updated={...unit,startDate:v}; if(isWeekly) updated.weekDays=[parseDate(v).getDay()]; onChange(updated) }} placeholder="Select date"/></div>
+          <div style={{marginBottom:20}}><label style={labelSt}>Date</label><CalInput value={unit.startDate} onChange={v=>{ const updated={...unit,startDate:v}; if(isWeekly) updated.weekDays=[parseDate(v).getDay()]; onChange(updated) }} placeholder="Select date" bookedDates={bookedDates}/></div>
           <div><label style={labelSt}>Start time</label><TimeInput value={unit.startTime} onChange={v=>onChange({...unit,startTime:v})} placeholder="Select time"/>
             {unit.startTime&&unit.durationMins&&<div style={{fontSize:14,color:R.gray,marginTop:4,lineHeight:1.5}}>Ends at {fmtTime(endTimeFromDuration(unit.startTime,unit.durationMins))}</div>}
           </div>
@@ -870,7 +876,7 @@ function AgendaView({agenda, upcomingRef, currentWeekRef, firstUpcomingKey, relE
                     const overnight=occ.svc.type==="overnight"
                     const timeLabel=overnight?`${fmtDate(occ.start)} – ${fmtDate(occ.end)}`:fmtTime(occ.unit.startTime)
                     return(
-                      <div key={`${occ.key}-${occ.nightIndex||0}`} style={{border:`2px solid #D7DCE0`,borderRadius:8,padding:"0 16px",background:R.white,marginBottom:8}}>
+                      <div key={`${occ.key}-${occ.nightIndex||0}`} style={{border:`2px solid #D7DCE0`,borderRadius:8,padding:"0 16px",background:past&&!showReviewBtn?"#F4F5F6":R.white,marginBottom:8}}>
                         <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:16,paddingBottom:isOccToday||showReviewBtn?8:16}}>
                           <div style={{flex:1}}>
                             <p style={{fontFamily,fontWeight:600,fontSize:16,color:R.navy,margin:"0 0 4px",lineHeight:1.5}}>{timeLabel}</p>
@@ -916,7 +922,7 @@ function AgendaView({agenda, upcomingRef, currentWeekRef, firstUpcomingKey, relE
 }
 
 // ─── RelationshipScreen ───────────────────────────────────────────────────────
-export default function RelationshipScreen({ initialPets, initialUnits }){
+export default function RelationshipScreen({ initialPets, initialUnits, onResolveIncomplete }){
   const [pets,       setPets]       = useState(initialPets || PETS_SEED)
   const [units,      setUnits]      = useState(initialUnits || [])
   const [relEndDate, setRelEndDate] = useState("")
@@ -924,6 +930,7 @@ export default function RelationshipScreen({ initialPets, initialUnits }){
   const [showManage, setShowManage] = useState(false)
   const [activeOcc,  setActiveOcc]  = useState(null)
   const [reviewOcc,  setReviewOcc]  = useState(null)
+  const [incompleteResolved, setIncompleteResolved] = useState(false)
   const [cancelUnit,       setCancelUnit]       = useState(null)
   const [pastWeeksVisible,  setPastWeeksVisible]  = useState(0)
   const [currentWeekHidden, setCurrentWeekHidden] = useState(false)
@@ -1081,12 +1088,13 @@ export default function RelationshipScreen({ initialPets, initialUnits }){
 
   const agenda=buildAgenda(units,relEndDate)
   const incompleteKey=useMemo(()=>{
+    if(incompleteResolved) return null
     const thisMonday=getWeekMonday(PROTO_TODAY)
     const lastMonday=addDays(thisMonday,-7)
     const lastWeekOccs=agenda.flatMap(([,occs])=>occs).filter(occ=>occ.start>=lastMonday&&occ.start<thisMonday)
     if(!lastWeekOccs.length) return null
     return lastWeekOccs.reduce((max,occ)=>occ.start>max.start?occ:max).key
-  },[agenda])
+  },[agenda,incompleteResolved])
 const allPastEntries=agenda.filter(([dk])=>isPast(parseDate(dk)))
   const allUpcoming=agenda.filter(([dk])=>!isPast(parseDate(dk)))
   const pastWeekGroups=[];let _lastWk=null
@@ -1151,10 +1159,16 @@ const allPastEntries=agenda.filter(([dk])=>isPast(parseDate(dk)))
         const card={
           label:`${reviewOcc.svc.label}${occPets.length>0?`: ${occPets.map(p=>p.name).join(", ")}` :""}`,
           sublabel:`${fmtRelDate(reviewOcc.start)} · ${fmtTime(reviewOcc.unit.startTime)} to ${fmtTime(endT)}`,
+          dateLabel:`${fmtRelDate(reviewOcc.start)} at ${fmtTime(reviewOcc.unit.startTime)}`,
           images:occPets.map(p=>p.img),
-          cost:"",
+          cost:`$${(reviewOcc.unit.cost||0).toFixed(2)}`,
         }
-        return <ReviewSheet visible card={card} onClose={()=>setReviewOcc(null)} onComplete={()=>setReviewOcc(null)} onCancelRefund={()=>setReviewOcc(null)}/>
+        const resolve=(resolution)=>{
+          setReviewOcc(null)
+          setIncompleteResolved(true)
+          onResolveIncomplete?.(resolution, card)
+        }
+        return <ReviewSheet visible card={card} onClose={()=>setReviewOcc(null)} onComplete={()=>resolve('completed')} onCancelRefund={()=>resolve('cancelled')}/>
       })()}
     </div>
   )

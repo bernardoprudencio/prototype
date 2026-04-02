@@ -90,10 +90,10 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
                   sublabel={`Today · ${walk.timeRange}`}
                   rightItem={<PetAvatar size={48} images={walk.owner.petImages} />}
                   firstRow
-                  onClick={!blocked ? onNavigateConversation : undefined}
+                  onClick={!blocked ? () => onNavigateConversation(walk) : undefined}
                 />
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <Button variant={i === 0 ? 'primary' : 'default'} style={{ flex: 1 }} disabled={blocked} onClick={!blocked ? onNavigateConversation : undefined}>
+                  <Button variant={i === 0 ? 'primary' : 'default'} style={{ flex: 1 }} disabled={blocked} onClick={!blocked ? () => onNavigateConversation(walk) : undefined}>
                     Start Rover Card
                   </Button>
                   <Button variant="default" icon={<MoreIcon size={16} />} onClick={() => onOpenTodaySheet(walk)} />
