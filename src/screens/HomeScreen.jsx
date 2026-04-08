@@ -125,7 +125,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
         </div>
       </div>
 
-      <TabBar activeTab="home" />
+      <TabBar />
     </div>
   )
 }

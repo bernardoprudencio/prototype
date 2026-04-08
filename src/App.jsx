@@ -1,10 +1,12 @@
 import React, { useState, useRef } from 'react'
+import { Routes, Route } from 'react-router-dom'
 import { colors, typography, shadows } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, Button } from './components'
 import { HomeScreen, ConversationScreen } from './screens'
 import RelationshipScreen from './screens/relationship/RelationshipScreen'
+import InboxScreen from './screens/InboxScreen'
 import { BackIcon } from './assets/icons'
 import { OWNERS } from './data/owners'
 import { petImages } from './assets/images'
@@ -26,25 +28,56 @@ const getOwner = (conv) => {
 }
 
 export default function App() {
-  const [screen, setScreen]         = useState('home')
-  const [sheetItem, setSheetItem]   = useState(null)
+  const [sheetItem, setSheetItem]             = useState(null)
   const [reviewSheetCard, setReviewSheetCard] = useState(null)
-  const [resolvedCards, setResolvedCards] = useState({})
-  const [conversation, setConversation]   = useState(null)
-  const [liveEvents, setLiveEvents]       = useState({})
+  const [resolvedCards, setResolvedCards]     = useState({})
+  const [conversation, setConversation]       = useState(null)
+  const [liveEvents, setLiveEvents]           = useState({})
   const [scheduleContext, setScheduleContext] = useState(null)
-  const [ownerUnits, setOwnerUnits] = useState({})
+  const [ownerUnits, setOwnerUnits]           = useState({})
   const scheduleRef = useRef(null)
-  const [transition, setTransition] = useState(false)
-  const [direction, setDirection]   = useState('forward')
+
+  // Overlay animation state
+  const [convVisible, setConvVisible]     = useState(false)
+  const [convTransition, setConvTransition] = useState(false)
+  const [schedVisible, setSchedVisible]   = useState(false)
+  const [schedTransition, setSchedTransition] = useState(false)
+
   const loadTime = useLoadTime()
 
-  const navigateTo = (target, dir = 'forward') => {
-    setDirection(dir)
-    setTransition(true)
+  // Open the conversation overlay (slide in from right)
+  const openConversation = (conv) => {
+    setConversation(conv)
+    setConvVisible(true)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setConvTransition(true))
+    })
+  }
+
+  // Close the conversation overlay (slide out to right)
+  const closeConversation = () => {
+    setConvTransition(false)
     setTimeout(() => {
-      setScreen(target)
-      setTransition(false)
+      setConvVisible(false)
+      setConversation(null)
+    }, TRANSITION_MS)
+  }
+
+  // Open the schedule overlay
+  const openSchedule = (ctx) => {
+    setScheduleContext(ctx)
+    setSchedVisible(true)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setSchedTransition(true))
+    })
+  }
+
+  // Close the schedule overlay
+  const closeSchedule = () => {
+    setSchedTransition(false)
+    setTimeout(() => {
+      setSchedVisible(false)
+      setScheduleContext(null)
     }, TRANSITION_MS)
   }
 
@@ -56,8 +89,7 @@ export default function App() {
     setResolvedCards(prev => ({ ...prev, [card.id]: { resolution, timestamp: ts } }))
     setReviewSheetCard(null)
     addLiveEvent(card.clientKey, { id: Date.now(), type: 'resolution', resolution, timestamp: ts, card })
-    setConversation({ type: 'incomplete', card })
-    setTimeout(() => navigateTo('conversation', 'forward'), TRANSITION_MS)
+    openConversation({ type: 'incomplete', card })
   }
 
   const openIncompleteSheet = (card) => setSheetItem({
@@ -78,34 +110,43 @@ export default function App() {
     ownerKey: walk.owner.id,
   })
 
+  const overlayStyle = (visible, transitioning) => ({
+    position: 'absolute',
+    inset: 0,
+    background: colors.white,
+    transition: `transform ${TRANSITION_MS}ms ease, opacity ${TRANSITION_MS}ms ease`,
+    transform: transitioning ? 'translateX(0)' : 'translateX(100%)',
+    opacity: transitioning ? 1 : 0,
+    pointerEvents: visible ? 'auto' : 'none',
+  })
+
+  const homeProps = {
+    resolvedCards,
+    loadTime,
+    onOpenActionSheet: openIncompleteSheet,
+    onOpenReviewSheet: (card) => setReviewSheetCard(card),
+    onOpenTodaySheet: openTodaySheet,
+    onNavigateConversation: (walk) => openConversation({ type: 'today', clientKey: walk?.owner?.id }),
+    onNavigateToCard: (card) => openConversation({ type: 'incomplete', card }),
+  }
+
+  const inboxProps = {
+    liveEvents,
+    onNavigateConversation: (owner) => openConversation({ type: 'today', clientKey: owner.id }),
+  }
+
   return (
-    <div className="phone-shell" style={{ fontFamily: typography.fontFamily }}>
-      <div style={{
-        position: 'absolute', inset: 0,
-        transition: 'transform 0.25s ease, opacity 0.2s ease',
-        transform: transition
-          ? (direction === 'forward' ? 'translateX(-30%)' : 'translateX(30%)')
-          : 'translateX(0)',
-        opacity: transition ? 0 : 1,
-      }}>
-        {screen === 'home' && (
-          <HomeScreen
-            resolvedCards={resolvedCards}
-            loadTime={loadTime}
-            onOpenActionSheet={openIncompleteSheet}
-            onOpenReviewSheet={(card) => setReviewSheetCard(card)}
-            onOpenTodaySheet={openTodaySheet}
-            onNavigateConversation={(walk) => {
-              setConversation({ type: 'today', clientKey: walk?.owner?.id })
-              navigateTo('conversation', 'forward')
-            }}
-            onNavigateToCard={(card) => {
-              setConversation({ type: 'incomplete', card })
-              navigateTo('conversation', 'forward')
-            }}
-          />
-        )}
-        {screen === 'conversation' && (
+    <div className="phone-shell" style={{ fontFamily: typography.fontFamily, position: 'relative', overflow: 'hidden' }}>
+
+      {/* ── Route layer ── */}
+      <Routes>
+        <Route path="/" element={<HomeScreen {...homeProps} />} />
+        <Route path="/inbox" element={<InboxScreen {...inboxProps} />} />
+      </Routes>
+
+      {/* ── Conversation overlay ── */}
+      {convVisible && (
+        <div style={overlayStyle(convVisible, convTransition)}>
           <ConversationScreen
             conversation={conversation}
             owner={getOwner(conversation)}
@@ -120,21 +161,23 @@ export default function App() {
             }}
             onOpenSchedule={(ctx) => {
               const ownerId = getOwner(conversation).id
-              setScheduleContext({ ...ctx, units: ownerUnits[ownerId] ?? ctx.units, ownerId })
-              navigateTo('schedule', 'forward')
+              openSchedule({ ...ctx, units: ownerUnits[ownerId] ?? ctx.units, ownerId })
             }}
-            onBack={() => navigateTo('home', 'back')}
+            onBack={closeConversation}
           />
-        )}
-        {screen === 'schedule' && scheduleContext && (() => {
-          const unitLabel = UNIT_LABELS[scheduleContext.units?.[0]?.serviceId] ?? 'service'
-          return (
+        </div>
+      )}
+
+      {/* ── Schedule overlay ── */}
+      {schedVisible && scheduleContext && (() => {
+        const unitLabel = UNIT_LABELS[scheduleContext.units?.[0]?.serviceId] ?? 'service'
+        return (
+          <div style={{ ...overlayStyle(schedVisible, schedTransition), zIndex: 20 }}>
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
-              {/* Header — mirrors conversation header layout */}
               <div style={{ borderBottom: `1px solid ${colors.border}`, boxShadow: shadows.headerShadow, padding: '12px 16px 0', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', minHeight: 62, padding: '8px 0' }}>
                   <div
-                    onClick={() => navigateTo('conversation', 'back')}
+                    onClick={closeSchedule}
                     style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flexShrink: 0 }}
                   >
                     <BackIcon />
@@ -177,10 +220,11 @@ export default function App() {
                 }}
               />
             </div>
-          )
-        })()}
-      </div>
+          </div>
+        )
+      })()}
 
+      {/* ── Global modals ── */}
       <ActionSheet
         visible={!!sheetItem}
         type={sheetItem?.type}
@@ -193,11 +237,10 @@ export default function App() {
           const item = sheetItem
           setSheetItem(null)
           if (item.type === 'incomplete') {
-            setConversation({ type: 'incomplete', card: item.card })
+            openConversation({ type: 'incomplete', card: item.card })
           } else {
-            setConversation({ type: 'today', clientKey: item.ownerKey })
+            openConversation({ type: 'today', clientKey: item.ownerKey })
           }
-          setTimeout(() => navigateTo('conversation', 'forward'), TRANSITION_MS)
         }}
         onReviewAndComplete={() => {
           const card = sheetItem.card
