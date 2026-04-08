@@ -42,7 +42,7 @@ function PetSelector({pets, selectedIds, onChange}) {
 }
 
 // ── UnitEditor ────────────────────────────────────────────────────────────────
-export default function UnitEditor({unit, onChange, allUnits, allPets, simplified=false, timeOnly=false}) {
+export default function UnitEditor({unit, onChange, allUnits, allPets, simplified=false, timeOnly=false, maxDate}) {
   const svc          = SERVICES.find(s => s.id === unit.serviceId)
   const overnight    = (svc && svc.type) === "overnight"
   const isDaycare    = (svc && svc.id) === "doggy_daycare"
@@ -78,12 +78,12 @@ export default function UnitEditor({unit, onChange, allUnits, allPets, simplifie
       {conflict && <div style={{fontSize:12,background:R.redLight,color:R.red,fontWeight:600,padding:"8px 12px",borderRadius:8,marginBottom:10}}>⚠ Conflict with another service</div>}
       {overnight ? (
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-          <div><label style={labelSt}>Check-in</label><CalInput value={unit.startDate} onChange={v => onChange({...unit,startDate:v})} placeholder="Check-in date" bookedDates={bookedDates}/></div>
-          <div><label style={labelSt}>Check-out</label><CalInput value={unit.endDate} onChange={v => onChange({...unit,endDate:v})} minDate={unit.startDate} placeholder="Check-out date"/></div>
+          <div><label style={labelSt}>Check-in</label><CalInput value={unit.startDate} onChange={v => onChange({...unit,startDate:v})} placeholder="Check-in date" maxDate={maxDate} bookedDates={bookedDates}/></div>
+          <div><label style={labelSt}>Check-out</label><CalInput value={unit.endDate} onChange={v => onChange({...unit,endDate:v})} minDate={unit.startDate} maxDate={maxDate} placeholder="Check-out date"/></div>
         </div>
       ) : (
         <div style={{marginBottom:20}}>
-          <div style={{marginBottom:20}}><label style={labelSt}>Date</label><CalInput value={unit.startDate} onChange={v => { const updated = {...unit,startDate:v}; if(isWeekly) updated.weekDays = [parseDate(v).getDay()]; onChange(updated) }} placeholder="Select date" bookedDates={bookedDates}/></div>
+          <div style={{marginBottom:20}}><label style={labelSt}>Date</label><CalInput value={unit.startDate} onChange={v => { const updated = {...unit,startDate:v}; if(isWeekly) updated.weekDays = [parseDate(v).getDay()]; onChange(updated) }} placeholder="Select date" maxDate={maxDate} bookedDates={bookedDates}/></div>
           <div><label style={labelSt}>Start time</label><TimeInput value={unit.startTime} onChange={v => onChange({...unit,startTime:v})} placeholder="Select time"/>
             {unit.startTime && unit.durationMins && <div style={{fontSize:14,color:R.gray,marginTop:4,lineHeight:1.5}}>Ends at {fmtTime(endTimeFromDuration(unit.startTime, unit.durationMins))}</div>}
           </div>
@@ -164,7 +164,7 @@ export default function UnitEditor({unit, onChange, allUnits, allPets, simplifie
       {!simplified && repeats && (
         <div style={{marginBottom:12,background:R.bg,borderRadius:8,padding:"10px 12px",border:`1px solid ${R.border}`}}>
           <label style={{...labelSt,marginBottom:5}}>Series ends <span style={{fontWeight:400,color:R.gray}}>(optional)</span></label>
-          <CalInput value={unit.repeatEndDate||""} onChange={v => onChange({...unit,repeatEndDate:v})} minDate={unit.startDate} placeholder="No end date"/>
+          <CalInput value={unit.repeatEndDate||""} onChange={v => onChange({...unit,repeatEndDate:v})} minDate={unit.startDate} maxDate={maxDate} placeholder="No end date"/>
           <div style={{fontSize:11,color:R.gray,marginTop:5}}>{unit.repeatEndDate ? `Stops after ${fmtDate(parseDate(unit.repeatEndDate))}` : "No end — continues until relationship ends"}</div>
         </div>
       )}

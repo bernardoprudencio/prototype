@@ -1,11 +1,21 @@
-import React, { useState } from 'react'
-import { colors, typography } from './tokens'
+import React, { useState, useRef } from 'react'
+import { colors, typography, shadows } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
-import { ActionSheet, ReviewSheet } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen } from './screens'
+import { ActionSheet, ReviewSheet, Button } from './components'
+import { HomeScreen, ConversationScreen } from './screens'
+import RelationshipScreen from './screens/relationship/RelationshipScreen'
+import { BackIcon } from './assets/icons'
 import { OWNERS } from './data/owners'
 import { petImages } from './assets/images'
+
+const UNIT_LABELS = {
+  dog_walking:   'walk',
+  drop_in:       'visit',
+  doggy_daycare: 'day',
+  boarding:      'night',
+  house_sitting: 'night',
+}
 
 const TRANSITION_MS = 200
 
@@ -22,6 +32,9 @@ export default function App() {
   const [resolvedCards, setResolvedCards] = useState({})
   const [conversation, setConversation]   = useState(null)
   const [liveEvents, setLiveEvents]       = useState({})
+  const [scheduleContext, setScheduleContext] = useState(null)
+  const [ownerUnits, setOwnerUnits] = useState({})
+  const scheduleRef = useRef(null)
   const [transition, setTransition] = useState(false)
   const [direction, setDirection]   = useState('forward')
   const loadTime = useLoadTime()
@@ -105,20 +118,67 @@ export default function App() {
               setResolvedCards(prev => ({ ...prev, [card.id]: { resolution, timestamp: ts } }))
               addLiveEvent(owner.id, { id: Date.now(), type: 'resolution', resolution, timestamp: ts, card })
             }}
+            onOpenSchedule={(ctx) => {
+              const ownerId = getOwner(conversation).id
+              setScheduleContext({ ...ctx, units: ownerUnits[ownerId] ?? ctx.units, ownerId })
+              navigateTo('schedule', 'forward')
+            }}
             onBack={() => navigateTo('home', 'back')}
           />
         )}
-        {screen === 'schedule' && (
-          <ScheduleScreen
-            owner={getOwner(conversation)}
-            onBack={(savedChanges) => {
-              if (savedChanges?.length) {
-                addLiveEvent(getOwner(conversation).id, { id: Date.now(), type: 'scheduleChange', changes: savedChanges })
-              }
-              navigateTo('conversation', 'back')
-            }}
-          />
-        )}
+        {screen === 'schedule' && scheduleContext && (() => {
+          const unitLabel = UNIT_LABELS[scheduleContext.units?.[0]?.serviceId] ?? 'service'
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
+              {/* Header — mirrors conversation header layout */}
+              <div style={{ borderBottom: `1px solid ${colors.border}`, boxShadow: shadows.headerShadow, padding: '12px 16px 0', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', minHeight: 62, padding: '8px 0' }}>
+                  <div
+                    onClick={() => navigateTo('conversation', 'back')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    <BackIcon />
+                  </div>
+                  <div style={{ flex: 1, marginLeft: 8, minWidth: 0 }}>
+                    <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 16, lineHeight: 1.5, color: colors.primary, margin: 0 }}>Manage schedule</p>
+                    <p style={{ fontFamily: typography.fontFamily, fontSize: 14, lineHeight: 1.25, color: colors.primary, margin: 0 }}>{scheduleContext.ownerName}</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, paddingTop: 12, paddingBottom: 14 }}>
+                  <Button variant="primary" style={{ flexShrink: 0 }} onClick={() => scheduleRef.current?.openAdd()}>Add a {unitLabel}</Button>
+                  <Button variant="default" style={{ flexShrink: 0 }} onClick={() => scheduleRef.current?.openManage()}>Manage templates</Button>
+                </div>
+              </div>
+              <RelationshipScreen
+                ref={scheduleRef}
+                initialPets={scheduleContext.pets}
+                initialUnits={scheduleContext.units}
+                ownerFirstName={scheduleContext.ownerFirstName}
+                isIncompleteResolved={!!resolvedCards[`${scheduleContext.ownerId}-incomplete`]}
+                onScheduleChange={(text, committedUnits) => {
+                  if (committedUnits) setOwnerUnits(prev => ({ ...prev, [scheduleContext.ownerId]: committedUnits }))
+                  addLiveEvent(scheduleContext.ownerId, {
+                    id: Date.now(),
+                    type: 'scheduleChange',
+                    text: text.replace('{ts}', formatActionTimestamp()),
+                  })
+                }}
+                onReviewComplete={(resolution, card) => {
+                  const ts = formatActionTimestamp()
+                  const cardId = `${scheduleContext.ownerId}-incomplete`
+                  setResolvedCards(prev => ({ ...prev, [cardId]: { resolution, timestamp: ts } }))
+                  addLiveEvent(scheduleContext.ownerId, {
+                    id: Date.now(),
+                    type: 'resolution',
+                    resolution,
+                    timestamp: ts,
+                    card,
+                  })
+                }}
+              />
+            </div>
+          )
+        })()}
       </div>
 
       <ActionSheet

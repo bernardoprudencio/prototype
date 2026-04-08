@@ -20,7 +20,7 @@ export default function DeleteConfirmDialog({unit, units, onDelete, onDeleteKeep
         <p style={{margin:0,fontSize:14,color:R.gray,fontFamily,lineHeight:1.5}}>
           {isOnce
             ? <>This will remove <strong style={{color:R.navy}}>{svc && svc.label}</strong> on {unit.startDate ? fmtDate(parseDate(unit.startDate)) : "(no date)"}. {hasPaid && "A refund will be issued per Rover's cancellation policy."}</>
-            : <>This will remove the <strong style={{color:R.navy}}>{svc && svc.label}</strong> rule and cancel all upcoming sessions. {hasPaid && "Paid sessions will be refunded per Rover's cancellation policy."}</>
+            : <>This will remove the <strong style={{color:R.navy}}>{svc && svc.label}</strong> template and cancel all upcoming sessions. {hasPaid && "Paid sessions will be refunded per Rover's cancellation policy."}</>
           }
         </p>
         {!isOnce && (hasPaid || unpaidUpcoming.length > 0) && (

@@ -3,7 +3,7 @@ import { R, fontFamily, labelSt } from './theme'
 import { SERVICES } from '../../data/services'
 import { PROTO_TODAY } from '../../data/owners'
 import { parseDate, dateKey, fmtDate, fmtDateLong, fmtTime, addDays, endTimeFromDuration } from '../../lib/dateUtils'
-import { newId, shortRuleLabel, getRuleImpact } from '../../lib/scheduleHelpers'
+import { newId, shortRuleLabel, getWeekSunday, getScheduleHorizon } from '../../lib/scheduleHelpers'
 import Button from '../../components/Button'
 import Row from '../../components/Row'
 import PetAvatar from '../../components/PetAvatar'
@@ -13,13 +13,15 @@ import CalInput from '../../components/CalInput'
 import TimeInput from '../../components/TimeInput'
 import { CancelIcon, ChevronRightIcon } from '../../assets/icons'
 
-export default function ManageSheet({units, pets, onUnitsChange, onClose}) {
+export default function ManageSheet({units, pets, onUnitsChange, onClose, onAdd}) {
   const [view,        setView]        = useState("list")
   const [editingUnit, setEditingUnit] = useState(null)
 
+  const unitLabel = id => ({ dog_walking: 'walk', drop_in: 'visit', doggy_daycare: 'day', boarding: 'night', house_sitting: 'night' })[id] ?? (SERVICES.find(s => s.id === id)?.label ?? id).toLowerCase()
+
   const recurring       = units.filter(u => u.frequency !== "once")
-  const removeUnit      = id => onUnitsChange(units.filter(x => x.id !== id))
-  const refundAndDelete = id => onUnitsChange(units.filter(x => x.id !== id))
+  const removeUnit      = id => { onUnitsChange(units.filter(x => x.id !== id)) }
+  const refundAndDelete = id => { onUnitsChange(units.filter(x => x.id !== id)) }
   const updateUnit      = updated => {
     const orig         = units.find(x => x.id === updated.id)
     const todayMid     = new Date(PROTO_TODAY); todayMid.setHours(0,0,0,0)
@@ -43,37 +45,38 @@ export default function ManageSheet({units, pets, onUnitsChange, onClose}) {
   const subtitle = svc ? `${svc.label} with ${petStr || "your pet"}` : ""
 
   const handleDismiss = () => {
-    if(view === "cancel") { setView("edit"); return }
-    if(view === "edit")   { setView("list"); setEditingUnit(null); return }
+    if(view === "edit") { setView("list"); setEditingUnit(null); return }
     onClose()
   }
 
   const u                   = editingUnit
   const editEndT            = u ? endTimeFromDuration(u.startTime, u.durationMins) : null
-  const editRecurrenceLabel = u ? `Repeats on ${shortRuleLabel(u)}` : ""
+  const editRecurrenceLabel = u ? shortRuleLabel(u) : ""
   const editDateLabel       = u ? (u.repeatEndDate
     ? `${fmtDate(parseDate(u.startDate))} to ${fmtDate(parseDate(u.repeatEndDate))}`
     : `${fmtDate(parseDate(u.startDate))} with no end`) : ""
   const toggleWeekDay       = d => { if(!u) return; const days = u.weekDays || []; setEditingUnit({...u, weekDays: days.includes(d) ? days.filter(x => x !== d) : [...days, d]}) }
   const isWeekly            = u && u.frequency === "weekly"
 
-  const cancelSvc      = u ? SERVICES.find(s => s.id === u.serviceId) : null
-  const cancelSvcName  = cancelSvc ? cancelSvc.label : "service"
-  const todayMid       = new Date(PROTO_TODAY); todayMid.setHours(0,0,0,0)
-  const startInPast    = u && u.startDate && parseDate(u.startDate) < todayMid
+  const todayMid    = new Date(PROTO_TODAY); todayMid.setHours(0,0,0,0)
+  const startInPast = u && u.startDate && parseDate(u.startDate) < todayMid
 
-  // Phase 5: use getRuleImpact for consistent refund calculation
-  const { paidOccs, refundTotal } = u ? getRuleImpact(u, units) : { paidOccs: [], refundTotal: 0 }
-  const hasPaid        = paidOccs.length > 0
-  const paidDays       = u ? [...new Set(paidOccs.map(o => ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][o.start.getDay()]))] : []
-  const paidDayStr     = paidDays.length === 0 ? "" : paidDays.length === 1 ? paidDays[0] : paidDays.slice(0,-1).join(", ") + " and " + paidDays[paidDays.length-1]
-  const paidWalksSublabel = u ? `${fmtTime(u.startTime)} ${cancelSvcName.toLowerCase()}s on ${paidDayStr}` : ""
+  const cancelTemplate = () => {
+    if (!u) return
+    const paidThru = getWeekSunday(PROTO_TODAY)
+    if (parseDate(u.startDate) > paidThru) {
+      onUnitsChange(units.filter(x => x.id !== u.id))
+    } else {
+      onUnitsChange(units.map(x => x.id !== u.id ? x : { ...x, repeatEndDate: dateKey(paidThru) }))
+    }
+    onClose()
+  }
 
   const header = (
     view === "list" ? (
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",paddingBottom:24}}>
         <div style={{flex:1,minWidth:0}}>
-          <p style={{fontFamily,fontWeight:600,fontSize:20,color:R.navy,margin:0,lineHeight:1.25}}>Recurring rules</p>
+          <p style={{fontFamily,fontWeight:600,fontSize:20,color:R.navy,margin:0,lineHeight:1.25}}>Recurring templates</p>
           <p style={{fontFamily,fontWeight:400,fontSize:14,color:R.gray,margin:"4px 0 0",lineHeight:1.25}}>{subtitle}</p>
         </div>
         <PetAvatar size={48} images={pets.map(p => p.img)}/>
@@ -81,16 +84,7 @@ export default function ManageSheet({units, pets, onUnitsChange, onClose}) {
     ) : view === "edit" && u ? (
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",paddingBottom:24}}>
         <div style={{flex:1,minWidth:0}}>
-          <p style={{fontFamily,fontWeight:600,fontSize:20,color:R.navy,margin:0,lineHeight:1.25}}>Edit rule: {fmtTime(u.startTime)}</p>
-          <p style={{fontFamily,fontWeight:400,fontSize:14,color:R.gray,margin:"4px 0 0",lineHeight:1.25}}>{editRecurrenceLabel}</p>
-          <p style={{fontFamily,fontWeight:400,fontSize:14,color:R.gray,margin:"2px 0 0",lineHeight:1.25}}>{editDateLabel}</p>
-        </div>
-        <PetAvatar size={48} images={pets.map(p => p.img)}/>
-      </div>
-    ) : view === "cancel" && u ? (
-      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",paddingBottom:24}}>
-        <div style={{flex:1,minWidth:0}}>
-          <p style={{fontFamily,fontWeight:600,fontSize:20,color:R.navy,margin:0,lineHeight:1.25}}>Cancel and refund</p>
+          <p style={{fontFamily,fontWeight:600,fontSize:20,color:R.navy,margin:0,lineHeight:1.25}}>Edit template: {fmtTime(u.startTime)}</p>
           <p style={{fontFamily,fontWeight:400,fontSize:14,color:R.gray,margin:"4px 0 0",lineHeight:1.25}}>{editRecurrenceLabel}</p>
           <p style={{fontFamily,fontWeight:400,fontSize:14,color:R.gray,margin:"2px 0 0",lineHeight:1.25}}>{editDateLabel}</p>
         </div>
@@ -105,14 +99,16 @@ export default function ManageSheet({units, pets, onUnitsChange, onClose}) {
         {recurring.map(ru => {
           const endT            = endTimeFromDuration(ru.startTime, ru.durationMins)
           const timeLabel       = `${fmtTime(ru.startTime)} to ${fmtTime(endT)}`
-          const recurrenceLabel = `Repeats on ${shortRuleLabel(ru)}`
+          const recurrenceLabel = shortRuleLabel(ru)
+          const isCancelled     = !!ru.repeatEndDate
           const dateLabel       = ru.repeatEndDate
-            ? `${fmtDate(parseDate(ru.startDate))} to ${fmtDate(parseDate(ru.repeatEndDate))}`
+            ? `Cancelled · ${fmtDate(parseDate(ru.startDate))} to ${fmtDate(parseDate(ru.repeatEndDate))}`
             : `${fmtDate(parseDate(ru.startDate))} with no end`
-          return <Row key={ru.id} label={timeLabel} sublabel={recurrenceLabel} sublabel2={dateLabel} rightItem={<ChevronRightIcon/>} onClick={() => {setEditingUnit(ru); setView("edit")}}/>
+          return <Row key={ru.id} label={timeLabel} sublabel={recurrenceLabel} sublabel2={dateLabel} rightItem={isCancelled ? null : <ChevronRightIcon/>} onClick={isCancelled ? undefined : () => {setEditingUnit(ru); setView("edit")}}/>
         })}
         <div style={{marginTop:24}}>
-          <Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button>
+          {onAdd && <Button variant="primary" size="small" fullWidth onClick={onAdd}>Add a {unitLabel(svc?.id ?? '')}</Button>}
+          <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
         </div>
       </>
     ) : view === "edit" && u ? (
@@ -121,7 +117,7 @@ export default function ManageSheet({units, pets, onUnitsChange, onClose}) {
           <label style={labelSt}>Start date</label>
           {startInPast
             ? <DisabledInput value={fmtDateLong(parseDate(u.startDate))}/>
-            : <CalInput value={u.startDate} onChange={v => setEditingUnit({...u, startDate:v})} placeholder="Select date"/>
+            : <CalInput value={u.startDate} onChange={v => setEditingUnit({...u, startDate:v})} placeholder="Select date" maxDate={dateKey(getScheduleHorizon())}/>
           }
         </div>
         <div style={{marginBottom:24}}>
@@ -145,26 +141,12 @@ export default function ManageSheet({units, pets, onUnitsChange, onClose}) {
           <label style={labelSt}>End date</label>
           <DisabledInput value={u.repeatEndDate ? fmtDate(parseDate(u.repeatEndDate)) : "No end date"}/>
         </div>
-        <div onClick={() => setView("cancel")} style={{display:"flex",alignItems:"center",gap:10,minHeight:56,paddingTop:8,paddingBottom:8,cursor:"pointer"}}>
+        <div onClick={cancelTemplate} style={{display:"flex",alignItems:"center",gap:10,minHeight:56,paddingTop:8,paddingBottom:8,cursor:"pointer"}}>
           <CancelIcon color={R.red}/>
-          <p style={{fontFamily,fontWeight:400,fontSize:16,color:R.red,margin:0,lineHeight:1.5}}>Cancel rule and refund</p>
+          <p style={{fontFamily,fontWeight:400,fontSize:16,color:R.red,margin:0,lineHeight:1.5}}>Cancel template</p>
         </div>
         <div style={{marginTop:16}}>
           <Button variant="primary" size="small" fullWidth onClick={() => updateUnit(u)}>Save changes</Button>
-          <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
-        </div>
-      </>
-    ) : view === "cancel" && u ? (
-      <>
-        <p style={{fontFamily,fontSize:14,color:R.navy,lineHeight:1.5,margin:"0 0 8px"}}>
-          {`This will remove the ${cancelSvcName} rule and cancel all upcoming sessions.${hasPaid ? " Paid sessions will be refunded." : ""}`}
-        </p>
-        {hasPaid && <>
-          <Row label={`Paid ${cancelSvcName.toLowerCase()}s`} sublabel={paidWalksSublabel}/>
-          <Row label="Refund amount" sublabel={`$${refundTotal.toFixed(2)}`}/>
-        </>}
-        <div style={{marginTop:24}}>
-          <Button variant="destructive" size="small" fullWidth onClick={() => {hasPaid ? refundAndDelete(u.id) : removeUnit(u.id); onClose()}}>Cancel and refund</Button>
           <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
         </div>
       </>

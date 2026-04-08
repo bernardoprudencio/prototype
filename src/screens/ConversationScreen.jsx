@@ -4,7 +4,6 @@ import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
 import { getOwnerRelUnit } from '../data/owners'
 import { peopleImages, petImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
-import RelationshipScreen from './RelationshipScreen'
 
 const DayDivider = ({ label }) => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
@@ -14,10 +13,9 @@ const DayDivider = ({ label }) => (
 
 const Gap = ({ h = 12 }) => <div style={{ height: h }} />
 
-export default function ConversationScreen({ onBack, conversation, owner, liveEvents = [], onLiveEvent, onResolveIncomplete }) {
+export default function ConversationScreen({ onBack, conversation, owner, liveEvents = [], onLiveEvent, onResolveIncomplete, onOpenSchedule }) {
   const { type, card } = conversation || {}
   const messagesEndRef = useRef(null)
-  const [tab, setTab] = useState('messages')
   const [text, setText] = useState('')
 
   const sendMessage = () => {
@@ -30,7 +28,6 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
     setText('')
   }
 
-  const isToday = type === 'today'
   const ownerId = owner?.id
   const clientName = owner?.name ?? card?.client
   const clientImg  = peopleImages[ownerId] ?? peopleImages.owen
@@ -70,28 +67,15 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
           </div>
           <div style={{ cursor: 'pointer', flexShrink: 0 }}><MoreIcon /></div>
         </div>
-        <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, paddingTop: 12, overflowX: 'auto', paddingBottom: 14, marginBottom: -14 }}>
+        <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, paddingTop: 12, overflowX: 'auto', paddingBottom: 14 }}>
           <Button variant="primary" style={{ boxShadow: shadows.medium, flexShrink: 0 }}>Leave feedback</Button>
-<Button variant="default" style={{ flexShrink: 0 }}>Details</Button>
-        </div>
-
-        {/* ─── Tab bar ─── */}
-        <div style={{ display: 'flex', marginTop: 14 }}>
-          {[['messages', 'Messages'], ['schedule', 'Schedule']].map(([id, label]) => (
-            <Button key={id} variant="flat" onClick={() => setTab(id)} style={{
-              flex: 1, borderRadius: 0, padding: '11px 0', flexShrink: 1,
-              color: tab === id ? colors.link : colors.tertiary,
-              border: 'none', borderBottom: `2.5px solid ${tab === id ? colors.link : 'transparent'}`,
-            }}>{label}</Button>
-          ))}
+          <Button variant="default" style={{ flexShrink: 0 }} onClick={() => onOpenSchedule?.({ pets: conversationPets, units: relUnits, ownerFirstName: owner?.name?.split(' ')[0] ?? '', ownerName: owner?.name ?? '' })}>Manage schedule</Button>
+          <Button variant="default" style={{ flexShrink: 0 }}>Details</Button>
         </div>
       </div>
 
-      {/* ─── Schedule tab ─── */}
-      {tab === 'schedule' && <RelationshipScreen initialPets={conversationPets} initialUnits={relUnits} onResolveIncomplete={onResolveIncomplete} />}
-
       {/* ─── Messages ─── */}
-      {tab === 'messages' && <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>
+      <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>
 
         {/* ── Owen · Koni & Burley · Today's walk ── */}
         {(!ownerId || ownerId === 'owen') && (
@@ -159,7 +143,7 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
           </>
         )}
 
-        {/* ── Live events: resolutions, schedule changes, sent messages — in order ── */}
+        {/* ── Live events ── */}
         {liveEvents.length > 0 && <DayDivider label="Today" />}
         {liveEvents.map(event => {
           if (event.type === 'message') {
@@ -171,33 +155,16 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
               : <BannerBlock key={event.id} text={`Walk from ${event.card.dateLabel} was cancelled on ${event.timestamp}. A refund of ${event.card.cost} has been processed.`} />
           }
           if (event.type === 'scheduleChange') {
-            return (
-              <ChatBubble
-                key={event.id}
-                message={[
-                  'I made changes to the upcoming schedule. Here\'s a summary:',
-                  ...event.changes.map(c => {
-                    const parts = []
-                    c.removed.forEach(t => parts.push(`${c.day}, ${c.date}: removed ${t}`))
-                    c.added.forEach(t => parts.push(`${c.day}, ${c.date}: added ${t}`))
-                    if (!c.removed.length && !c.added.length) parts.push(`${c.day}, ${c.date}: removed`)
-                    return parts.join('\n')
-                  }),
-                ].join('\n')}
-                time="Just now"
-                isOwner
-                showCheck
-              />
-            )
+            return <BannerBlock key={event.id} text={event.text} />
           }
           return null
         })}
 
         <div ref={messagesEndRef} />
-      </div>}
+      </div>
 
       {/* ─── Composer ─── */}
-      {tab === 'messages' && <div style={{
+      <div style={{
         borderTop: `1px solid ${colors.border}`, padding: '8px 12px',
         display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0,
       }}>
@@ -224,7 +191,7 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
         {text.trim() && (
           <Button variant="primary" icon={<SendIcon />} onClick={sendMessage} />
         )}
-      </div>}
+      </div>
     </div>
   )
 }

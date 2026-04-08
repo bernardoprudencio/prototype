@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { PETS_SEED, PROTO_TODAY } from '../../data/owners'
-import { parseDate, dateKey, fmtRelDate, fmtTime, addDays, isPast, endTimeFromDuration } from '../../lib/dateUtils'
-import { buildAgenda, expandUnit, getWeekMonday, getPaidThruSunday, isPaidOcc, defaultUnit, newId } from '../../lib/scheduleHelpers'
+import { parseDate, dateKey, fmtDate, fmtRelDate, fmtTime, addDays, isPast, endTimeFromDuration } from '../../lib/dateUtils'
+import { buildAgenda, expandUnit, getWeekMonday, getPaidThruSunday, isPaidOcc, defaultUnit, newId, shortRuleLabel, getRuleImpact } from '../../lib/scheduleHelpers'
+import SummarySheet from './SummarySheet'
 import Button from '../../components/Button'
 import ReviewSheet from '../../components/ReviewSheet'
 import { R, fontFamily } from './theme'
@@ -11,84 +12,45 @@ import OccActionSheet from './OccActionSheet'
 import ManageSheet from './ManageSheet'
 import DeleteConfirmDialog from './DeleteConfirmDialog'
 
-export default function RelationshipScreen({initialPets, initialUnits}) {
+const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, initialUnits, ownerFirstName = '', onScheduleChange, onReviewComplete, isIncompleteResolved = false}, ref) {
   const [pets,       setPets]       = useState(initialPets || PETS_SEED)
   const [units,      setUnits]      = useState(initialUnits || [])
   const [relEndDate, setRelEndDate] = useState("")
   const [showAdd,    setShowAdd]    = useState(false)
   const [showManage, setShowManage] = useState(false)
+  const [showSummary,setShowSummary]= useState(false)
   const [activeOcc,  setActiveOcc]  = useState(null)
   const [reviewOcc,  setReviewOcc]  = useState(null)
   const [cancelUnit, setCancelUnit] = useState(null)
-  const [pastWeeksVisible,  setPastWeeksVisible]  = useState(0)
-  const [currentWeekHidden, setCurrentWeekHidden] = useState(false)
-  const [isBelowToday,      setIsBelowToday]      = useState(false)
-  const [isLoadingPast,     setIsLoadingPast]     = useState(false)
+  const savedUnitsRef = useRef(initialUnits || [])
+  const [scrollToKey, setScrollToKey] = useState(null)
 
-  const PAST_PAGE          = 2
-  const WEEK_HEIGHT        = 150
-  const scrollRef          = useRef(null)
-  const upcomingRef        = useRef(null)
-  const currentWeekRef     = useRef(null)
-  const prevScrollHeightRef= useRef(null)
-  const hiddenPastWeeksRef = useRef(0)
+  const emit = (text, committedUnits) => onScheduleChange?.(text, committedUnits)
 
-  const checkScrollPosition = () => {
-    if(!scrollRef.current || !upcomingRef.current) return
-    const cRect = scrollRef.current.getBoundingClientRect()
-    const aTop  = upcomingRef.current.getBoundingClientRect().top
-    setIsBelowToday(aTop < cRect.top)
-    setCurrentWeekHidden(aTop < cRect.top - WEEK_HEIGHT || aTop > cRect.bottom)
-  }
+  const hasChanges = JSON.stringify(units) !== JSON.stringify(savedUnitsRef.current)
 
-  const triggerLoadPast = () => {
-    if(isLoadingPast || hiddenPastWeeksRef.current <= 0) return
-    setIsLoadingPast(true)
-    prevScrollHeightRef.current = scrollRef.current?.scrollHeight ?? null
-  }
+  const scrollRef      = useRef(null)
+  const upcomingRef    = useRef(null)
+  const currentWeekRef = useRef(null)
 
   useEffect(() => {
-    checkScrollPosition()
-    window.addEventListener('resize', checkScrollPosition)
-    return () => window.removeEventListener('resize', checkScrollPosition)
-  }, [pastWeeksVisible, units])
+    if (!scrollToKey || !scrollRef.current) return
+    const el = scrollRef.current.querySelector(`[data-day-key="${scrollToKey}"]`)
+    if (!el) return
+    const containerTop = scrollRef.current.getBoundingClientRect().top
+    const elTop        = el.getBoundingClientRect().top
+    scrollRef.current.scrollTo({ top: scrollRef.current.scrollTop + (elTop - containerTop) - 72, behavior: 'smooth' })
+    setScrollToKey(null)
+  }, [scrollToKey])
 
   useEffect(() => {
-    const el = scrollRef.current; if(!el) return
-    const onWheel = e => { if(el.scrollTop === 0 && e.deltaY < 0) triggerLoadPast() }
-    el.addEventListener('wheel', onWheel, {passive:true})
-    return () => el.removeEventListener('wheel', onWheel)
-  }, [isLoadingPast])
-
-  useEffect(() => {
-    const el = scrollRef.current; if(!el) return
-    let touchStartY = 0
-    const onTouchStart = e => { touchStartY = e.touches[0].clientY }
-    const onTouchEnd   = e => { const deltaY = e.changedTouches[0].clientY - touchStartY; if(el.scrollTop === 0 && deltaY > 30) triggerLoadPast() }
-    el.addEventListener('touchstart', onTouchStart, {passive:true})
-    el.addEventListener('touchend',   onTouchEnd,   {passive:true})
-    return () => { el.removeEventListener('touchstart', onTouchStart); el.removeEventListener('touchend', onTouchEnd) }
-  }, [isLoadingPast])
-
-  useEffect(() => {
+    if(allPastEntries.length > 0) return
     if(currentWeekRef.current && scrollRef.current) {
       const containerTop = scrollRef.current.getBoundingClientRect().top
       const elTop        = currentWeekRef.current.getBoundingClientRect().top
       scrollRef.current.scrollTop += (elTop - containerTop) - 72
     }
   }, [])
-
-  useEffect(() => {
-    if(!isLoadingPast) return
-    const t = setTimeout(() => { setPastWeeksVisible(v => v + PAST_PAGE); setIsLoadingPast(false) }, 600)
-    return () => clearTimeout(t)
-  }, [isLoadingPast])
-
-  useEffect(() => {
-    if(prevScrollHeightRef.current == null || !scrollRef.current) return
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight - prevScrollHeightRef.current
-    prevScrollHeightRef.current = null
-  }, [pastWeeksVisible])
 
   const updateUnit = u => setUnits(prev => prev.map(x => x.id === u.id ? u : x))
 
@@ -159,6 +121,9 @@ export default function RelationshipScreen({initialPets, initialUnits}) {
     })
   }
 
+  const [resolvedIncompleteKey, setResolvedIncompleteKey] = useState(null)
+
+  const allEnded = units.length > 0 && units.every(u => !!u.repeatEndDate)
   const agenda = buildAgenda(units, relEndDate)
   const incompleteKey = useMemo(() => {
     const thisMonday   = getWeekMonday(PROTO_TODAY)
@@ -167,59 +132,53 @@ export default function RelationshipScreen({initialPets, initialUnits}) {
     if(!lastWeekOccs.length) return null
     return lastWeekOccs.reduce((max, occ) => occ.start > max.start ? occ : max).key
   }, [agenda])
+  const effectiveIncompleteKey = (incompleteKey === resolvedIncompleteKey || isIncompleteResolved) ? null : incompleteKey
 
-  const allPastEntries = agenda.filter(([dk]) => isPast(parseDate(dk)))
-  const allUpcoming    = agenda.filter(([dk]) => !isPast(parseDate(dk)))
-  const pastWeekGroups = []; let _lastWk = null
-  allPastEntries.forEach(entry => {
-    const wk = dateKey(getWeekMonday(parseDate(entry[0])))
-    if(wk !== _lastWk) { pastWeekGroups.push([]); _lastWk = wk }
-    pastWeekGroups[pastWeekGroups.length-1].push(entry)
-  })
-  const totalPastWeeks       = pastWeekGroups.length
-  const hiddenPastWeeks      = Math.max(0, totalPastWeeks - pastWeeksVisible)
-  hiddenPastWeeksRef.current = hiddenPastWeeks
-  const visiblePastEntries   = pastWeeksVisible > 0 ? pastWeekGroups.slice(-pastWeeksVisible).flat() : []
+  const thisMonday             = getWeekMonday(PROTO_TODAY)
+  const allPastEntries         = agenda.filter(([dk, occs]) => { const d = parseDate(dk); return isPast(d) && d < thisMonday && occs.some(occ => occ.key === effectiveIncompleteKey) })
+  const currentWeekPastEntries = agenda.filter(([dk]) => { const d = parseDate(dk); return isPast(d) && d >= thisMonday })
+  const allUpcoming            = agenda.filter(([dk]) => !isPast(parseDate(dk)))
+
+  useImperativeHandle(ref, () => ({
+    openAdd:    () => setShowAdd(true),
+    openManage: () => setShowManage(true),
+  }))
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:R.white,position:"relative"}}>
-      <div ref={scrollRef} onScroll={checkScrollPosition} className="hide-scrollbar" style={{flex:1,overflowY:"auto",padding:"0 16px 0"}}>
-        {(isLoadingPast || hiddenPastWeeksRef.current > 0) && (
-          <div style={{height:44,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            {isLoadingPast && <div style={{width:18,height:18,border:`2px solid ${R.border}`,borderTopColor:R.blue,borderRadius:"50%",animation:"spin 0.7s linear infinite"}}/>}
-          </div>
-        )}
+      <div ref={scrollRef} className="hide-scrollbar" style={{flex:1,overflowY:"auto",padding:"0 16px 0"}}>
         <AgendaView
-          agenda={[...visiblePastEntries, ...allUpcoming]}
+          agenda={[...allPastEntries, ...currentWeekPastEntries, ...allUpcoming]}
+          pets={pets}
+          onAdd={() => setShowAdd(true)}
+          allEnded={allEnded}
           upcomingRef={upcomingRef}
           currentWeekRef={currentWeekRef}
           firstUpcomingKey={allUpcoming[0]?.[0]}
           relEndDate={relEndDate}
-          incompleteKey={incompleteKey}
+          incompleteKey={effectiveIncompleteKey}
+          ownerFirstName={ownerFirstName}
+          scrollContainerRef={scrollRef}
           onTap={setActiveOcc}
           onReview={setReviewOcc}
         />
       </div>
-      {currentWeekHidden && (
-        <div style={{position:"absolute",bottom:72,left:"50%",transform:"translateX(-50%)",zIndex:10,pointerEvents:"auto"}}>
-          <button
-            onClick={() => upcomingRef.current?.scrollIntoView({behavior:"smooth",block:"start"})}
-            style={{background:R.navy,color:"#fff",border:"none",borderRadius:99,padding:"8px 20px",fontFamily,fontWeight:600,fontSize:14,cursor:"pointer",boxShadow:"0px 2px 12px -1px rgba(27,31,35,0.32)",whiteSpace:"nowrap"}}
-          >
-            {isBelowToday ? "↑ Current week" : "↓ Current week"}
-          </button>
+      {hasChanges && (
+        <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:10,background:R.white,borderTop:`1px solid ${R.separator}`,padding:16,display:"flex",gap:12}}>
+          <Button variant="primary" style={{flex:1}} onClick={() => setShowSummary(true)}>Save changes</Button>
+          <Button variant="default" onClick={() => setUnits(savedUnitsRef.current)}>Dismiss</Button>
         </div>
       )}
-      <div style={{padding:"10px 16px 12px",background:R.white,borderTop:`1px solid ${R.separator}`,flexShrink:0}}>
-        <div style={{display:"flex",gap:12}}>
-          <Button variant="primary" size="small" onClick={() => setShowAdd(true)} style={{flex:2}}>Add a service</Button>
-          <Button variant="default" size="small" onClick={() => setShowManage(true)} style={{flex:1}}>Manage</Button>
-        </div>
-      </div>
 
       {showAdd && (
         <AddSheet
-          onAdd={u => { setUnits(prev => [...prev, {...u, petIds: u.petIds.length ? u.petIds : pets.map(p => p.id)}]); setShowAdd(false) }}
+          onAdd={u => {
+            const finalUnit = {...u, petIds: u.petIds.length ? u.petIds : pets.map(p => p.id)}
+            setUnits(prev => [...prev, finalUnit])
+            setShowAdd(false)
+            const firstOcc = expandUnit(finalUnit).find(o => !o.skipped)
+            if (firstOcc) setScrollToKey(dateKey(firstOcc.start))
+          }}
           onClose={() => setShowAdd(false)}
           existing={units}
           allPets={pets}
@@ -227,7 +186,7 @@ export default function RelationshipScreen({initialPets, initialUnits}) {
         />
       )}
       {showManage && (
-        <ManageSheet units={units} pets={pets} onUnitsChange={setUnits} onClose={() => setShowManage(false)}/>
+        <ManageSheet units={units} pets={pets} onUnitsChange={setUnits} onClose={() => setShowManage(false)} onAdd={() => { setShowManage(false); setShowAdd(true) }}/>
       )}
       {activeOcc && (
         <OccActionSheet
@@ -246,16 +205,33 @@ export default function RelationshipScreen({initialPets, initialUnits}) {
         <DeleteConfirmDialog
           unit={cancelUnit}
           units={units}
-          onDelete={id => { setUnits(prev => prev.filter(x => x.id !== id)) }}
+          onDelete={id => {
+            setUnits(prev => prev.filter(x => x.id !== id))
+          }}
           onDeleteKeepPaid={id => {
             const u      = units.find(x => x.id === id); if(!u) return
-            const paidThru= getPaidThruSunday(units)
+            const paidThru= getPaidThruSunday()
             const occs   = expandUnit(u).filter(o => !o.skipped && isPaidOcc(o.start, paidThru))
             const kept   = occs.map(o => ({...defaultUnit(u.serviceId, {petIds:u.petIds, startDate:dateKey(o.start), endDate:u.endDate?dateKey(o.end||o.start):"", startTime:u.startTime, durationMins:u.durationMins}), frequency:"once"}))
             setUnits(prev => [...prev.filter(x => x.id !== id), ...kept])
           }}
-          onRefundAndDelete={id => { setUnits(prev => prev.filter(x => x.id !== id)) }}
+          onRefundAndDelete={id => {
+            setUnits(prev => prev.filter(x => x.id !== id))
+          }}
           onClose={() => setCancelUnit(null)}
+        />
+      )}
+      {showSummary && (
+        <SummarySheet
+          savedUnits={savedUnitsRef.current}
+          draftUnits={units}
+          pets={pets}
+          onConfirm={text => {
+            savedUnitsRef.current = units
+            emit(text, units)
+            setShowSummary(false)
+          }}
+          onBack={() => setShowSummary(false)}
         />
       )}
       {reviewOcc && (() => {
@@ -265,10 +241,18 @@ export default function RelationshipScreen({initialPets, initialUnits}) {
           label:    `${reviewOcc.svc.label}${occPets.length > 0 ? `: ${occPets.map(p => p.name).join(", ")}` : ""}`,
           sublabel: `${fmtRelDate(reviewOcc.start)} · ${fmtTime(reviewOcc.unit.startTime)} to ${fmtTime(endT)}`,
           images:   occPets.map(p => p.img),
-          cost:     "",
+          cost:     reviewOcc.unit.cost ? `$${reviewOcc.unit.cost.toFixed(2)}` : "",
+          dateLabel: fmtRelDate(reviewOcc.start),
         }
-        return <ReviewSheet visible card={card} onClose={() => setReviewOcc(null)} onComplete={() => setReviewOcc(null)} onCancelRefund={() => setReviewOcc(null)}/>
+        const handleResolve = resolution => {
+          onReviewComplete?.(resolution, card)
+          if(reviewOcc.key === incompleteKey) setResolvedIncompleteKey(incompleteKey)
+          setReviewOcc(null)
+        }
+        return <ReviewSheet visible card={card} onClose={() => setReviewOcc(null)} onComplete={() => handleResolve('completed')} onCancelRefund={() => handleResolve('cancelled')}/>
       })()}
     </div>
   )
-}
+})
+
+export default RelationshipScreen

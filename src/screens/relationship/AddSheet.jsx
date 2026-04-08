@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { R, fontFamily } from './theme'
 import { SERVICES } from '../../data/services'
-import { PETS_SEED, PROTO_TODAY } from '../../data/owners'
+import { PETS_SEED } from '../../data/owners'
 import { parseDate, dateKey, fmtDate, fmtDateLong, fmtTime, addDays, endTimeFromDuration } from '../../lib/dateUtils'
-import { defaultUnit, expandUnit, getWeekMonday, getWeekSunday, shortSvcName } from '../../lib/scheduleHelpers'
+import { defaultUnit, shortSvcName, getScheduleHorizon } from '../../lib/scheduleHelpers'
 import Button from '../../components/Button'
 import Row from '../../components/Row'
 import PetAvatar from '../../components/PetAvatar'
@@ -51,23 +51,17 @@ export default function AddSheet({onAdd, onClose, existing, allPets, defaultServ
     setUnit(updated)
   }
 
-  const draftDate      = unit?.startDate ? parseDate(unit.startDate) : null
-  const draftEndT      = unit?.startTime && unit?.durationMins ? endTimeFromDuration(unit.startTime, unit.durationMins) : null
-  const dateTimeLabel  = draftDate && unit?.startTime
+  const draftDate     = unit?.startDate ? parseDate(unit.startDate) : null
+  const draftEndT     = unit?.startTime && unit?.durationMins ? endTimeFromDuration(unit.startTime, unit.durationMins) : null
+  const dateTimeLabel = draftDate && unit?.startTime
     ? `${fmtDate(draftDate)} · ${fmtTime(unit.startTime)} to ${fmtTime(draftEndT)}`
     : draftDate ? fmtDate(draftDate) : "Today — default"
-  const isCurrWeek     = draftDate ? dateKey(getWeekMonday(draftDate)) === dateKey(getWeekMonday(PROTO_TODAY)) : false
-  const isMultiDay     = (unit?.weekDays || []).length > 1
-  const cost           = unit?.cost || 20
-  const svcName        = svc ? shortSvcName(svc) : ""
-  const currWeekSunday = draftDate ? getWeekSunday(getWeekMonday(PROTO_TODAY)) : null
-  const currWeekOccs   = unit && draftDate ? expandUnit({...unit, frequency:"weekly"}).filter(o => o.start >= draftDate && currWeekSunday && o.start <= currWeekSunday).length : 0
-  const currWeekTotal  = currWeekOccs * cost
+  const isMultiDay    = (unit?.weekDays || []).length > 1
+  const svcName       = svc ? shortSvcName(svc) : ""
 
   const handleSave = () => {
     if(!unit?.startDate) return
-    if(isCurrWeek) { setAddView("chargeConfirm") }
-    else if(isMultiDay) { onAdd({...unit, frequency:"weekly"}); onClose() }
+    if(isMultiDay) { onAdd({...unit, frequency:"weekly"}); onClose() }
     else { setScopeChoice("this"); setAddView("scopePicker") }
   }
 
@@ -90,8 +84,7 @@ export default function AddSheet({onAdd, onClose, existing, allPets, defaultServ
     <BottomSheet onDismiss={onClose}>
       {sheetHeader(`Add ${svcName}`, draftDate ? fmtDateLong(draftDate) : "Today — default")}
       <div style={{marginBottom:8}}/>
-      <UnitEditor unit={unit} onChange={handleUnitChange} allUnits={existing} allPets={pets} simplified/>
-      {isCurrWeek && <p style={{fontFamily,fontSize:14,color:R.gray,margin:"-8px 0 16px",lineHeight:1.5}}>${currWeekTotal}.00 will be charged</p>}
+      <UnitEditor unit={unit} onChange={handleUnitChange} allUnits={existing} allPets={pets} simplified maxDate={dateKey(getScheduleHorizon())}/>
       <Button variant="primary" size="small" fullWidth disabled={!unit?.startDate} onClick={handleSave}>Save changes</Button>
       <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
     </BottomSheet>
@@ -109,20 +102,6 @@ export default function AddSheet({onAdd, onClose, existing, allPets, defaultServ
         }}>Save changes</Button>
         <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
       </div>
-    </BottomSheet>
-  )
-
-  if(addView === "chargeConfirm") return (
-    <BottomSheet onDismiss={onClose}>
-      {sheetHeader("Add and charge", dateTimeLabel)}
-      <p style={{fontFamily,fontSize:14,color:R.gray,lineHeight:1.6,margin:"8px 0 20px"}}>
-        {`Are you sure you want to add the ${svcName} and charge $${currWeekTotal}.00 to their original payment method?`}
-      </p>
-      <Button variant="primary" size="small" fullWidth onClick={() => {
-        onAdd({...unit, frequency:isMultiDay?"weekly":"once", weekDays:isMultiDay?unit.weekDays:[]})
-        onClose()
-      }}>Confirm and charge</Button>
-      <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
     </BottomSheet>
   )
 

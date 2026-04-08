@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { R, fontFamily } from './theme'
-import { PROTO_TODAY } from '../../data/owners'
 import { dateKey, fmtDate, fmtDateLong, fmtTime, addDays, nightCount, endTimeFromDuration } from '../../lib/dateUtils'
-import { getWeekMonday, shortSvcName } from '../../lib/scheduleHelpers'
+import { shortSvcName } from '../../lib/scheduleHelpers'
 import Button from '../../components/Button'
 import Row from '../../components/Row'
 import PetAvatar from '../../components/PetAvatar'
@@ -16,12 +15,9 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
   const [draft, setDraft] = useState({...occ.unit, startDate: dateKey(occ.start)})
   const [scope, setScope] = useState("this")
 
-  const isRecurring     = (occ.parentUnit || occ.unit).frequency !== "once"
-  const overnight       = occ.svc.type === "overnight"
-  const occWeekMonday   = getWeekMonday(occ.start)
-  const todayWeekMonday = getWeekMonday(PROTO_TODAY)
-  const isCurrentWeek   = dateKey(occWeekMonday) === dateKey(todayWeekMonday)
-  const endT            = !overnight ? endTimeFromDuration(occ.unit.startTime, occ.unit.durationMins) : null
+  const isRecurring = (occ.parentUnit || occ.unit).frequency !== "once"
+  const overnight   = occ.svc.type === "overnight"
+  const endT        = !overnight ? endTimeFromDuration(occ.unit.startTime, occ.unit.durationMins) : null
   const occPets         = allPets.filter(p => occ.unit.petIds.includes(p.id))
   const dateLabel       = overnight
     ? `${fmtDate(occ.start)} to ${fmtDate(occ.end)} · ${occ.totalNights || nightCount(occ.unit)} night${(occ.totalNights || nightCount(occ.unit)) !== 1 ? "s" : ""}`
@@ -53,7 +49,6 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
     }
     const handleRemove = () => {
       if(isRecurring) { setScope("this"); setView("removeScope") }
-      else if(isCurrentWeek) { setScope("this"); setView("cancelRefund") }
       else { onCancel(occ.unit); onClose() }
     }
     return (
@@ -86,13 +81,8 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
   if(view === "removeScope") {
     const followingLabel = `This and following ${svcName}s`
     const handleConfirm = () => {
-      if(scope === "this") {
-        if(isCurrentWeek) { setView("cancelRefund") }
-        else { onSkip(occ.key, true); onClose() }
-      } else {
-        if(isCurrentWeek) { setView("cancelRefund") }
-        else { applyRemoveFollowing(); onClose() }
-      }
+      if(scope === "this") { onSkip(occ.key, true); onClose() }
+      else { applyRemoveFollowing(); onClose() }
     }
     return (
       <BottomSheet onDismiss={onClose}>
@@ -103,26 +93,6 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
           <Button variant="primary" size="small" fullWidth onClick={handleConfirm}>Save changes</Button>
           <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
         </div>
-      </BottomSheet>
-    )
-  }
-
-  if(view === "cancelRefund") {
-    const handleConfirmRefund = () => {
-      if(scope === "this") {
-        if(isRecurring) { onSkip(occ.key, true) }
-        else { onCancel(occ.unit) }
-      } else { applyRemoveFollowing() }
-      onClose()
-    }
-    return (
-      <BottomSheet onDismiss={onClose}>
-        {headerRow("Cancel and refund")}
-        <p style={{fontFamily,fontSize:14,color:R.gray,lineHeight:1.6,margin:"8px 0 20px"}}>
-          {`Are you sure you want to cancel and refund the ${svcName} of ${fmtDate(occ.start)}? A refund of $${occ.unit.cost || 0}.00 will automatically be processed.`}
-        </p>
-        <Button variant="destructive" size="small" fullWidth onClick={handleConfirmRefund}>Cancel and refund</Button>
-        <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
       </BottomSheet>
     )
   }

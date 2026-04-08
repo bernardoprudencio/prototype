@@ -10,7 +10,7 @@ export default function BannerBlock({ text, link, onClick }) {
     }}>
       <div style={{ flexShrink: 0 }}><ClockIcon /></div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontFamily: typography.fontFamily, fontSize: 14, lineHeight: 1.5, color: colors.primary, margin: 0 }}>{text}</p>
+        <p style={{ fontFamily: typography.fontFamily, fontSize: 14, lineHeight: 1.5, color: colors.primary, margin: 0, whiteSpace: 'pre-line' }}>{text}</p>
         {link && (
           <p onClick={onClick} style={{
             fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 14,

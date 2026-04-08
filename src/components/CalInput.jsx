@@ -21,10 +21,11 @@ function isToday(d)     { const t = new Date(); return d.getFullYear()===t.getFu
  *   placeholder  string
  *   bookedDates  string[]  "YYYY-MM-DD" dates to show a green dot indicator
  */
-export default function CalInput({ value, onChange, minDate, placeholder, bookedDates }) {
+export default function CalInput({ value, onChange, minDate, maxDate, placeholder, bookedDates }) {
   const sel   = value ? parseDate(value) : null
   const today = new Date(); today.setHours(0,0,0,0)
   const minD  = minDate ? parseDate(minDate) : today
+  const maxD  = maxDate ? parseDate(maxDate) : null
 
   const bookedSet = bookedDates ? new Set(bookedDates) : null
 
@@ -71,13 +72,15 @@ export default function CalInput({ value, onChange, minDate, placeholder, booked
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ]
 
+  const isAtMaxMonth = maxD && (viewYear > maxD.getFullYear() || (viewYear === maxD.getFullYear() && viewMonth >= maxD.getMonth()))
   const prevM = () => viewMonth === 0  ? (setViewYear(y => y - 1), setViewMonth(11)) : setViewMonth(m => m - 1)
-  const nextM = () => viewMonth === 11 ? (setViewYear(y => y + 1), setViewMonth(0))  : setViewMonth(m => m + 1)
+  const nextM = () => { if (isAtMaxMonth) return; viewMonth === 11 ? (setViewYear(y => y + 1), setViewMonth(0)) : setViewMonth(m => m + 1) }
 
   const pick = day => {
     if (!day) return
     const d = new Date(viewYear, viewMonth, day)
     if (minD && d < minD) return
+    if (maxD && d > maxD) return
     onChange(dateKey(d))
     setOpen(false)
   }
@@ -116,7 +119,7 @@ export default function CalInput({ value, onChange, minDate, placeholder, booked
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <button onClick={prevM} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', transform: 'rotate(180deg)' }}><ChevronRightIcon /></button>
             <span style={{ fontFamily, fontWeight: 600, fontSize: 14, color: colors.primary }}>{MONTHS[viewMonth]} {viewYear}</span>
-            <button onClick={nextM} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center' }}><ChevronRightIcon /></button>
+            <button onClick={nextM} style={{ background: 'none', border: 'none', cursor: isAtMaxMonth ? 'default' : 'pointer', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', opacity: isAtMaxMonth ? 0.3 : 1 }}><ChevronRightIcon /></button>
           </div>
 
           {/* Day letter headers */}
@@ -135,7 +138,7 @@ export default function CalInput({ value, onChange, minDate, placeholder, booked
               const d       = new Date(viewYear, viewMonth, day)
               const dk      = dateKey(d)
               const isSel   = sel && dk === dateKey(sel)
-              const dis     = minD && d < minD
+              const dis     = (minD && d < minD) || (maxD && d > maxD)
               const tod     = isToday(d)
               const booked  = bookedSet ? bookedSet.has(dk) : false
               const hover   = hoveredDay === day && !dis && !isSel
