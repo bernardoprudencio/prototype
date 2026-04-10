@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { PETS_SEED, PROTO_TODAY } from '../../data/owners'
 import { parseDate, dateKey, fmtDate, fmtRelDate, fmtTime, addDays, isPast, endTimeFromDuration } from '../../lib/dateUtils'
-import { buildAgenda, expandUnit, getWeekMonday, getPaidThruSunday, isPaidOcc, defaultUnit, newId, shortRuleLabel, getRuleImpact } from '../../lib/scheduleHelpers'
+import { buildAgenda, expandUnit, getWeekMonday, defaultUnit, newId, shortRuleLabel, getRuleImpact } from '../../lib/scheduleHelpers'
 import SummarySheet from './SummarySheet'
 import Button from '../../components/Button'
 import ReviewSheet from '../../components/ReviewSheet'
@@ -10,7 +10,6 @@ import AgendaView from './AgendaView'
 import AddSheet from './AddSheet'
 import OccActionSheet from './OccActionSheet'
 import ManageSheet from './ManageSheet'
-import DeleteConfirmDialog from './DeleteConfirmDialog'
 
 const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, initialUnits, ownerFirstName = '', onScheduleChange, onReviewComplete, isIncompleteResolved = false}, ref) {
   const [pets,       setPets]       = useState(initialPets || PETS_SEED)
@@ -21,7 +20,6 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
   const [showSummary,setShowSummary]= useState(false)
   const [activeOcc,  setActiveOcc]  = useState(null)
   const [reviewOcc,  setReviewOcc]  = useState(null)
-  const [cancelUnit, setCancelUnit] = useState(null)
   const savedUnitsRef  = useRef(initialUnits || [])
   const [savedVersion, setSavedVersion] = useState(0)
   const [scrollToKey, setScrollToKey] = useState(null)
@@ -285,31 +283,11 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
           onOverride={overrideOccurrence}
           onOverrideFromDate={overrideFromDate}
           onCancelDayFromDate={cancelDayFromDate}
-          onCancel={u => { setActiveOcc(null); setCancelUnit(u) }}
+          onCancel={u => { setActiveOcc(null); setUnits(prev => prev.filter(x => x.id !== u.id)) }}
           onClose={() => setActiveOcc(null)}
         />
       )}
-      {cancelUnit && (
-        <DeleteConfirmDialog
-          unit={cancelUnit}
-          units={units}
-          onDelete={id => {
-            setUnits(prev => prev.filter(x => x.id !== id))
-          }}
-          onDeleteKeepPaid={id => {
-            const u      = units.find(x => x.id === id); if(!u) return
-            const paidThru= getPaidThruSunday()
-            const occs   = expandUnit(u).filter(o => !o.skipped && isPaidOcc(o.start, paidThru))
-            const kept   = occs.map(o => ({...defaultUnit(u.serviceId, {petIds:u.petIds, startDate:dateKey(o.start), endDate:u.endDate?dateKey(o.end||o.start):"", startTime:u.startTime, durationMins:u.durationMins}), frequency:"once"}))
-            setUnits(prev => [...prev.filter(x => x.id !== id), ...kept])
-          }}
-          onRefundAndDelete={id => {
-            setUnits(prev => prev.filter(x => x.id !== id))
-          }}
-          onClose={() => setCancelUnit(null)}
-        />
-      )}
-      {showSummary && (
+{showSummary && (
         <SummarySheet
           savedUnits={savedUnitsRef.current}
           draftUnits={units}

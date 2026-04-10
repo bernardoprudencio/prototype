@@ -1,18 +1,56 @@
 import { useState } from 'react'
 import { R, fontFamily } from './theme'
 import { textStyles } from '../../tokens'
-import { computeScheduleDiff, shortRuleLabel } from '../../lib/scheduleHelpers'
+import { computeScheduleDiff, shortRuleLabel, expandUnit, isPaidOcc, getPaidThruSunday } from '../../lib/scheduleHelpers'
 import { parseDate, fmtDate, fmtDateLong, fmtTime } from '../../lib/dateUtils'
+import { PROTO_TODAY } from '../../data/owners'
+import { SERVICES } from '../../data/services'
 import BottomSheet from '../../components/BottomSheet'
 import Button from '../../components/Button'
 import Row from '../../components/Row'
 import PetAvatar from '../../components/PetAvatar'
 
 const UNIT_LABEL = id => ({ dog_walking: 'walk', drop_in: 'visit', doggy_daycare: 'day', boarding: 'night', house_sitting: 'night' })[id] ?? id
+const SVC_LABEL  = id => SERVICES.find(s => s.id === id)?.label ?? id
 
-function financeLabel(amount, type) {
-  if (!amount || amount <= 0) return ''
-  return ` · $${amount.toFixed(2)} ${type}`
+function computeWeekBilling(savedUnits, draftUnits, petsArr) {
+  const paidThru = getPaidThruSunday()
+  const todayMid = new Date(PROTO_TODAY); todayMid.setHours(0, 0, 0, 0)
+
+  const weekOccs = units =>
+    units.flatMap(u =>
+      expandUnit(u)
+        .filter(o => !o.skipped && isPaidOcc(o.start, paidThru) && o.start >= todayMid)
+        .map(o => ({ unit: u, occ: o }))
+    )
+
+  const savedOccs = weekOccs(savedUnits)
+  const draftOccs = weekOccs(draftUnits)
+
+  const savedTotal = savedOccs.reduce((s, { unit: u }) => s + (u.cost || 0), 0)
+  const draftTotal = draftOccs.reduce((s, { unit: u }) => s + (u.cost || 0), 0)
+
+  // Build line items from draft; fall back to saved when all were removed
+  const sourceOccs = draftOccs.length > 0 ? draftOccs : savedOccs
+  const seen = new Set()
+  const lineItems = []
+  for (const { unit: u } of sourceOccs) {
+    if (seen.has(u.id)) continue
+    seen.add(u.id)
+    const count    = sourceOccs.filter(o => o.unit.id === u.id).length
+    const petNames = petsArr.filter(p => u.petIds.includes(p.id)).map(p => p.name).join(' & ') || 'Pets'
+    lineItems.push({ unit: u, count: draftOccs.length > 0 ? count : 0, petNames, total: draftOccs.length > 0 ? count * (u.cost || 0) : 0 })
+  }
+
+  const net = draftTotal - savedTotal
+  return { savedTotal, draftTotal, net, lineItems, hasActivity: savedOccs.length !== draftOccs.length || net !== 0 }
+}
+
+function chargeSuffix(amount) {
+  return amount > 0 ? ` · Amount due: $${amount.toFixed(2)}` : ''
+}
+function refundSuffix(amount) {
+  return amount > 0 ? ` · Refund: $${amount.toFixed(2)}` : ''
 }
 
 export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, onBack }) {
@@ -67,7 +105,7 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
   }
 
   const handlePrimaryAction = () => {
-    if (netAmount !== 0 && view === 'review') { setView('confirm'); return }
+    if (view === 'review') { setView('confirm'); return }
     handleConfirm()
   }
 
@@ -95,31 +133,67 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
   }
 
   if (view === 'confirm') {
+    const { savedTotal, draftTotal, net, lineItems, hasActivity } = computeWeekBilling(savedUnits, draftUnits, pets)
+    const fmt = n => `$${n.toFixed(2)}`
+    const divider = { borderTop: `1px solid ${R.separator}` }
+
     return (
       <BottomSheet variant="full" onDismiss={() => setView('review')} header={header}>
-        <p style={{ ...textStyles.paragraph100, color: R.navy, margin: '0 0 4px' }}>
-          Are you sure you want to confirm these changes?
-        </p>
-        <p style={{ fontFamily, fontSize: 13, color: R.gray, lineHeight: 1.5, margin: '0 0 16px' }}>
-          Changes take effect immediately. Refunds are processed within 3–5 days.
-        </p>
-        {refundTotal > 0 && (
-          <Row label="Refund" sublabel={`$${refundTotal.toFixed(2)} will be returned to the client`} />
-        )}
-        {chargeTotal > 0 && (
-          <Row label="Charge" sublabel={`$${chargeTotal.toFixed(2)} will be charged to the client`} />
-        )}
-        {refundTotal > 0 && chargeTotal > 0 && (
-          <Row
-            label={netAmount >= 0 ? 'Net charge' : 'Net refund'}
-            sublabel={`$${Math.abs(netAmount).toFixed(2)}`}
-          />
-        )}
-        <div style={{ marginTop: 24 }}>
-          <Button variant="primary" size="small" fullWidth onClick={handleConfirm}>Yes, confirm</Button>
-          <div style={{ marginTop: 12 }}>
-            <Button variant="default" size="small" fullWidth onClick={() => setView('review')}>Go back</Button>
+        {hasActivity ? (
+          <div style={{ background: R.bg, borderRadius: 8, padding: 16, marginBottom: 24 }}>
+            <p style={{ ...textStyles.heading200, color: R.navy, margin: '0 0 12px' }}>Current week summary</p>
+
+            {lineItems.map((item, i) => (
+              <div key={`${item.unit.id}-${i}`} style={{ padding: '12px 0', ...(i > 0 ? divider : {}) }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <p style={{ ...textStyles.text100Semibold, color: R.navy, margin: 0 }}>{item.petNames}</p>
+                  <p style={{ ...textStyles.text100Semibold, color: R.navy, margin: 0 }}>{fmt(item.total)}</p>
+                </div>
+                <p style={{ ...textStyles.paragraph100, color: R.gray, margin: 0 }}>{SVC_LABEL(item.unit.serviceId)}</p>
+                <p style={{ ...textStyles.paragraph100, color: R.gray, margin: 0 }}>
+                  {fmt(item.unit.cost || 0)} per {UNIT_LABEL(item.unit.serviceId)} × {item.count} {item.count === 1 ? UNIT_LABEL(item.unit.serviceId) : UNIT_LABEL(item.unit.serviceId) + 's'}
+                </p>
+              </div>
+            ))}
+
+            <div style={{ padding: '12px 0', ...divider }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <p style={{ ...textStyles.text100Semibold, color: R.navy, margin: 0 }}>Subtotal</p>
+                <p style={{ ...textStyles.text100Semibold, color: R.navy, margin: 0 }}>{fmt(draftTotal)}</p>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <p style={{ ...textStyles.paragraph100, color: R.gray, margin: 0 }}>Previous total</p>
+                <p style={{ ...textStyles.paragraph100, color: R.gray, margin: 0 }}>{fmt(savedTotal)}</p>
+              </div>
+            </div>
+
+            <div style={{ padding: '12px 0', ...divider }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <p style={{ ...textStyles.heading200, color: R.navy, margin: 0 }}>
+                  {net < 0 ? 'Refund amount' : 'Amount due'}
+                </p>
+                <p style={{ ...textStyles.heading200, color: R.navy, margin: 0 }}>
+                  {net < 0 ? `– ${fmt(Math.abs(net))}` : fmt(net)}
+                </p>
+              </div>
+              <p style={{ ...textStyles.paragraph100, color: R.gray, margin: 0 }}>
+                {net > 0
+                  ? `Submitting these changes will charge the owner ${fmt(net)} to their original payment method.`
+                  : net < 0
+                    ? `Submitting these changes will refund the owner ${fmt(Math.abs(net))} to their original payment method.`
+                    : 'No change in price.'}
+              </p>
+            </div>
           </div>
+        ) : (
+          <p style={{ ...textStyles.paragraph100, color: R.gray, margin: '0 0 24px' }}>
+            All modifications will go into place. We'll let the other party know of the changes.
+          </p>
+        )}
+
+        <Button variant="primary" size="small" fullWidth onClick={handleConfirm}>Confirm changes</Button>
+        <div style={{ marginTop: 12 }}>
+          <Button variant="default" size="small" fullWidth onClick={() => setView('review')}>Go back</Button>
         </div>
       </BottomSheet>
     )
@@ -127,43 +201,73 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
 
   // view === 'review' — all items sorted by effective date
   const reviewItems = [
-    ...added.map(({ unit: u, chargeAmount }) => ({
-      key: `add-${u.id}`,
-      date: parseDate(u.startDate),
-      label: u._parentTime
-        ? `${fmtTime(u._parentTime)} · Changed to ${fmtTime(u.startTime)}`
-        : `${fmtTime(u.startTime)} · Added`,
-      sublabel: u.frequency === 'once'
-        ? `${fmtDate(parseDate(u.startDate))}${financeLabel(chargeAmount, 'charged')}`
-        : `${shortRuleLabel(u)} starting ${fmtDate(parseDate(u.startDate))}${financeLabel(chargeAmount, 'charged')}`,
-    })),
-    ...removed.map(({ unit: u, refundAmount }) => ({
-      key: `rem-${u.id}`,
-      date: parseDate(u.startDate),
-      label: `${fmtTime(u.startTime)} · Removed`,
-      sublabel: u.frequency === 'once'
-        ? `${fmtDate(parseDate(u.startDate))}${financeLabel(refundAmount, 'refund')}`
-        : `${shortRuleLabel(u)} starting ${fmtDate(parseDate(u.startDate))}${financeLabel(refundAmount, 'refund')}`,
-    })),
+    ...added.map(({ unit: u, chargeAmount }) => {
+      const startDate = parseDate(u.startDate)
+      if (u._parentTime) {
+        // "Edit all future" time change — new unit forked from existing rule
+        return {
+          key: `add-${u.id}`,
+          date: startDate,
+          label: `${fmtTime(u._parentTime)} ${ul(u.serviceId)} moved to ${fmtTime(u.startTime)}`,
+          sublabel: `Starting ${fmtDateLong(startDate)}, ${shortRuleLabel(u).replace(/^Repeats/, 'repeats')}`,
+        }
+      }
+      if (u.frequency === 'once') {
+        return {
+          key: `add-${u.id}`,
+          date: startDate,
+          label: `Added ${fmtTime(u.startTime)} ${ul(u.serviceId)}`,
+          sublabel: `${fmtDateLong(startDate)}${chargeSuffix(chargeAmount)}`,
+        }
+      }
+      return {
+        key: `add-${u.id}`,
+        date: startDate,
+        label: `Added ${fmtTime(u.startTime)} rule`,
+        sublabel: `Starting ${fmtDateLong(startDate)}, ${shortRuleLabel(u).replace(/^Repeats/, 'repeats')}${chargeSuffix(chargeAmount)}`,
+      }
+    }),
+    ...removed.map(({ unit: u, refundAmount }) => {
+      const startDate = parseDate(u.startDate)
+      if (u.frequency === 'once') {
+        return {
+          key: `rem-${u.id}`,
+          date: startDate,
+          label: `Removed ${fmtTime(u.startTime)} ${ul(u.serviceId)}`,
+          sublabel: `${fmtDateLong(startDate)}${refundSuffix(refundAmount)}`,
+        }
+      }
+      const allOccs = expandUnit(u)
+      const lastOcc = allOccs.length > 0 ? allOccs[allOccs.length - 1] : null
+      const endDate = lastOcc ? lastOcc.start : startDate
+      return {
+        key: `rem-${u.id}`,
+        date: startDate,
+        label: `Removed ${fmtTime(u.startTime)} rule`,
+        sublabel: `${shortRuleLabel(u)}, ends ${fmtDateLong(endDate)}${refundSuffix(refundAmount)}`,
+      }
+    }),
     ...modified.map(({ saved, draft }) => {
       const isEnded = !saved.repeatEndDate && !!draft.repeatEndDate
       return {
         key: `mod-${draft.id}`,
         date: draft.repeatEndDate ? parseDate(draft.repeatEndDate) : parseDate(draft.startDate),
-        label: isEnded ? `${fmtTime(draft.startTime)} · Ended rule` : `${fmtTime(draft.startTime)} · Updated rule`,
-        sublabel: `${shortRuleLabel(draft)}${draft.repeatEndDate ? `, ends ${fmtDate(parseDate(draft.repeatEndDate))}` : ''}`,
+        label: isEnded ? `Removed ${fmtTime(draft.startTime)} rule` : `Updated ${fmtTime(draft.startTime)} rule`,
+        sublabel: isEnded
+          ? `${shortRuleLabel(draft)}, ends ${fmtDateLong(parseDate(draft.repeatEndDate))}`
+          : `${shortRuleLabel(draft)}${draft.repeatEndDate ? `, ends ${fmtDate(parseDate(draft.repeatEndDate))}` : ''}`,
       }
     }),
     ...skipped.map(({ unit, dk, refundAmount }) => ({
       key: `skip-${unit.id}-${dk}`,
       date: parseDate(dk),
-      label: `${fmtTime(unit.startTime)} · Removed`,
-      sublabel: `${fmtDateLong(parseDate(dk))}${financeLabel(refundAmount, 'refund')}`,
+      label: `Removed ${fmtTime(unit.startTime)} ${ul(unit.serviceId)}`,
+      sublabel: `${fmtDateLong(parseDate(dk))}${refundSuffix(refundAmount)}`,
     })),
     ...overridden.map(({ unit, dk, newTime }) => ({
       key: `ovr-${unit.id}-${dk}`,
       date: parseDate(dk),
-      label: `${fmtTime(unit.startTime)} · Changed to ${fmtTime(newTime)}`,
+      label: `${fmtTime(unit.startTime)} ${ul(unit.serviceId)} moved to ${fmtTime(newTime)}`,
       sublabel: fmtDateLong(parseDate(dk)),
     })),
   ].sort((a, b) => a.date - b.date)
