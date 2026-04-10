@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { R, fontFamily } from './theme'
 import { computeScheduleDiff, shortRuleLabel } from '../../lib/scheduleHelpers'
-import { parseDate, fmtDate, fmtTime } from '../../lib/dateUtils'
+import { parseDate, fmtDate, fmtDateLong, fmtTime } from '../../lib/dateUtils'
 import BottomSheet from '../../components/BottomSheet'
 import Button from '../../components/Button'
 import Row from '../../components/Row'
@@ -17,7 +17,7 @@ function financeLabel(amount, type) {
 export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, onBack }) {
   const [view, setView] = useState('review')
   const diff = computeScheduleDiff(savedUnits, draftUnits)
-  const { added, removed, modified, skipped, refundTotal, chargeTotal, netAmount, totalCount } = diff
+  const { added, removed, modified, skipped, overridden, refundTotal, chargeTotal, netAmount, totalCount } = diff
 
   const ul = UNIT_LABEL
 
@@ -27,23 +27,34 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
     const items = [
       ...added.map(({ unit: u }) => ({
         date: parseDate(u.startDate),
-        line: u.frequency === 'once'
-          ? `Added ${ul(u.serviceId)} on ${fmtDate(parseDate(u.startDate))}`
-          : `Added ${ul(u.serviceId)} template — ${shortRuleLabel(u)} at ${fmtTime(u.startTime)} starting ${fmtDate(parseDate(u.startDate))}`,
+        line: u._parentTime
+          ? `Changed ${ul(u.serviceId)} rule to ${fmtTime(u.startTime)} — ${shortRuleLabel(u)} starting ${fmtDate(parseDate(u.startDate))}`
+          : u.frequency === 'once'
+            ? `Added ${ul(u.serviceId)} on ${fmtDate(parseDate(u.startDate))}`
+            : `Added ${ul(u.serviceId)} rule — ${shortRuleLabel(u)} at ${fmtTime(u.startTime)} starting ${fmtDate(parseDate(u.startDate))}`,
       })),
       ...removed.map(({ unit: u }) => ({
         date: parseDate(u.startDate),
         line: u.frequency === 'once'
           ? `Removed ${ul(u.serviceId)} on ${fmtDate(parseDate(u.startDate))}`
-          : `Removed ${ul(u.serviceId)} template — ${shortRuleLabel(u)} at ${fmtTime(u.startTime)} starting ${fmtDate(parseDate(u.startDate))}`,
+          : `Removed ${ul(u.serviceId)} rule — ${shortRuleLabel(u)} at ${fmtTime(u.startTime)} starting ${fmtDate(parseDate(u.startDate))}`,
       })),
-      ...modified.map(({ draft }) => ({
-        date: draft.repeatEndDate ? parseDate(draft.repeatEndDate) : parseDate(draft.startDate),
-        line: `Updated ${ul(draft.serviceId)} template — ${shortRuleLabel(draft)} at ${fmtTime(draft.startTime)}${draft.repeatEndDate ? `, ends ${fmtDate(parseDate(draft.repeatEndDate))}` : ''}`,
-      })),
+      ...modified.map(({ saved, draft }) => {
+        const isEnded = !saved.repeatEndDate && !!draft.repeatEndDate
+        return {
+          date: draft.repeatEndDate ? parseDate(draft.repeatEndDate) : parseDate(draft.startDate),
+          line: isEnded
+            ? `Ended ${ul(draft.serviceId)} rule — ${shortRuleLabel(draft)} at ${fmtTime(draft.startTime)}, ends ${fmtDate(parseDate(draft.repeatEndDate))}`
+            : `Updated ${ul(draft.serviceId)} rule — ${shortRuleLabel(draft)} at ${fmtTime(draft.startTime)}${draft.repeatEndDate ? `, ends ${fmtDate(parseDate(draft.repeatEndDate))}` : ''}`,
+        }
+      }),
       ...skipped.map(({ unit, dk }) => ({
         date: parseDate(dk),
-        line: `Skipped ${ul(unit.serviceId)} on ${fmtDate(parseDate(dk))}`,
+        line: `Removed ${ul(unit.serviceId)} on ${fmtDate(parseDate(dk))}`,
+      })),
+      ...overridden.map(({ unit, dk, newTime }) => ({
+        date: parseDate(dk),
+        line: `Updated ${ul(unit.serviceId)} on ${fmtDateLong(parseDate(dk))} — new time ${fmtTime(newTime)}`,
       })),
     ]
     items.sort((a, b) => a.date - b.date)
@@ -85,8 +96,11 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
   if (view === 'confirm') {
     return (
       <BottomSheet variant="full" onDismiss={() => setView('review')} header={header}>
-        <p style={{ fontFamily, fontSize: 14, color: R.navy, lineHeight: 1.5, margin: '0 0 16px' }}>
+        <p style={{ fontFamily, fontSize: 14, color: R.navy, lineHeight: 1.5, margin: '0 0 4px' }}>
           Are you sure you want to confirm these changes?
+        </p>
+        <p style={{ fontFamily, fontSize: 13, color: R.gray, lineHeight: 1.5, margin: '0 0 16px' }}>
+          Changes take effect immediately. Refunds are processed within 3–5 days.
         </p>
         {refundTotal > 0 && (
           <Row label="Refund" sublabel={`$${refundTotal.toFixed(2)} will be returned to the client`} />
@@ -115,30 +129,41 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
     ...added.map(({ unit: u, chargeAmount }) => ({
       key: `add-${u.id}`,
       date: parseDate(u.startDate),
-      label: u.frequency === 'once' ? `Added ${ul(u.serviceId)}` : `Added ${ul(u.serviceId)} template`,
+      label: u._parentTime
+        ? `${fmtTime(u._parentTime)} · Changed to ${fmtTime(u.startTime)}`
+        : `${fmtTime(u.startTime)} · Added`,
       sublabel: u.frequency === 'once'
         ? `${fmtDate(parseDate(u.startDate))}${financeLabel(chargeAmount, 'charged')}`
-        : `${shortRuleLabel(u)} at ${fmtTime(u.startTime)} starting ${fmtDate(parseDate(u.startDate))}${financeLabel(chargeAmount, 'charged')}`,
+        : `${shortRuleLabel(u)} starting ${fmtDate(parseDate(u.startDate))}${financeLabel(chargeAmount, 'charged')}`,
     })),
     ...removed.map(({ unit: u, refundAmount }) => ({
       key: `rem-${u.id}`,
       date: parseDate(u.startDate),
-      label: u.frequency === 'once' ? `Removed ${ul(u.serviceId)}` : `Removed ${ul(u.serviceId)} template`,
+      label: `${fmtTime(u.startTime)} · Removed`,
       sublabel: u.frequency === 'once'
         ? `${fmtDate(parseDate(u.startDate))}${financeLabel(refundAmount, 'refund')}`
-        : `${shortRuleLabel(u)} at ${fmtTime(u.startTime)} starting ${fmtDate(parseDate(u.startDate))}${financeLabel(refundAmount, 'refund')}`,
+        : `${shortRuleLabel(u)} starting ${fmtDate(parseDate(u.startDate))}${financeLabel(refundAmount, 'refund')}`,
     })),
-    ...modified.map(({ draft }) => ({
-      key: `mod-${draft.id}`,
-      date: draft.repeatEndDate ? parseDate(draft.repeatEndDate) : parseDate(draft.startDate),
-      label: `Updated ${ul(draft.serviceId)} template`,
-      sublabel: `${shortRuleLabel(draft)} at ${fmtTime(draft.startTime)}${draft.repeatEndDate ? `, ends ${fmtDate(parseDate(draft.repeatEndDate))}` : ''}`,
-    })),
+    ...modified.map(({ saved, draft }) => {
+      const isEnded = !saved.repeatEndDate && !!draft.repeatEndDate
+      return {
+        key: `mod-${draft.id}`,
+        date: draft.repeatEndDate ? parseDate(draft.repeatEndDate) : parseDate(draft.startDate),
+        label: isEnded ? `${fmtTime(draft.startTime)} · Ended rule` : `${fmtTime(draft.startTime)} · Updated rule`,
+        sublabel: `${shortRuleLabel(draft)}${draft.repeatEndDate ? `, ends ${fmtDate(parseDate(draft.repeatEndDate))}` : ''}`,
+      }
+    }),
     ...skipped.map(({ unit, dk, refundAmount }) => ({
       key: `skip-${unit.id}-${dk}`,
       date: parseDate(dk),
-      label: `Skipped ${ul(unit.serviceId)}`,
-      sublabel: `${fmtDate(parseDate(dk))}${financeLabel(refundAmount, 'refund')}`,
+      label: `${fmtTime(unit.startTime)} · Removed`,
+      sublabel: `${fmtDateLong(parseDate(dk))}${financeLabel(refundAmount, 'refund')}`,
+    })),
+    ...overridden.map(({ unit, dk, newTime }) => ({
+      key: `ovr-${unit.id}-${dk}`,
+      date: parseDate(dk),
+      label: `${fmtTime(unit.startTime)} · Changed to ${fmtTime(newTime)}`,
+      sublabel: fmtDateLong(parseDate(dk)),
     })),
   ].sort((a, b) => a.date - b.date)
 

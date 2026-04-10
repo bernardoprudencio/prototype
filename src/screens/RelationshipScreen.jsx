@@ -523,8 +523,8 @@ function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOverride, onOverrid
   if(view==="editScope") return(
     <BottomSheet onDismiss={onClose}>
       {headerRow(`Edit ${svcName}`)}
-      <RadioRow label="This one" value="this" selected={scope} onSelect={setScope}/>
-      <RadioRow label="All future ones" value="following" selected={scope} onSelect={setScope}/>
+      <RadioRow label={`This ${svcName} only`} value="this" selected={scope} onSelect={setScope}/>
+      <RadioRow label={`This and following ${svcName}s`} value="following" selected={scope} onSelect={setScope}/>
       <div style={{marginTop:8}}>
         <Button variant="primary" size="small" fullWidth onClick={()=>{scope==="this"?onOverride(occ,draft):onOverrideFromDate(occ,draft);onClose()}}>Save changes</Button>
         <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
@@ -797,7 +797,7 @@ function ManageSheet({units, pets, onUnitsChange, onClose}){
 }
 
 // ─── Agenda view ──────────────────────────────────────────────────────────────
-function AgendaView({agenda, upcomingRef, currentWeekRef, firstUpcomingKey, relEndDate, incompleteKey, onTap, onReview}){
+function AgendaView({agenda, upcomingRef, currentWeekRef, firstUpcomingKey, relEndDate, incompleteKey, addedUnitIds, overriddenKeys, removedKeys, onTap, onReview}){
   if(agenda.length===0) return(
     <div style={{textAlign:"center",padding:"48px 20px",color:R.grayLight}}>
       <div style={{fontSize:32,marginBottom:8}}>📅</div>
@@ -875,14 +875,21 @@ function AgendaView({agenda, upcomingRef, currentWeekRef, firstUpcomingKey, relE
                     const showReviewBtn=occ.key===incompleteKey
                     const overnight=occ.svc.type==="overnight"
                     const timeLabel=overnight?`${fmtDate(occ.start)} – ${fmtDate(occ.end)}`:fmtTime(occ.unit.startTime)
+                    const isAdded=addedUnitIds&&addedUnitIds.has(occ.unit.id)
+                    const changedToTime=overriddenKeys&&overriddenKeys.get(occ.key)
+                    const isRemoved=removedKeys&&removedKeys.has(occ.key)
+                    const flagBorder=isAdded?R.brand:changedToTime?R.blue:isRemoved?R.red:"#D7DCE0"
                     return(
-                      <div key={`${occ.key}-${occ.nightIndex||0}`} style={{border:`2px solid #D7DCE0`,borderRadius:8,padding:"0 16px",background:past&&!showReviewBtn?"#F4F5F6":R.white,marginBottom:8}}>
+                      <div key={`${occ.key}-${occ.nightIndex||0}`} style={{border:`2px solid ${flagBorder}`,borderRadius:8,padding:"0 16px",background:isRemoved?"#FDF2F2":past&&!showReviewBtn?"#F4F5F6":R.white,marginBottom:8}}>
                         <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:16,paddingBottom:isOccToday||showReviewBtn?8:16}}>
                           <div style={{flex:1}}>
-                            <p style={{fontFamily,fontWeight:600,fontSize:16,color:R.navy,margin:"0 0 4px",lineHeight:1.5}}>{timeLabel}</p>
-                            <p style={{fontFamily,fontSize:14,color:R.gray,margin:0,lineHeight:1.25}}>{shortRuleLabel(occ.unit)}</p>
+                            <p style={{fontFamily,fontWeight:600,fontSize:16,color:isRemoved?R.red:R.navy,margin:"0 0 4px",lineHeight:1.5,textDecoration:isRemoved?"line-through":"none"}}>{timeLabel}</p>
+                            <p style={{fontFamily,fontSize:14,color:R.gray,margin:"0 0 2px",lineHeight:1.25}}>{shortRuleLabel(occ.unit)}</p>
+                            {isAdded&&<p style={{fontFamily,fontSize:13,fontWeight:600,color:R.brand,margin:0,lineHeight:1.25}}>Added</p>}
+                            {changedToTime&&<p style={{fontFamily,fontSize:13,fontWeight:600,color:R.blue,margin:0,lineHeight:1.25}}>Changed to {fmtTime(changedToTime)}</p>}
+                            {isRemoved&&<p style={{fontFamily,fontSize:13,fontWeight:600,color:R.red,margin:0,lineHeight:1.25}}>Removed</p>}
                           </div>
-                          {(!past||showReviewBtn)&&<Button variant="default" icon={<MoreIcon size={16}/>} onClick={e=>{e.stopPropagation();onTap(occ)}}/>}
+                          {(!past||showReviewBtn)&&!isRemoved&&<Button variant="default" icon={<MoreIcon size={16}/>} onClick={e=>{e.stopPropagation();onTap(occ)}}/>}
                         </div>
                         {isOccToday&&(
                           <div style={{display:"flex",gap:8,paddingTop:8,paddingBottom:16}}>
@@ -1087,6 +1094,54 @@ export default function RelationshipScreen({ initialPets, initialUnits, onResolv
   }
 
   const agenda=buildAgenda(units,relEndDate)
+
+  // Draft change flags — used to badge agenda cards until changes are saved/dismissed
+  const addedUnitIds = useMemo(() => {
+    const savedIds = new Set(savedUnitsRef.current.map(u => u.id))
+    return new Set(units.filter(u => !savedIds.has(u.id)).map(u => u.id))
+  }, [units])
+  const overriddenKeys = useMemo(() => {
+    const map = new Map()
+    for (const draft of units) {
+      const saved = savedUnitsRef.current.find(u => u.id === draft.id)
+      if (!saved) continue
+      const savedOvr = saved.overrides || {}
+      const draftOvr = draft.overrides || {}
+      for (const dk of Object.keys(draftOvr)) {
+        if (!savedOvr[dk] || savedOvr[dk].startTime !== draftOvr[dk].startTime) {
+          map.set(`${draft.id}-${dk}`, draftOvr[dk].startTime)
+        }
+      }
+    }
+    return map
+  }, [units])
+  const removedKeys = useMemo(() => {
+    const set = new Set()
+    for (const draft of units) {
+      const saved = savedUnitsRef.current.find(u => u.id === draft.id)
+      if (!saved) continue
+      const savedSkipped = new Set(saved.skippedKeys || [])
+      for (const dk of (draft.skippedKeys || [])) {
+        if (!savedSkipped.has(dk)) set.add(`${draft.id}-${dk}`)
+      }
+    }
+    return set
+  }, [units])
+  const agendaWithRemoved = useMemo(() => {
+    if (removedKeys.size === 0) return agenda
+    const removedOccs = units.flatMap(u =>
+      expandUnit(u).filter(occ => occ.skipped && removedKeys.has(`${u.id}-${dateKey(occ.start)}`))
+    )
+    const byDay = new Map(agenda.map(([dk, occs]) => [dk, [...occs]]))
+    for (const occ of removedOccs) {
+      const dk = dateKey(occ.start)
+      if (!byDay.has(dk)) byDay.set(dk, [])
+      byDay.get(dk).push(occ)
+      byDay.get(dk).sort((a, b) => a.unit.startTime.localeCompare(b.unit.startTime))
+    }
+    return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [agenda, removedKeys, units])
+
   const incompleteKey=useMemo(()=>{
     if(incompleteResolved) return null
     const thisMonday=getWeekMonday(PROTO_TODAY)
@@ -1095,8 +1150,8 @@ export default function RelationshipScreen({ initialPets, initialUnits, onResolv
     if(!lastWeekOccs.length) return null
     return lastWeekOccs.reduce((max,occ)=>occ.start>max.start?occ:max).key
   },[agenda,incompleteResolved])
-const allPastEntries=agenda.filter(([dk])=>isPast(parseDate(dk)))
-  const allUpcoming=agenda.filter(([dk])=>!isPast(parseDate(dk)))
+const allPastEntries=agendaWithRemoved.filter(([dk])=>isPast(parseDate(dk)))
+  const allUpcoming=agendaWithRemoved.filter(([dk])=>!isPast(parseDate(dk)))
   const pastWeekGroups=[];let _lastWk=null
   allPastEntries.forEach(entry=>{ const wk=dateKey(getWeekMonday(parseDate(entry[0]))); if(wk!==_lastWk){pastWeekGroups.push([]);_lastWk=wk}; pastWeekGroups[pastWeekGroups.length-1].push(entry) })
   const totalPastWeeks=pastWeekGroups.length
@@ -1112,7 +1167,7 @@ const allPastEntries=agenda.filter(([dk])=>isPast(parseDate(dk)))
             {isLoadingPast&&<div style={{width:18,height:18,border:`2px solid ${R.border}`,borderTopColor:R.blue,borderRadius:"50%",animation:"spin 0.7s linear infinite"}}/>}
           </div>
         )}
-        <AgendaView agenda={[...visiblePastEntries, ...allUpcoming]} upcomingRef={upcomingRef} currentWeekRef={currentWeekRef} firstUpcomingKey={allUpcoming[0]?.[0]} relEndDate={relEndDate} incompleteKey={incompleteKey} onTap={setActiveOcc} onReview={setReviewOcc}/>
+        <AgendaView agenda={[...visiblePastEntries, ...allUpcoming]} upcomingRef={upcomingRef} currentWeekRef={currentWeekRef} firstUpcomingKey={allUpcoming[0]?.[0]} relEndDate={relEndDate} incompleteKey={incompleteKey} addedUnitIds={addedUnitIds} overriddenKeys={overriddenKeys} removedKeys={removedKeys} onTap={setActiveOcc} onReview={setReviewOcc}/>
       </div>
       {currentWeekHidden&&(
         <div style={{position:"absolute",bottom:72,left:"50%",transform:"translateX(-50%)",zIndex:10,pointerEvents:"auto"}}>

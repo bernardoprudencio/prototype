@@ -76,7 +76,7 @@ export default function ManageSheet({units, pets, onUnitsChange, onClose, onAdd}
     view === "list" ? (
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",paddingBottom:24}}>
         <div style={{flex:1,minWidth:0}}>
-          <p style={{fontFamily,fontWeight:600,fontSize:20,color:R.navy,margin:0,lineHeight:1.25}}>Recurring templates</p>
+          <p style={{fontFamily,fontWeight:600,fontSize:20,color:R.navy,margin:0,lineHeight:1.25}}>Recurring rules</p>
           <p style={{fontFamily,fontWeight:400,fontSize:14,color:R.gray,margin:"4px 0 0",lineHeight:1.25}}>{subtitle}</p>
         </div>
         <PetAvatar size={48} images={pets.map(p => p.img)}/>
@@ -84,7 +84,7 @@ export default function ManageSheet({units, pets, onUnitsChange, onClose, onAdd}
     ) : view === "edit" && u ? (
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",paddingBottom:24}}>
         <div style={{flex:1,minWidth:0}}>
-          <p style={{fontFamily,fontWeight:600,fontSize:20,color:R.navy,margin:0,lineHeight:1.25}}>Edit template: {fmtTime(u.startTime)}</p>
+          <p style={{fontFamily,fontWeight:600,fontSize:20,color:R.navy,margin:0,lineHeight:1.25}}>Edit rule: {fmtTime(u.startTime)}</p>
           <p style={{fontFamily,fontWeight:400,fontSize:14,color:R.gray,margin:"4px 0 0",lineHeight:1.25}}>{editRecurrenceLabel}</p>
           <p style={{fontFamily,fontWeight:400,fontSize:14,color:R.gray,margin:"2px 0 0",lineHeight:1.25}}>{editDateLabel}</p>
         </div>
@@ -143,7 +143,7 @@ export default function ManageSheet({units, pets, onUnitsChange, onClose, onAdd}
         </div>
         <div onClick={cancelTemplate} style={{display:"flex",alignItems:"center",gap:10,minHeight:56,paddingTop:8,paddingBottom:8,cursor:"pointer"}}>
           <CancelIcon color={R.red}/>
-          <p style={{fontFamily,fontWeight:400,fontSize:16,color:R.red,margin:0,lineHeight:1.5}}>Cancel template</p>
+          <p style={{fontFamily,fontWeight:400,fontSize:16,color:R.red,margin:0,lineHeight:1.5}}>Cancel rule</p>
         </div>
         <div style={{marginTop:16}}>
           <Button variant="primary" size="small" fullWidth onClick={() => updateUnit(u)}>Save changes</Button>

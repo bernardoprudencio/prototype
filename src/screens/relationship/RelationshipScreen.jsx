@@ -22,7 +22,8 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
   const [activeOcc,  setActiveOcc]  = useState(null)
   const [reviewOcc,  setReviewOcc]  = useState(null)
   const [cancelUnit, setCancelUnit] = useState(null)
-  const savedUnitsRef = useRef(initialUnits || [])
+  const savedUnitsRef  = useRef(initialUnits || [])
+  const [savedVersion, setSavedVersion] = useState(0)
   const [scrollToKey, setScrollToKey] = useState(null)
 
   const emit = (text, committedUnits) => onScheduleChange?.(text, committedUnits)
@@ -81,7 +82,11 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
     const newWeekDays = (parentUnit.weekDays || []).filter(d => d !== occDow)
     const dk          = dateKey(occ.start)
     setUnits(prev => {
-      const updated = prev.map(u => u.id !== parentUnit.id ? u : {...u, repeatEndDate: dateKey(addDays(occ.start, -1))})
+      const updated = prev.map(u => {
+        if (u.id !== parentUnit.id) return u
+        const keys = u.skippedKeys || []
+        return {...u, repeatEndDate: dk, skippedKeys: [...new Set([...keys, dk])]}
+      })
       const newUnit = {
         ...defaultUnit(parentUnit.serviceId, {
           petIds:      parentUnit.petIds,
@@ -93,6 +98,7 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
           everyNWeeks: parentUnit.everyNWeeks,
         }),
         repeatEndDate: parentUnit.repeatEndDate || "",
+        _continuation: true,
       }
       return [...updated, newUnit]
     })
@@ -104,20 +110,39 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
     setUnits(prev => {
       const parent  = prev.find(u => u.id === parentId); if(!parent) return prev
       const updated = prev.map(u => u.id !== parentId ? u : {...u, repeatEndDate: dateKey(addDays(occ.start, -1))})
-      const newUnit = {
+      const occDow    = occ.start.getDay()
+      const otherDays = (parent.weekDays || []).filter(d => d !== occDow)
+      const common    = { repeatEndDate: parent.repeatEndDate || "", endDate: parent.endDate || "" }
+      // Rule for the edited weekday with new time
+      const changedUnit = {
         ...defaultUnit(draft.serviceId, {
           petIds:      draft.petIds,
           startDate:   dk,
           startTime:   draft.startTime,
           durationMins:draft.durationMins,
-          frequency:   draft.frequency,
-          weekDays:    draft.weekDays,
-          everyNWeeks: draft.everyNWeeks,
+          frequency:   parent.frequency,
+          weekDays:    [occDow],
+          everyNWeeks: parent.everyNWeeks,
         }),
-        repeatEndDate: parent.repeatEndDate || "",
-        endDate:       parent.endDate || "",
+        ...common,
+        _parentTime: parent.startTime,
       }
-      return [...updated, newUnit]
+      if (otherDays.length === 0) return [...updated, changedUnit]
+      // Rule for remaining weekdays — continuation at original time
+      const continuationUnit = {
+        ...defaultUnit(parent.serviceId, {
+          petIds:      parent.petIds,
+          startDate:   dk,
+          startTime:   parent.startTime,
+          durationMins:parent.durationMins,
+          frequency:   parent.frequency,
+          weekDays:    otherDays,
+          everyNWeeks: parent.everyNWeeks,
+        }),
+        ...common,
+        _continuation: true,
+      }
+      return [...updated, changedUnit, continuationUnit]
     })
   }
 
@@ -125,6 +150,64 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
 
   const allEnded = units.length > 0 && units.every(u => !!u.repeatEndDate)
   const agenda = buildAgenda(units, relEndDate)
+
+  // Draft change flags — badge agenda cards until changes are saved/dismissed
+  const addedUnitIds = useMemo(() => {
+    const savedIds = new Set(savedUnitsRef.current.map(u => u.id))
+    return new Set(units.filter(u => !savedIds.has(u.id) && !u._parentTime && !u._continuation).map(u => u.id))
+  }, [units, savedVersion])
+  // forked units: "edit all future" time changes — new unit spawned from existing one
+  const changedUnitIds = useMemo(() => {
+    const savedIds = new Set(savedUnitsRef.current.map(u => u.id))
+    const map = new Map()
+    for (const u of units) {
+      if (!savedIds.has(u.id) && u._parentTime && u._parentTime !== u.startTime) {
+        map.set(u.id, u._parentTime) // unitId → original time
+      }
+    }
+    return map
+  }, [units, savedVersion])
+  const overriddenKeys = useMemo(() => {
+    const map = new Map()
+    for (const draft of units) {
+      const saved = savedUnitsRef.current.find(u => u.id === draft.id)
+      if (!saved) continue
+      const savedOvr = saved.overrides || {}
+      const draftOvr = draft.overrides || {}
+      for (const dk of Object.keys(draftOvr)) {
+        if (!savedOvr[dk] || savedOvr[dk].startTime !== draftOvr[dk].startTime) {
+          map.set(`${draft.id}-${dk}`, draftOvr[dk].startTime)
+        }
+      }
+    }
+    return map
+  }, [units, savedVersion])
+  const { removedOccKeys, agendaWithRemoved } = useMemo(() => {
+    // Compare by (serviceId + date) so continuation units (new IDs) don't cause false "removed" flags
+    const draftByDateSvc = new Set(
+      units.flatMap(u => expandUnit(u).filter(o => !o.skipped).map(o => `${u.serviceId}-${dateKey(o.start)}`))
+    )
+    const savedOccs   = savedUnitsRef.current.flatMap(u => expandUnit(u).filter(o => !o.skipped))
+    const removedOccs = savedOccs.filter(o => !draftByDateSvc.has(`${o.parentUnit.serviceId}-${dateKey(o.start)}`))
+    const keys = new Set(removedOccs.map(o => o.key))
+    if (removedOccs.length === 0) return { removedOccKeys: keys, agendaWithRemoved: agenda }
+    const byDay = new Map(agenda.map(([dk, occs]) => [dk, [...occs]]))
+    for (const occ of removedOccs) {
+      const dk = dateKey(occ.start)
+      if (!byDay.has(dk)) byDay.set(dk, [])
+      if (!byDay.get(dk).some(o => o.key === occ.key)) {
+        byDay.get(dk).push(occ)
+        byDay.get(dk).sort((a, b) => a.unit.startTime.localeCompare(b.unit.startTime))
+      }
+    }
+    return { removedOccKeys: keys, agendaWithRemoved: [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)) }
+  }, [agenda, units, savedVersion])
+  // Continuation units (rule was split) — flag their occurrences as "Updated"
+  const updatedUnitIds = useMemo(() => {
+    const savedIds = new Set(savedUnitsRef.current.map(u => u.id))
+    return new Set(units.filter(u => !savedIds.has(u.id) && u._continuation).map(u => u.id))
+  }, [units, savedVersion])
+
   const incompleteKey = useMemo(() => {
     const thisMonday   = getWeekMonday(PROTO_TODAY)
     const lastMonday   = addDays(thisMonday, -7)
@@ -135,9 +218,9 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
   const effectiveIncompleteKey = (incompleteKey === resolvedIncompleteKey || isIncompleteResolved) ? null : incompleteKey
 
   const thisMonday             = getWeekMonday(PROTO_TODAY)
-  const allPastEntries         = agenda.filter(([dk, occs]) => { const d = parseDate(dk); return isPast(d) && d < thisMonday && occs.some(occ => occ.key === effectiveIncompleteKey) })
-  const currentWeekPastEntries = agenda.filter(([dk]) => { const d = parseDate(dk); return isPast(d) && d >= thisMonday })
-  const allUpcoming            = agenda.filter(([dk]) => !isPast(parseDate(dk)))
+  const allPastEntries         = agendaWithRemoved.filter(([dk, occs]) => { const d = parseDate(dk); return isPast(d) && d < thisMonday && occs.some(occ => occ.key === effectiveIncompleteKey) })
+  const currentWeekPastEntries = agendaWithRemoved.filter(([dk]) => { const d = parseDate(dk); return isPast(d) && d >= thisMonday })
+  const allUpcoming            = agendaWithRemoved.filter(([dk]) => !isPast(parseDate(dk)))
 
   useImperativeHandle(ref, () => ({
     openAdd:    () => setShowAdd(true),
@@ -159,6 +242,11 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
           incompleteKey={effectiveIncompleteKey}
           ownerFirstName={ownerFirstName}
           scrollContainerRef={scrollRef}
+          addedUnitIds={addedUnitIds}
+          changedUnitIds={changedUnitIds}
+          overriddenKeys={overriddenKeys}
+          removedKeys={removedOccKeys}
+          updatedUnitIds={updatedUnitIds}
           onTap={setActiveOcc}
           onReview={setReviewOcc}
         />
@@ -228,6 +316,7 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
           pets={pets}
           onConfirm={text => {
             savedUnitsRef.current = units
+            setSavedVersion(v => v + 1)
             emit(text, units)
             setShowSummary(false)
           }}

@@ -258,12 +258,28 @@ export function computeScheduleDiff(savedUnits, draftUnits) {
     }
   }
 
+  // Flat overridden list — new override entries where the time changed
+  const overridden = []
+  for (const id of keptIds) {
+    const saved = savedUnits.find(u => u.id === id)
+    const draft = draftUnits.find(u => u.id === id)
+    const savedOverrides = saved.overrides || {}
+    const draftOverrides = draft.overrides || {}
+    for (const dk of Object.keys(draftOverrides)) {
+      const savedOvr = savedOverrides[dk]
+      const draftOvr = draftOverrides[dk]
+      if (!savedOvr || savedOvr.startTime !== draftOvr.startTime) {
+        overridden.push({ unit: draft, dk, newTime: draftOvr.startTime })
+      }
+    }
+  }
+
   const refundTotal = removed.reduce((s, r) => s + r.refundAmount, 0) +
                       skipped.reduce((s, sk) => s + sk.refundAmount, 0)
   const chargeTotal = added.reduce((s, a) => s + a.chargeAmount, 0)
   // Net: positive = charge, negative = refund, 0 = no financial impact (e.g. same-week move)
   const netAmount   = chargeTotal - refundTotal
-  const totalCount  = added.length + removed.length + modified.length + skipped.length
+  const totalCount  = added.length + removed.length + modified.length + skipped.length + overridden.length
 
-  return { added, removed, modified, skipped, refundTotal, chargeTotal, netAmount, totalCount }
+  return { added, removed, modified, skipped, overridden, refundTotal, chargeTotal, netAmount, totalCount }
 }

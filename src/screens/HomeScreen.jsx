@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { colors, typography, shadows } from '../tokens'
 import { BellIcon, ChevronUpIcon, ChevronDownIcon, EditIcon, MoreIcon } from '../assets/icons'
 import { petImages } from '../assets/images'
 import { formatHeaderDate } from '../hooks/useDate'
 import { Button, PetAvatar, UserAvatar, TabBar, Row } from '../components'
-import { getTodayWalks, getIncompleteCards } from '../data/owners'
+import { getTodayWalks, getIncompleteCards } from '../data/scheduleData'
+import { useAppContext } from '../context/AppContext'
 
 const TODAY_WALKS = getTodayWalks()
 const INCOMPLETE_CARDS = getIncompleteCards()
@@ -14,7 +16,9 @@ const PROMO_CARDS = [
   { bg: colors.cyan100, title: 'Share more, earn more', desc: 'Earn a $100 reward for every two customers you invite who book.', cta: 'Start Sharing', img: petImages.promo2 },
 ]
 
-export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onNavigateToCard, onOpenTodaySheet, loadTime }) {
+export default function HomeScreen({ onOpenActionSheet, onOpenReviewSheet, onOpenTodaySheet, loadTime }) {
+  const navigate = useNavigate()
+  const { resolvedCards } = useAppContext()
   const [incompleteOpen, setIncompleteOpen] = useState(true)
 
   const visibleCards = INCOMPLETE_CARDS.filter(c => !resolvedCards[c.id])
@@ -64,7 +68,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
                       sublabel={card.sublabel}
                       rightItem={<PetAvatar size={48} images={card.petImgs || [petImages[card.petKey]]} />}
                       firstRow
-                      onClick={() => onNavigateToCard(card)}
+                      onClick={() => navigate(`/conversation/${card.clientKey}`, { state: { type: 'incomplete', card } })}
                     />
                     <div style={{ display: 'flex', gap: 8 }}>
                       <Button variant="flat" style={{ flex: 1 }} onClick={() => onOpenReviewSheet(card)}>Review and complete</Button>
@@ -90,10 +94,10 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
                   sublabel={`Today · ${walk.timeRange}`}
                   rightItem={<PetAvatar size={48} images={walk.owner.petImages} />}
                   firstRow
-                  onClick={!blocked ? () => onNavigateConversation(walk) : undefined}
+                  onClick={!blocked ? () => navigate(`/conversation/${walk.owner.id}`, { state: { type: 'today' } }) : undefined}
                 />
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <Button variant={i === 0 ? 'primary' : 'default'} style={{ flex: 1 }} disabled={blocked} onClick={!blocked ? () => onNavigateConversation(walk) : undefined}>
+                  <Button variant={i === 0 ? 'primary' : 'default'} style={{ flex: 1 }} disabled={blocked} onClick={!blocked ? () => navigate(`/conversation/${walk.owner.id}`, { state: { type: 'today' } }) : undefined}>
                     Start Rover Card
                   </Button>
                   <Button variant="default" icon={<MoreIcon size={16} />} onClick={() => onOpenTodaySheet(walk)} />
@@ -107,8 +111,8 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
           </div>
         </div>
 
-        {/* ─── Rover recommends ─── */}
-        <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 20, lineHeight: 1.25, color: colors.primary, margin: '24px 0 8px' }}>Rover recommends</p>
+        {/* ─── Expand your business ─── */}
+        <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 20, lineHeight: 1.25, color: colors.primary, margin: '24px 0 8px' }}>Expand your business</p>
         <div style={{ display: 'flex', flexDirection: 'row', gap: 12, paddingBottom: 24 }}>
           {PROMO_CARDS.map((c, i) => (
             <div key={i} style={{ borderRadius: 8, overflow: 'hidden', boxShadow: shadows.low, background: c.bg, display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>

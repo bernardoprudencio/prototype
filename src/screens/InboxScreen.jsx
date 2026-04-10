@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { colors, typography, spacing } from '../tokens'
 import TabBar from '../components/TabBar'
 import Chip from '../components/Chip'
+import ThreadRow from '../components/ThreadRow'
 import { DropdownIcon } from '../assets/icons'
 import { OWNERS } from '../data/owners'
-import { INBOX_THREADS } from '../data/conversations'
-import { peopleImages } from '../assets/images'
+import { INBOX_THREADS } from '../data/threads'
+import { useAppContext } from '../context/AppContext'
 
 // Filter definitions
 // Primary = all except archived; others filter by status or special fields
@@ -30,14 +32,10 @@ function applyFilter(threads, filterId) {
   }
 }
 
-// Strip the time portion: "Today 10:07 AM" → "Today", "Mar 13 10:12 AM" → "Mar 13"
-const dateOnly = (ts) => ts.replace(/\s+\d{1,2}:\d{2}\s*(AM|PM)/i, '').trim()
 
-// Build snippet: "You: [text]" for sitter messages, plain text for pet parent messages
-const buildSnippet = (text, sender) =>
-  sender === 'you' ? `You: ${text}` : text
-
-export default function InboxScreen({ onNavigateConversation, liveEvents = {} }) {
+export default function InboxScreen() {
+  const navigate = useNavigate()
+  const { liveEvents } = useAppContext()
   const [activeFilter, setActiveFilter] = useState('primary')
   const filtered = applyFilter(INBOX_THREADS, activeFilter)
 
@@ -137,158 +135,21 @@ export default function InboxScreen({ onNavigateConversation, liveEvents = {} })
         ) : filtered.map((thread) => {
           const owner = OWNERS[thread.ownerId]
           if (!owner) return null
-          const { serviceLabel, alert } = thread
 
-          // Use the latest live message if one exists for this owner
           const ownerLiveEvents = liveEvents[thread.ownerId] ?? []
           const lastLive = [...ownerLiveEvents].reverse().find(e => e.type === 'message')
           const displayMessage = lastLive
             ? { text: lastLive.text, sender: 'you', timestamp: 'Today' }
             : thread.lastMessage
 
-          const snippet = buildSnippet(displayMessage.text, displayMessage.sender)
-
           return (
-            <div
+            <ThreadRow
               key={thread.ownerId}
-              onClick={() => onNavigateConversation?.(owner)}
-              style={{ cursor: 'pointer' }}
-            >
-              {/* margin wrapper */}
-              <div style={{ paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
-                {/* padding wrapper */}
-                <div style={{
-                  paddingLeft: spacing.lg,
-                  paddingRight: spacing.lg,
-                  paddingTop: spacing.xl,
-                  paddingBottom: spacing.xl,
-                  background: colors.white,
-                }}>
-
-                  {/* firstRow: avatar + name/pet + date (no time) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.lg }}>
-                    <div style={{ flexShrink: 0 }}>
-                      <img
-                        src={peopleImages[thread.ownerId]}
-                        alt={owner.name}
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '50%',
-                          objectFit: 'cover',
-                          display: 'block',
-                          border: `1px solid ${colors.white}`,
-                        }}
-                      />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{
-                        fontFamily: typography.fontFamily,
-                        fontWeight: 600,
-                        fontSize: 14,
-                        lineHeight: 1.25,
-                        color: colors.primary,
-                        margin: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>{owner.name}</p>
-                      <p style={{
-                        fontFamily: typography.fontFamily,
-                        fontWeight: 400,
-                        fontSize: 14,
-                        lineHeight: 1.25,
-                        color: colors.tertiary,
-                        margin: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>{owner.petNames}</p>
-                    </div>
-                    <div style={{ flexShrink: 0 }}>
-                      <p style={{
-                        fontFamily: typography.fontFamily,
-                        fontWeight: 400,
-                        fontSize: 14,
-                        lineHeight: 1.25,
-                        color: colors.tertiary,
-                        margin: 0,
-                        textAlign: 'right',
-                        whiteSpace: 'nowrap',
-                      }}>{dateOnly(displayMessage.timestamp)}</p>
-                    </div>
-                  </div>
-
-                  {/* messageSnippet */}
-                  <p style={{
-                    fontFamily: typography.fontFamily,
-                    fontWeight: 400,
-                    fontSize: 14,
-                    lineHeight: 1.25,
-                    color: colors.primary,
-                    margin: 0,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>{snippet}</p>
-
-                  {/* serviceDetail */}
-                  <p style={{
-                    fontFamily: typography.fontFamily,
-                    fontWeight: 400,
-                    fontSize: 14,
-                    lineHeight: 1.25,
-                    color: colors.tertiary,
-                    margin: 0,
-                    paddingTop: spacing.lg,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>{serviceLabel}</p>
-
-                  {/* lastRow: status */}
-                  <div style={{ paddingTop: spacing.sm }}>
-                    <p style={{
-                      fontFamily: typography.fontFamily,
-                      fontWeight: 400,
-                      fontSize: 14,
-                      lineHeight: 1.25,
-                      color: colors.success,
-                      margin: 0,
-                    }}>Ongoing</p>
-                  </div>
-
-                  {/* subActionFrame: nudge — shown when alert is set */}
-                  {alert && (
-                    <div style={{ paddingTop: spacing.lg }}>
-                      <div style={{
-                        background: colors.blueLight,
-                        borderRadius: 8,
-                        padding: '8px 16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: spacing.sm,
-                      }}>
-                        <p style={{
-                          fontFamily: typography.fontFamily,
-                          fontWeight: 600,
-                          fontSize: 14,
-                          lineHeight: 1.25,
-                          color: colors.link,
-                          textDecoration: 'underline',
-                          margin: 0,
-                          flex: 1,
-                        }}>{alert}</p>
-                        <span style={{ color: colors.link, fontSize: 16 }}>›</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* border separator */}
-              <div style={{ height: 1, background: colors.border }} />
-            </div>
+              thread={thread}
+              owner={owner}
+              displayMessage={displayMessage}
+              onClick={() => navigate(`/conversation/${owner.id}`, { state: { type: 'today' } })}
+            />
           )
         })}
       </div>

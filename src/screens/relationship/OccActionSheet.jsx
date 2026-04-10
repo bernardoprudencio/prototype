@@ -30,8 +30,13 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
 
   const endRuleFromDate = () => {
     const baseUnit = occ.parentUnit || occ.unit
-    if(dateKey(occ.start) === baseUnit.startDate) { onCancel(baseUnit) }
-    else { onSaveUnit({...baseUnit, repeatEndDate: dateKey(addDays(occ.start, -1))}); onClose() }
+    const dk = dateKey(occ.start)
+    if(dk === baseUnit.startDate) { onCancel(baseUnit) }
+    else {
+      const keys = baseUnit.skippedKeys || []
+      onSaveUnit({...baseUnit, repeatEndDate: dk, skippedKeys: [...new Set([...keys, dk])]})
+      onClose()
+    }
   }
 
   const applyRemoveFollowing = () => {
@@ -69,8 +74,8 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
   if(view === "editScope") return (
     <BottomSheet onDismiss={onClose}>
       {headerRow(`Edit ${svcName}`)}
-      <RadioRow label="This one" value="this" selected={scope} onSelect={setScope}/>
-      <RadioRow label="All future ones" value="following" selected={scope} onSelect={setScope}/>
+      <RadioRow label={`This ${svcName} only`} value="this" selected={scope} onSelect={setScope}/>
+      <RadioRow label={`This and following ${svcName}s`} value="following" selected={scope} onSelect={setScope}/>
       <div style={{marginTop:8}}>
         <Button variant="primary" size="small" fullWidth onClick={() => {scope === "this" ? onOverride(occ, draft) : onOverrideFromDate(occ, draft); onClose()}}>Save changes</Button>
         <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>

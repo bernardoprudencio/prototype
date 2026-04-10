@@ -10,7 +10,7 @@ import { MoreIcon, ChevronDownIcon, CheckIcon } from '../../assets/icons'
 
 const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
-export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, currentWeekRef, firstUpcomingKey, relEndDate, incompleteKey, ownerFirstName, scrollContainerRef, onTap, onReview}) {
+export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, currentWeekRef, firstUpcomingKey, relEndDate, incompleteKey, ownerFirstName, scrollContainerRef, addedUnitIds, changedUnitIds, overriddenKeys, removedKeys, updatedUnitIds, onTap, onReview}) {
   const [showJump, setShowJump] = useState(false)
   const [activeMo, setActiveMo] = useState(null)
   const monthRefs = useRef(new Map())
@@ -184,15 +184,35 @@ export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, 
                         const timeLabel     = overnight
                           ? `${fmtDate(occ.start)} – ${fmtDate(occ.end)}`
                           : fmtTime(occ.unit.startTime)
+                        const isAdded          = addedUnitIds?.has(occ.unit.id)
+                        const changedToTime    = overriddenKeys?.get(occ.key)
+                        const unitChangedFrom  = changedUnitIds?.get(occ.unit.id)
+                        const isRemoved        = removedKeys?.has(occ.key)
+                        const isUpdated        = !isAdded && !changedToTime && !unitChangedFrom && updatedUnitIds?.has(occ.unit.id)
+                        const originalTime     = changedToTime && occ.parentUnit ? fmtTime(occ.parentUnit.startTime) : timeLabel
+                        const unitOriginalTime = unitChangedFrom ? fmtTime(unitChangedFrom) : timeLabel
+                        const flagBorder       = isAdded ? R.brand : (changedToTime || unitChangedFrom || isUpdated) ? R.blue : isRemoved ? R.red : '#D7DCE0'
+                        const headingColor     = isAdded ? R.brand : isRemoved ? R.red : (changedToTime || unitChangedFrom || isUpdated) ? R.blue : R.navy
+                        const headingText      = isAdded
+                          ? `${timeLabel} · Added`
+                          : isRemoved
+                            ? `${timeLabel} · Removed`
+                            : changedToTime
+                              ? `${originalTime} · Changed to ${fmtTime(changedToTime)}`
+                              : unitChangedFrom
+                                ? `${unitOriginalTime} · Changed to ${timeLabel}`
+                                : isUpdated
+                                  ? `${timeLabel} · Updated`
+                                  : timeLabel
                         return (
-                          <div key={`${occ.key}-${occ.nightIndex || 0}`} style={{border:`2px solid #D7DCE0`,borderRadius:8,padding:"0 16px",background:R.white,marginBottom:8}}>
+                          <div key={`${occ.key}-${occ.nightIndex || 0}`} style={{border:`2px solid ${flagBorder}`,borderRadius:8,padding:"0 16px",background:isRemoved?'#FDF2F2':R.white,marginBottom:8}}>
                             <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:16,paddingBottom:isOccToday || showReviewBtn ? 8 : 16}}>
                               <div style={{flex:1}}>
-                                <p style={{fontFamily,fontWeight:600,fontSize:16,color:R.navy,margin:"0 0 4px",lineHeight:1.5}}>{timeLabel}</p>
+                                <p style={{fontFamily,fontWeight:600,fontSize:16,color:headingColor,margin:"0 0 4px",lineHeight:1.5}}>{headingText}</p>
                                 <p style={{fontFamily,fontSize:14,color:R.gray,margin:0,lineHeight:1.25}}>{shortRuleLabel(occ.unit)}</p>
                               </div>
-                              {!past && !showReviewBtn && <Button variant="default" icon={<MoreIcon size={16}/>} onClick={e => {e.stopPropagation(); onTap(occ)}}/>}
-                              {past && !showReviewBtn && <div style={{width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><CheckIcon /></div>}
+                              {!past && !showReviewBtn && !isRemoved && <Button variant="default" icon={<MoreIcon size={16}/>} onClick={e => {e.stopPropagation(); onTap(occ)}}/>}
+                              {past && !showReviewBtn && !isRemoved && <div style={{width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><CheckIcon /></div>}
                             </div>
                             {isOccToday && (
                               <div style={{display:"flex",gap:8,paddingTop:8,paddingBottom:16}}>

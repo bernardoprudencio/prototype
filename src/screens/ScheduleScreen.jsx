@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { colors, typography, shadows, radius } from '../tokens'
 import { BackIcon } from '../assets/icons'
 import { Button, PetAvatar, Chip } from '../components'
-import { PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeek } from '../data/owners'
+import { PROTO_TODAY } from '../data/owners'
+import { getOwnerUpcomingWeeks, getOwnerCurrentWeek } from '../data/scheduleData'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const TrashIcon = () => (
