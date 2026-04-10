@@ -163,13 +163,14 @@ export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, 
                   <p style={{...textStyles.heading200,color:isGapWeek ? R.grayLight : R.navy,margin:0}}>Week of {fmtDate(monday)}</p>
                   <p style={{...textStyles.text100,color:paymentColor,margin:"4px 0 0"}}>{paymentLabel}</p>
                 </div>
-                {!isGapWeek && entries.map(([dayKey, occs], entryIdx) => {
+                {!isGapWeek && <div style={{background:R.bg,borderRadius:12,padding:'16px',marginBottom:8}}>
+                {entries.map(([dayKey, occs], entryIdx) => {
                   const d             = parseDate(dayKey)
                   const today         = isToday(d), past = isPast(d)
                   const isLastEntry   = isLastWeek && entryIdx === entries.length - 1
                   const showEndMarker = relEndDate && isLastEntry
                   return (
-                    <div key={dayKey} data-day-key={dayKey} ref={dayKey === firstUpcomingKey ? upcomingRef : null} style={{marginBottom:16}}>
+                    <div key={dayKey} data-day-key={dayKey} ref={dayKey === firstUpcomingKey ? upcomingRef : null} style={{marginBottom: entryIdx === entries.length - 1 ? 0 : 16}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                         <p style={{...textStyles.heading100,color:R.navy,margin:0,flex:1}}>{DAY_NAMES_FULL[d.getDay()]}</p>
                         <div style={{background:"#FFECBD",borderRadius:8,width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -240,6 +241,7 @@ export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, 
                     </div>
                   )
                 })}
+                </div>}
               </div>
             )
           })}
