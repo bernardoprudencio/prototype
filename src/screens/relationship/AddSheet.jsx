@@ -93,8 +93,8 @@ export default function AddSheet({onAdd, onClose, existing, allPets, defaultServ
   if(addView === "scopePicker") return (
     <BottomSheet onDismiss={onClose}>
       {sheetHeader(`Add ${svcName}`, dateTimeLabel)}
-      <RadioRow label={`This ${svcName} only`} value="this" selected={scopeChoice} onSelect={setScopeChoice}/>
-      <RadioRow label={`This and following ${svcName}s`} value="following" selected={scopeChoice} onSelect={setScopeChoice}/>
+      <RadioRow label={`One-time ${svcName}`} value="this" selected={scopeChoice} onSelect={setScopeChoice}/>
+      <RadioRow label="Repeat weekly from this date" value="following" selected={scopeChoice} onSelect={setScopeChoice}/>
       <div style={{marginTop:8}}>
         <Button variant="primary" size="small" fullWidth onClick={() => {
           scopeChoice === "this" ? onAdd({...unit, frequency:"once", weekDays:[]}) : onAdd({...unit, frequency:"weekly"})

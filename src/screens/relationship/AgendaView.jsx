@@ -6,7 +6,7 @@ import { getWeekMonday, shortRuleLabel } from '../../lib/scheduleHelpers'
 import Button from '../../components/Button'
 import PetAvatar from '../../components/PetAvatar'
 import { textStyles } from '../../tokens'
-import { MoreIcon, ChevronDownIcon, CheckIcon } from '../../assets/icons'
+import { MoreIcon, DropdownIcon, CheckIcon } from '../../assets/icons'
 
 const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
@@ -111,7 +111,7 @@ export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, 
               style={{display:"flex",alignItems:"center",width:"100%",background:"none",border:"none",cursor:mo === activeMo ? "pointer" : "default",padding:0}}
             >
               <p style={{...textStyles.heading300,color:R.navy,margin:0,flex:1,textAlign:"left"}}>{label}</p>
-              {mo === activeMo && <ChevronDownIcon />}
+              {mo === activeMo && <DropdownIcon />}
             </button>
             {mo === activeMo && showJump && <>
               <div style={{position:"fixed",inset:0,zIndex:9}} onClick={() => setShowJump(false)} />
@@ -172,10 +172,7 @@ export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, 
                   return (
                     <div key={dayKey} data-day-key={dayKey} ref={dayKey === firstUpcomingKey ? upcomingRef : null} style={{marginBottom: entryIdx === entries.length - 1 ? 0 : 16}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                        <p style={{...textStyles.heading100,color:R.navy,margin:0,flex:1}}>{DAY_NAMES_FULL[d.getDay()]}</p>
-                        <div style={{background:"#FFECBD",borderRadius:8,width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                          <span style={{fontSize:13,fontWeight:600,color:R.navy,fontFamily,lineHeight:1}}>{d.getDate()}</span>
-                        </div>
+                        <p style={{...textStyles.heading100,color:R.navy,margin:0,flex:1}}>{`${DAY_NAMES_FULL[d.getDay()]}, ${fmtDate(d)}`}</p>
                       </div>
                       {occs.map((occ, occIdx) => {
                         const isOccToday    = today && !past

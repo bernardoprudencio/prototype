@@ -61,6 +61,7 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
   const ul = UNIT_LABEL
 
   const isEmpty = totalCount === 0
+  const { savedTotal, draftTotal, net, lineItems, hasActivity } = computeWeekBilling(savedUnits, draftUnits, pets)
 
   const handleConfirm = () => {
     const items = [
@@ -105,7 +106,11 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
   }
 
   const handlePrimaryAction = () => {
-    if (view === 'review') { setView('confirm'); return }
+    if (view === 'review') {
+      if (hasActivity) { setView('confirm'); return }
+      handleConfirm()
+      return
+    }
     handleConfirm()
   }
 
@@ -113,7 +118,7 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingBottom: 24 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ ...textStyles.heading300, color: R.navy, margin: 0 }}>
-          {view === 'confirm' ? 'Confirm changes' : 'Review changes'}
+          {view === 'confirm' ? 'Review charges and refunds' : 'Review changes'}
         </p>
         <p style={{ ...textStyles.text100, color: R.gray, margin: '4px 0 0' }}>
           {isEmpty ? 'No changes to save' : `${totalCount} change${totalCount !== 1 ? 's' : ''}`}
@@ -133,7 +138,6 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
   }
 
   if (view === 'confirm') {
-    const { savedTotal, draftTotal, net, lineItems, hasActivity } = computeWeekBilling(savedUnits, draftUnits, pets)
     const fmt = n => `$${n.toFixed(2)}`
     const divider = { borderTop: `1px solid ${R.separator}` }
 
@@ -141,7 +145,7 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
       <BottomSheet variant="full" onDismiss={() => setView('review')} header={header}>
         {hasActivity ? (
           <div style={{ background: R.bg, borderRadius: 8, padding: 16, marginBottom: 24 }}>
-            <p style={{ ...textStyles.heading200, color: R.navy, margin: '0 0 12px' }}>Current week summary</p>
+            <p style={{ ...textStyles.heading200, color: R.navy, margin: '0 0 12px' }}>This week's summary</p>
 
             {lineItems.map((item, i) => (
               <div key={`${item.unit.id}-${i}`} style={{ padding: '12px 0', ...(i > 0 ? divider : {}) }}>
@@ -278,7 +282,7 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
         <Row key={item.key} label={item.label} sublabel={item.sublabel} />
       ))}
       <div style={{ marginTop: 24 }}>
-        <Button variant="primary" size="small" fullWidth onClick={handlePrimaryAction}>Confirm changes</Button>
+        <Button variant="primary" size="small" fullWidth onClick={handlePrimaryAction}>{hasActivity ? 'Review charges and refunds' : 'Confirm changes'}</Button>
         <div style={{ marginTop: 12 }}>
           <Button variant="default" size="small" fullWidth onClick={onBack}>Go back</Button>
         </div>
