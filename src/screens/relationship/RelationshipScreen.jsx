@@ -237,14 +237,14 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
           currentWeekRef={currentWeekRef}
           firstUpcomingKey={allUpcoming[0]?.[0]}
           relEndDate={relEndDate}
-          incompleteKey={effectiveIncompleteKey}
+          incompleteKey={null}
           ownerFirstName={ownerFirstName}
           scrollContainerRef={scrollRef}
           addedUnitIds={addedUnitIds}
           changedUnitIds={changedUnitIds}
           overriddenKeys={overriddenKeys}
           removedKeys={removedOccKeys}
-          updatedUnitIds={updatedUnitIds}
+          updatedUnitIds={null}
           onTap={setActiveOcc}
           onReview={setReviewOcc}
         />
