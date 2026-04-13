@@ -80,11 +80,9 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
     const newWeekDays = (parentUnit.weekDays || []).filter(d => d !== occDow)
     const dk          = dateKey(occ.start)
     setUnits(prev => {
-      const updated = prev.map(u => {
-        if (u.id !== parentUnit.id) return u
-        const keys = u.skippedKeys || []
-        return {...u, repeatEndDate: dk, skippedKeys: [...new Set([...keys, dk])]}
-      })
+      const updated = prev.map(u =>
+        u.id !== parentUnit.id ? u : {...u, repeatEndDate: dateKey(addDays(occ.start, -1))}
+      )
       const newUnit = {
         ...defaultUnit(parentUnit.serviceId, {
           petIds:      parentUnit.petIds,
@@ -107,10 +105,40 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
     const parentId = occ.parentUnit ? occ.parentUnit.id : occ.unit.id
     setUnits(prev => {
       const parent  = prev.find(u => u.id === parentId); if(!parent) return prev
-      const updated = prev.map(u => u.id !== parentId ? u : {...u, repeatEndDate: dateKey(addDays(occ.start, -1))})
       const occDow    = occ.start.getDay()
       const otherDays = (parent.weekDays || []).filter(d => d !== occDow)
       const common    = { repeatEndDate: parent.repeatEndDate || "", endDate: parent.endDate || "" }
+
+      // Editing from the very first occurrence — no need to split, just replace parent
+      if (dk === parent.startDate) {
+        if ((parent.weekDays || []).length <= 1) {
+          // Single-day: update in-place, no new units
+          return prev.map(u => u.id !== parentId ? u : {...u, startTime: draft.startTime, durationMins: draft.durationMins})
+        }
+        // Multi-day: replace parent entirely to avoid a zombie with repeatEndDate < startDate
+        const changedUnit = {
+          ...defaultUnit(draft.serviceId, {
+            petIds: draft.petIds, startDate: dk, startTime: draft.startTime,
+            durationMins: draft.durationMins, frequency: parent.frequency,
+            weekDays: [occDow], everyNWeeks: parent.everyNWeeks,
+          }),
+          ...common,
+          _parentTime: parent.startTime,
+        }
+        const continuationUnit = {
+          ...defaultUnit(parent.serviceId, {
+            petIds: parent.petIds, startDate: dk, startTime: parent.startTime,
+            durationMins: parent.durationMins, frequency: parent.frequency,
+            weekDays: otherDays, everyNWeeks: parent.everyNWeeks,
+          }),
+          ...common,
+          _continuation: true,
+        }
+        const rest = prev.filter(u => u.id !== parentId)
+        return otherDays.length > 0 ? [...rest, changedUnit, continuationUnit] : [...rest, changedUnit]
+      }
+
+      const updated = prev.map(u => u.id !== parentId ? u : {...u, repeatEndDate: dateKey(addDays(occ.start, -1))})
       // Rule for the edited weekday with new time
       const changedUnit = {
         ...defaultUnit(draft.serviceId, {

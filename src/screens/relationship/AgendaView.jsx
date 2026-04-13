@@ -64,14 +64,23 @@ export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, 
   const svcNames = [...new Set(agenda.flatMap(([, occs]) => occs.map(o => svcShortMap[o.svc.id] || o.svc.label.toLowerCase())))]
   const emptyWeekSvc = svcNames.length === 1 ? `${svcNames[0]}s` : 'services'
 
-  // Build a map of week-monday-key → entries
+  // Build a map of week-monday-key → entries, excluding fully past weeks
+  const thisWeekMonday = getWeekMonday(todayMid)
   const weekEntryMap = new Map()
   agenda.forEach(([dayKey, occs]) => {
     const monday = getWeekMonday(parseDate(dayKey))
+    if (monday < thisWeekMonday) return  // skip weeks entirely before the current week
     const wk     = dateKey(monday)
     if (!weekEntryMap.has(wk)) weekEntryMap.set(wk, [])
     weekEntryMap.get(wk).push([dayKey, occs])
   })
+
+  if (weekEntryMap.size === 0) return endCard ?? (
+    <div style={{textAlign:"center",padding:"48px 20px",color:R.grayLight}}>
+      <div style={{fontSize:32,marginBottom:8}}>📅</div>
+      <div style={{fontSize:14,fontWeight:600,fontFamily}}>No upcoming services</div>
+    </div>
+  )
 
   // Generate all weeks in range (including gaps)
   const sortedWks   = [...weekEntryMap.keys()].sort()

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { R, fontFamily } from './theme'
 import { textStyles } from '../../tokens'
 import { computeScheduleDiff, shortRuleLabel, expandUnit, isPaidOcc, getPaidThruSunday } from '../../lib/scheduleHelpers'
-import { parseDate, fmtDate, fmtDateLong, fmtTime } from '../../lib/dateUtils'
+import { parseDate, dateKey, addDays, fmtDate, fmtDateLong, fmtTime } from '../../lib/dateUtils'
 import { PROTO_TODAY } from '../../data/owners'
 import { SERVICES } from '../../data/services'
 import BottomSheet from '../../components/BottomSheet'
@@ -87,15 +87,24 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
     if (!rootCont._continuation) continue
     if (consumedAddedIds.has(rootCont.id)) continue
 
-    // Only start a chain from a unit whose parent is in modified (the original saved rule)
+    // Only start a chain from a unit whose parent is in modified (the original saved rule).
+    // Both cancelDayFromDate and overrideFromDate now set repeatEndDate to dk-1
+    // (the day before the continuation's startDate).
+    const dk1 = dateKey(addDays(parseDate(rootCont.startDate), -1))
     const rootParentMod = modified.find(({ saved, draft }) =>
       !consumedModifiedIds.has(draft.id) &&
       !saved.repeatEndDate &&
-      draft.repeatEndDate === rootCont.startDate &&
-      draft.startTime === rootCont.startTime &&
+      draft.repeatEndDate === dk1 &&
       draft.serviceId === rootCont.serviceId
     )
     if (!rootParentMod) continue
+
+    // Detect edit-time continuation: a _parentTime sibling starts on the same date
+    const isEditContinuation = added.some(({ unit: au }) =>
+      au._parentTime &&
+      au.startDate === rootCont.startDate &&
+      au.serviceId === rootCont.serviceId
+    )
 
     // Build forward chain: rootCont → next (if rootCont is also truncated) → ...
     const chain = [{ contUnit: rootCont, parentWeekDays: rootParentMod.saved.weekDays || [] }]
@@ -118,6 +127,23 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
 
     // Consume all units in the chain (including no-op transitions)
     chain.forEach(({ contUnit }) => consumedAddedIds.add(contUnit.id))
+
+    // Edit-time continuation: unchanged days carried forward at original time.
+    // Show as an informational "continues" row, not a removal.
+    if (isEditContinuation) {
+      const pivotDate = parseDate(rootCont.startDate)
+      continuationGroups.push({
+        key: `cont-${rootCont.id}`,
+        date: pivotDate,
+        label: `${fmtDays(rootCont.weekDays || [])} ${ul(rootCont.serviceId)} continues at ${fmtTime(rootCont.startTime)}`,
+        sublabel: `Starting ${fmtDateLong(pivotDate)}`,
+        contLabel: null,
+        isInformational: true,
+      })
+      continue
+    }
+
+    // Remove-time continuation: build a forward chain and render each removed-day link.
 
     // If the terminal node has a repeatEndDate but no continuation was found,
     // endRuleFromDate() was called — the remaining days also end.
@@ -178,6 +204,7 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
         contLabel: isLastMeaningful && !isTerminated && effectiveContDays.length > 0
           ? `${fmtDays(effectiveContDays)} ${ul(contUnit.serviceId)} continues as scheduled`
           : null,
+        isInformational: false,
       })
     }
 
@@ -190,21 +217,22 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
         label: `Removed ${fmtTime(terminalNode.startTime)} ${ul(terminalNode.serviceId)}`,
         sublabel: `From ${fmtDateLong(termPivotDate)} onward`,
         contLabel: null,
+        isInformational: false,
       })
     }
   }
 
-  // Semantic change count: each continuation group = 1 change; remaining individual items = 1 each
+  // Semantic change count: informational "continues" rows don't count as a change
   const remainingCount = (added.length - consumedAddedIds.size)
     + removed.length
     + (modified.length - consumedModifiedIds.size)
     + (skipped.length - consumedSkipKeys.size)
     + overridden.length
-  const displayCount = continuationGroups.length + remainingCount
+  const displayCount = continuationGroups.filter(g => !g.isInformational).length + remainingCount
 
   const handleConfirm = () => {
     const items = [
-      ...added.map(({ unit: u }) => ({
+      ...added.filter(({ unit: u }) => !consumedAddedIds.has(u.id)).map(({ unit: u }) => ({
         date: parseDate(u.startDate),
         line: u._parentTime
           ? `Changed ${ul(u.serviceId)} rule to ${fmtTime(u.startTime)} — ${shortRuleLabel(u)} starting ${fmtDate(parseDate(u.startDate))}`
