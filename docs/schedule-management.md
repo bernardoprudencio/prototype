@@ -1,6 +1,6 @@
 # Schedule Management — Reference Document
 
-A comprehensive reference for the recurring schedule system. Covers data models, service types, billing logic, user-facing edit flows, and known gaps. Intended for engineering handover, design review, and user story derivation.
+A reference for the recurring schedule system in the Rover sitter prototype. Covers what sitters can do today, how the underlying data model works, and what the system is already built to support next.
 
 ---
 
@@ -11,122 +11,79 @@ A comprehensive reference for the recurring schedule system. Covers data models,
 3. [Service Types](#3-service-types)
 4. [Recurrence Rules](#4-recurrence-rules)
 5. [Billing Model](#5-billing-model)
-6. [User Actions & Edit Flows](#6-user-actions--edit-flows)
+6. [What Sitters Can Do Today](#6-what-sitters-can-do-today)
 7. [Overnight Services](#7-overnight-services)
 8. [Change Review & Confirmation](#8-change-review--confirmation)
 9. [Known Edge Cases & Gaps](#9-known-edge-cases--gaps)
-10. [User Story Candidates](#10-user-story-candidates)
+10. [What's Ready to Build Next](#10-whats-ready-to-build-next)
 
 ---
 
 ## 1. Overview
 
-The schedule system manages the ongoing service agreement between a sitter and a client. A sitter can add, modify, and cancel recurring or one-time pet care services. All changes are previewed together before being confirmed, and each change is evaluated for financial impact (refunds or charges) based on which occurrences are already paid.
+The schedule system manages the ongoing service agreement between a sitter and a client. The prototype currently supports one service per client relationship. A sitter can add, modify, and cancel that service — either for a single session or across all future sessions at once. All changes are previewed together before being confirmed, and each change is evaluated for financial impact (refunds or charges) based on which sessions are already paid.
 
 ### Core concepts
 
-| Concept | Definition |
-|---------|-----------|
-| **Unit** | A service rule — the "what, when, how often, and at what cost." Example: "Walk Louie and Max every Mon/Wed/Fri at 9am, starting March 3, for $20/walk." |
-| **Occurrence** | A single instance derived from a unit. Example: "Walk on Monday, March 10." Occurrences are not stored — they are computed on the fly from the unit. |
-| **Agenda** | The rendered schedule: all occurrences across all units, sorted by date, grouped by day. Skipped occurrences are excluded. |
-| **Paid-Through Sunday** | The billing cutoff date. Any occurrence on or before this date is considered paid; all others are upcoming/unpaid. |
+| Concept | What it means |
+|---------|---------------|
+| **Unit** | The service rule — "what, when, how often, and at what cost." Example: "Walk every Mon/Wed/Fri at 9am, starting March 3, for $20 per walk." |
+| **Occurrence** | A single session derived from a unit. Example: "Walk on Monday, March 10." Occurrences are calculated on the fly and never stored. |
+| **Agenda** | The full schedule view: all sessions across all units, sorted by date, grouped by day. Skipped sessions are not shown. |
+| **Paid-Through Sunday** | The billing boundary. Any session on or before this Sunday is treated as paid. All sessions after it are upcoming and unpaid. |
 
 ### How it flows
 
 ```
-Unit (stored) → expandUnit() → Occurrences → buildAgenda() → Agenda (displayed)
+Unit (stored rule) → expandUnit() → Occurrences → buildAgenda() → Agenda (displayed)
 ```
 
-The sitter edits units (adding, modifying, removing). A diff is computed between the saved and draft state. The sitter reviews the summary and confirms. On confirmation, draft units become the new saved state and a schedule-change event is emitted.
+The sitter edits units (adding, modifying, removing). A diff is computed between the saved and draft state. The sitter reviews the summary and confirms. On confirmation, draft units become the new saved state and a schedule-change event is sent to the conversation.
 
 ---
 
 ## 2. Data Model
 
-### Unit
+A **unit** is a plain JavaScript object — the core schedule rule. It defines everything about a service: what it is, when it starts, how often it repeats, which pets are included, and what it costs. Created via `defaultUnit()` in `src/lib/scheduleHelpers.js`.
 
-A unit is a plain JavaScript object — the core schedule rule. Created via `defaultUnit()` in `src/lib/scheduleHelpers.js`.
-
-| Field | Type | Description | Constraints |
-|-------|------|-------------|-------------|
-| `id` | number | Unique identifier, auto-incremented from 100 | Set by `newId()` on creation |
-| `serviceId` | string | Which service this unit represents | One of the 5 service IDs (see §3) |
-| `startDate` | `'YYYY-MM-DD'` | First date this service occurs | Required; drives all recurrence math |
-| `endDate` | `'YYYY-MM-DD'` | Checkout date for overnight services | Used only when serviceId is `boarding` or `house_sitting` |
-| `repeatEndDate` | `'YYYY-MM-DD'` | Last date this rule is active | Empty string = runs indefinitely; set when cancelling from a date forward |
+| Field | Type | What it means | Notes |
+|-------|------|---------------|-------|
+| `id` | number | Unique identifier for this rule | Auto-incremented from 100 on creation |
+| `serviceId` | string | Which service this is (e.g., `dog_walking`) | One of the 5 service IDs defined in `services.js` |
+| `startDate` | `'YYYY-MM-DD'` | The first date this service occurs | Required; all recurrence math is relative to this |
+| `endDate` | `'YYYY-MM-DD'` | Check-out date for overnight stays | Only used for boarding and house sitting |
+| `repeatEndDate` | `'YYYY-MM-DD'` | The last date this rule is active | Empty means it runs indefinitely. Set automatically when a sitter cancels from a date forward. |
 | `startTime` | `'HH:MM'` | Start time in 24-hour format | Defaults to `'09:00'` |
-| `durationMins` | number | Duration in minutes | Ignored for overnight services; defaults to 60 (480 for daycare) |
-| `petIds` | number[] | IDs of pets included in this booking | Must contain at least one pet ID |
+| `durationMins` | number | How long the session lasts, in minutes | Not used for overnight services. Defaults to 60 min (480 for daycare). |
+| `petIds` | number[] | Which pets are included in this booking | Currently defaults to all pets in the relationship. Selecting specific pets is not yet exposed in the UI. |
 | `frequency` | string | How often the service repeats | `'once'`, `'weekly'`, or `'monthly'` |
-| `weekDays` | number[] | Days of the week to recur on | 0=Sun, 1=Mon … 6=Sat; only applies to `frequency: 'weekly'` daytime services |
-| `everyNWeeks` | number | Recurrence interval | 1=every week, 2=every other week; used with `frequency: 'weekly'` |
-| `skippedKeys` | string[] | Individual dates to exclude | Each entry is a `'YYYY-MM-DD'` string |
-| `overrides` | object | Per-date field overrides | Key is `'YYYY-MM-DD'`; value is a partial unit (serviceId, startTime, durationMins, petIds) |
-| `cost` | number | Price per occurrence in USD | Used for all billing calculations |
-| `_parentTime` | string | UI flag: original startTime before a "this and following" time edit | Not a real data field; would not survive a backend round-trip |
-| `_continuation` | boolean | UI flag: this unit was created as a continuation when splitting a rule | Not a real data field; would not survive a backend round-trip |
-
-**Example — Mon/Wed/Fri walk:**
-```js
-{
-  id: 101,
-  serviceId: 'dog_walking',
-  startDate: '2025-03-03',
-  endDate: '',
-  repeatEndDate: '',
-  startTime: '09:00',
-  durationMins: 60,
-  petIds: [1, 2],
-  frequency: 'weekly',
-  weekDays: [1, 3, 5],       // Mon, Wed, Fri
-  everyNWeeks: 1,
-  skippedKeys: ['2025-07-04'],
-  overrides: {
-    '2025-03-26': { startTime: '10:00', durationMins: 60, petIds: [1, 2], serviceId: 'dog_walking' },
-  },
-  cost: 20,
-}
-```
-
----
-
-### Occurrence
-
-An occurrence is a computed object representing a single scheduled event. Generated by `expandUnit()`. Never stored.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `key` | string | Unique ID in the format `'<unitId>-<YYYY-MM-DD>'` (e.g., `'101-2025-03-10'`) |
-| `start` | Date | JavaScript Date at midnight on the occurrence date |
-| `end` | Date \| null | For overnight services: end date (startDate + nightCount); null for daytime |
-| `unit` | Unit | The unit for this occurrence. If overridden, override fields are merged in |
-| `svc` | Service | The service object (`{ id, label, type, ... }`) |
-| `skipped` | boolean | True if this date appears in `unit.skippedKeys` |
-| `isOverride` | boolean | True if this occurrence has per-date overrides applied |
-| `parentUnit` | Unit | Always the original unit before any override merging |
-| `nightIndex` | number | Overnight only: which night this entry represents (1-based) |
-| `totalNights` | number | Overnight only: total nights in the stay |
+| `weekDays` | number[] | Which days of the week to schedule | 0=Sun, 1=Mon … 6=Sat. Only applies to weekly recurring daytime services. Not yet exposed in the UI. |
+| `everyNWeeks` | number | How often the weekly pattern repeats | 1=every week, 2=every other week. Not yet exposed in the UI. |
+| `skippedKeys` | string[] | Individual dates to exclude from the schedule | Each entry is a `'YYYY-MM-DD'` string. When a sitter cancels a single session, that date is added here. There's currently no UI to undo a skip. |
+| `overrides` | object | Per-date changes to the normal service details | Key is a date (`'YYYY-MM-DD'`); value contains any fields that differ from the rule (e.g., a different start time). Used when a sitter edits a single session. Not directly visible or editable in the UI — it's set behind the scenes. |
+| `cost` | number | Price per session in USD | Used for all billing calculations |
+| `_parentTime` | string | UI tracking flag: the original start time before a "this and all future" time edit | Not a real data field. Exists only to drive the agenda badge display ("Changed from 9am"). Would not survive a backend round-trip. |
+| `_continuation` | boolean | UI tracking flag: this unit was created as a spin-off when splitting a rule | Not a real data field. Exists only to show the "Updated" badge in the agenda. Would not survive a backend round-trip. |
 
 ---
 
 ## 3. Service Types
 
-There are five service types, split into two categories: **daytime** and **overnight**.
+There are five service types in the data model, split into two categories: **daytime** and **overnight**.
 
 | Service ID | Label | Category | Duration |
 |-----------|-------|----------|----------|
 | `dog_walking` | Dog Walking | Daytime | 30, 45, 60, or 120 min |
 | `drop_in` | Drop-In Visit | Daytime | 30, 45, 60, or 120 min |
-| `doggy_daycare` | Doggy Day Care | Daytime (hour-based) | 4 hr (240 min), 8 hr (480 min), 12 hr (720 min) |
-| `boarding` | Boarding | Overnight | `startDate` + `endDate` (no `durationMins`) |
-| `house_sitting` | House Sitting | Overnight | `startDate` + `endDate` (no `durationMins`) |
+| `doggy_daycare` | Doggy Day Care | Daytime (hour-based) | 4 hr, 8 hr, or 12 hr |
+| `boarding` | Boarding | Overnight | Check-in + check-out date |
+| `house_sitting` | House Sitting | Overnight | Check-in + check-out date |
 
-### Category differences
+**In the current prototype**, each client relationship has a single service. The service type is set when the relationship is created and cannot be changed in the UI. Selecting or switching service types per unit is ready to build — see [Section 10](#10-whats-ready-to-build-next).
 
-**Daytime services** use `startTime` + `durationMins`. They support `weekDays` for weekly recurrence, allowing multi-day selections (e.g., Mon + Wed + Fri). The overlap check compares by `serviceId type + date + startTime`.
+**Daytime services** use a start time and a duration. They support multi-day weekly recurrence (e.g., Mon + Wed + Fri).
 
-**Overnight services** use `startDate` (check-in) + `endDate` (check-out) instead of `durationMins`. They do not use `weekDays` — the entire stay repeats on the same start day-of-week. If a stay is longer than 6 nights (`overnightCanRepeat()` returns false), the service cannot be set to repeat. See §7 for full overnight details.
+**Overnight services** use a check-in date and a check-out date instead of a duration. They repeat on the same start day-of-week. See [Section 7](#7-overnight-services) for full details.
 
 ---
 
@@ -136,50 +93,24 @@ A unit's recurrence is controlled by three fields: `frequency`, `weekDays`, and 
 
 ### Frequency options
 
-| `frequency` | Behavior |
-|-------------|----------|
-| `'once'` | A single occurrence on `startDate`. `weekDays` and `everyNWeeks` are ignored. |
-| `'weekly'` | Repeats weekly (or every N weeks). For daytime services, one occurrence per selected `weekDay` per cycle. For overnight, one occurrence per cycle on the start day-of-week. |
-| `'monthly'` | Repeats on the same calendar date each month (e.g., 3rd of every month). `weekDays` is ignored. |
+| `frequency` | How it behaves |
+|-------------|---------------|
+| `'once'` | A single session on the start date. Does not repeat. |
+| `'weekly'` | Repeats weekly (or every N weeks). For daytime services, one session per selected weekday per cycle. For overnight, the whole stay repeats on the same start day-of-week. |
+| `'monthly'` | Repeats on the same calendar date each month (e.g., the 3rd of every month). |
 
-### Recurrence horizon
+### How far out does the schedule generate?
 
-`expandUnit()` generates occurrences up to the earliest of:
-1. `repeatEndDate` (if set)
-2. 6 months from `startDate`
-3. 8 weeks from today (whichever is further)
-4. Hard cap: 120 occurrences total
-
-### Examples
-
-**Mon/Wed/Fri walk every week:**
-```
-frequency: 'weekly', weekDays: [1, 3, 5], everyNWeeks: 1
-→ Occurrences: every Monday, Wednesday, and Friday
-```
-
-**Bi-weekly Monday walk:**
-```
-frequency: 'weekly', weekDays: [1], everyNWeeks: 2
-→ Occurrences: every other Monday
-```
-
-**Monthly boarding (first of the month):**
-```
-frequency: 'monthly', startDate: '2025-04-01'
-→ Occurrences: May 1, Jun 1, Jul 1 …
-```
-
-**One-time drop-in:**
-```
-frequency: 'once', startDate: '2025-04-15'
-→ Occurrences: April 15 only
-```
+`expandUnit()` generates sessions up to the earliest of:
+1. The `repeatEndDate`, if one is set
+2. 6 months from the start date
+3. 8 weeks from today (whichever is further than option 2)
+4. A hard cap of 120 sessions total
 
 ### Recurrence labels
 
-`shortRuleLabel(unit)` generates a display string:
-- `"Repeats Mon, Wed and Fri"` — weekly, multiple days
+`shortRuleLabel(unit)` generates a human-readable display string:
+- `"Repeats Mon, Wed and Fri"` — weekly on multiple days
 - `"Repeats every 2 weeks on Mon"` — bi-weekly
 - `"Repeats monthly"` — monthly
 - `"One-time"` — no recurrence
@@ -190,331 +121,241 @@ frequency: 'once', startDate: '2025-04-15'
 
 ### Paid-Through Sunday
 
-All units in a relationship share a single billing boundary: the **paid-through Sunday**. This is the Sunday of the week containing `PROTO_TODAY` (today).
+All units in a relationship share a single billing boundary: the **paid-through Sunday**. This is the Sunday of the week containing today.
 
-```
-getPaidThruSunday() → Date (Sunday of the current week)
-```
+Any session whose date is on or before this Sunday is considered **paid**. All sessions after it are **upcoming and unpaid**.
 
-Any occurrence whose `start` is on or before this Sunday is **paid**. All occurrences after it are **unpaid/upcoming**.
-
-> **Why a full week?** The billing model treats the current week as already-paid. This prevents a sitter from being charged when rearranging services within the same week.
-
-### Paid vs. unpaid classification
-
-```
-isPaidOcc(occStart, paidThruSunday) → boolean
-→ true if occStart ≤ paidThruSunday
-```
+> **Why a full week?** The billing model treats the current week as already paid. This prevents a sitter from being charged when rearranging sessions within the same week.
 
 ### Financial impact of changes
 
-| Scenario | Financial result |
-|----------|-----------------|
-| Cancel a paid upcoming occurrence | Refund (`cost` × count of paid occurrences) |
-| Cancel an unpaid upcoming occurrence | No financial impact |
-| Add a service with paid upcoming occurrences | Charge (`cost` × count of paid new occurrences) |
-| Move a service within the same paid week | Net $0 (paid boundary is fixed from saved state) |
-| Skip a paid occurrence | Refund for that one occurrence |
-| Skip an unpaid occurrence | No financial impact |
-| Change time only (same day) | No financial impact |
+| What happens | Financial result |
+|---|---|
+| Cancel a paid upcoming session | Refund for that session |
+| Cancel an unpaid upcoming session | No financial impact |
+| Add a service with paid upcoming sessions | Charge for the paid sessions |
+| Move a session within the same paid week | Net $0 |
+| Skip a paid session | Refund for that one session |
+| Skip an unpaid session | No financial impact |
+| Change only the time of a session | No financial impact |
 
-### Same-week move = $0
+### Same-week moves = $0
 
-The paid boundary is always derived from **savedUnits** (the committed state), not the draft. This means if a sitter moves a walk from Tuesday to Thursday within the same already-paid week, the net is $0 — no refund for Tuesday, no charge for Thursday.
+The paid boundary is always derived from the **saved state**, not the current draft. This means if a sitter moves a walk from Tuesday to Thursday within the same already-paid week, the net is $0 — no refund for Tuesday, no charge for Thursday.
 
-### Cancellation impact (`getRuleImpact`)
+### Cancellation impact
 
-Used by all confirmation dialogs to show what money is at stake when cancelling or removing a unit.
+When a sitter cancels a rule, the system calculates:
+- How many future paid sessions are being removed (these trigger a refund)
+- How many future unpaid sessions are being removed (no refund)
+- The total refund amount
 
-```
-getRuleImpact(unit, allUnits) → {
-  paidOccs,        // future paid occurrences being removed → triggers refund
-  unpaidUpcoming,  // future unpaid occurrences being removed → no refund
-  refundTotal,     // total refund amount
-  chargeTotal,     // cost of first unpaid upcoming occurrence (charge for keeping-paid flow)
-}
-```
-
-Only future occurrences are counted. Past occurrences (already completed) are not affected.
-
-### Keep-paid option
-
-When cancelling paid occurrences, the sitter can choose "keep paid":
-- Paid future occurrences are converted to one-time units (they remain on the schedule and will be serviced as planned).
-- Only unpaid upcoming occurrences are removed.
-- No refund is issued.
+Only future sessions are counted. Past sessions that have already happened are not affected.
 
 ---
 
-## 6. User Actions & Edit Flows
+## 6. What Sitters Can Do Today
 
-### Summary table
-
-| Action | Scope | State change | Financial impact |
-|--------|-------|-------------|-----------------|
-| Add service | New unit | Unit added to `units` array | Charge for any new paid occurrences |
-| Skip occurrence | This only | Date added to `unit.skippedKeys` | Refund if occurrence was paid |
-| Edit time/details | This only | Date added to `unit.overrides` | None |
-| Edit time | This and following | Original unit gets `repeatEndDate`; 1–2 new units created | None (if within same paid week) |
-| Cancel occurrence | This only | Date added to `unit.skippedKeys` | Refund if occurrence was paid |
-| Cancel from date forward | This and following | Original unit gets `repeatEndDate`; continuation unit created for other weekdays | Refund for removed paid occurrences |
-| Cancel entire rule | All | Unit removed from `units` array | Refund for all paid occurrences |
-| Manage/edit recurring rule | Whole rule | Unit modified in place or cloned with new ID | Depends on change |
-
----
+The current prototype exposes the following actions in the sitter UI.
 
 ### Add a service
 
-**Entry point:** "Add" button → `AddSheet` → `UnitEditor`
+**How:** "Add" button → fill in the form → confirm
 
-1. Sitter selects service type, then fills in date, time, duration, pets, and recurrence.
-2. If `frequency: 'weekly'` is selected, the sitter picks one or more `weekDays`.
-3. On confirm, a new unit is created via `defaultUnit()` and appended to the `units` array.
-4. The agenda scrolls to the first occurrence of the new unit.
-5. The unit appears with a green **"Added"** badge in the agenda until changes are saved.
+The sitter sets a start date, start time, and whether the service repeats. On confirm, a new rule is created and added to the schedule. It appears with a green **"Added"** badge in the agenda until the changes are saved.
 
-**If no pets are explicitly selected**, all pets in the relationship are included (`petIds = pets.map(p => p.id)`).
+> Today the service type is fixed per relationship and not selectable in this form. The form is ready to support service type selection — see [Section 10](#10-whats-ready-to-build-next).
 
 ---
 
-### Skip an occurrence
+### Skip a single session
 
-**Entry point:** Tap occurrence → `OccActionSheet` → "Skip this service"
+**How:** Tap a session in the agenda → "Skip this service"
 
-1. The date key is added to `unit.skippedKeys`.
-2. `expandUnit()` still generates the occurrence, but marks it `skipped: true`.
-3. `buildAgenda()` filters it out — it no longer appears in the agenda.
-4. Financial impact: if the occurrence was paid (within paid-through Sunday), a refund is issued on confirmation.
+The date is added to the rule's skip list. The session disappears from the agenda. If it was a paid session, a refund is applied when the changes are confirmed.
 
-> Skipped occurrences can be "unskipped" by removing the key from `skippedKeys`, but there is currently no UI to do this.
+> Once a session is skipped, there is currently no UI to restore it. The data model supports it, but the flow hasn't been built yet.
 
 ---
 
-### Edit occurrence details — "This only"
+### Cancel a single session
 
-**Entry point:** Tap occurrence → `OccActionSheet` → edit time/service/duration/pets → "This occurrence"
-
-Calls `overrideOccurrence(occ, draft)`:
-
-1. Merges the changed fields (`serviceId`, `startTime`, `durationMins`, `petIds`) into `unit.overrides[dateKey]`.
-2. `expandUnit()` applies the override when generating that occurrence — the occurrence appears with the new details.
-3. No financial impact (time/detail changes do not create refunds or charges).
-
-The occurrence appears with a blue **"Changed"** badge (old time → new time) in the agenda until changes are saved.
+Same behavior as skipping. The date is added to the rule's skip list, and a refund is applied if the session was already paid.
 
 ---
 
-### Edit time — "This and following"
+### Cancel from a date forward
 
-**Entry point:** Tap occurrence → `OccActionSheet` → edit time → "This and all future"
+**How:** Tap a session → "Cancel this and following"
 
-Calls `overrideFromDate(occ, draft)`. This is the most complex flow. It **splits the rule into multiple units:**
+All sessions on that date and after are cancelled. If this session is part of a multi-day recurring rule (e.g., Mon/Wed/Fri), only the sessions on this specific day of the week are cancelled going forward — the other days continue as normal.
 
-**Example:** Mon/Wed/Fri walk at 9am. Sitter changes Wednesday to 10am starting March 19.
-
-| Before | After |
-|--------|-------|
-| Original unit (Mon/Wed/Fri 9am) | Original unit with `repeatEndDate = March 18` |
-| — | New unit: Wed only, 10am, starts March 19 (`_parentTime: '09:00'`) |
-| — | Continuation unit: Mon/Fri only, 9am, starts March 19 (`_continuation: true`) |
-
-If only one weekday exists, no continuation unit is created — just the original (truncated) and the changed unit.
-
-The changed unit appears with a blue **"Changed"** badge. The continuation unit appears with a blue **"Updated"** badge.
+Technically, this works by setting an end date on the current rule and (if needed) creating a continuation rule for the remaining weekdays.
 
 ---
 
-### Cancel occurrence — "This only"
+### Cancel an entire recurring rule
 
-Same mechanics as [Skip an occurrence](#skip-an-occurrence). Adds the date to `skippedKeys`. If the occurrence was paid, a refund is applied.
+**How:** "Manage" button → select a rule → "Cancel"
 
----
-
-### Cancel from date forward — "This and following"
-
-**Entry point:** Tap occurrence → `OccActionSheet` → "Cancel this and following"
-
-Calls `cancelDayFromDate(occ)`:
-
-1. Sets `repeatEndDate` on the original unit to the target date.
-2. Adds the target date to `skippedKeys` to prevent the last occurrence from showing.
-3. If other `weekDays` exist (e.g., cancelling only Wednesday from a Mon/Wed/Fri unit), a **continuation unit** is created for Mon/Fri starting from the same date.
-
-Financial impact: all paid occurrences that fall after `repeatEndDate` on the cancelled weekday(s) generate a refund.
+The entire rule is removed. All future paid sessions generate a refund.
 
 ---
 
-### Cancel entire recurring rule
+### Edit the time of a session
 
-**Entry point:** `ManageSheet` → select rule → "Cancel"
+**How:** Tap a session → edit the time → choose scope
 
-The unit is removed from the `units` array entirely. All paid future occurrences generate a refund.
+The sitter changes the start time and then picks:
+- **This occurrence only** — only that one session is updated. The change is stored as a per-date override.
+- **This and all future** — the rule is split. The original rule gets an end date just before this session, and a new rule picks up from here with the new time. If the rule had multiple weekdays (e.g., Mon/Wed/Fri), a separate continuation rule is created for the unchanged days.
+
+Changed sessions appear with a blue **"Changed"** badge (showing old time → new time). Sessions from a continuation rule show a blue **"Updated"** badge.
+
+> Duration, pets, and service type are not exposed for editing in this flow today — only time. These are ready to build — see [Section 10](#10-whats-ready-to-build-next).
 
 ---
 
-### Manage recurring rules
+### Review and confirm changes
 
-**Entry point:** "Manage" button → `ManageSheet`
+**How:** Any edit → "Review changes" button
 
-1. Lists all recurring units with their `shortRuleLabel` and cost.
-2. Sitter can edit a rule (opens `UnitEditor`) or cancel it.
-3. If the rule started in the past, editing clones it with a new ID (so past occurrences remain unchanged). If it starts in the future, the unit is modified in place.
+Before committing, the sitter sees a summary of everything that will change: sessions added, removed, or shifted, each with its financial impact. A net total is shown at the bottom. The sitter can confirm all changes at once or discard them and return to the last saved state.
 
 ---
 
 ## 7. Overnight Services
 
-Overnight services (Boarding, House Sitting) use a different data model and have special behavior throughout the system.
+Overnight services (Boarding, House Sitting) use a different data model and have some special behaviors.
 
-### Data model differences
+### How they differ from daytime services
 
-| Field | Daytime | Overnight |
-|-------|---------|-----------|
-| `durationMins` | Used (30–720 min) | Ignored |
-| `startDate` | First occurrence | Check-in date |
-| `endDate` | Empty | Check-out date |
-| `weekDays` | Controls recurrence days | Ignored; stay repeats on same start day-of-week |
+| | Daytime | Overnight |
+|--|---------|-----------|
+| Duration | Set in minutes (e.g., 60 min) | Derived from check-in + check-out dates |
+| Recurrence days | Selected weekdays (e.g., Mon/Wed/Fri) | Same start day-of-week each cycle |
+| `durationMins` field | Used | Ignored |
+| `endDate` field | Not used | Required (check-out date) |
 
-**Night count** = `endDate − startDate` (in days). A stay from Monday to Wednesday = 2 nights.
+**Night count** is the number of days between check-in and check-out. A stay from Monday to Wednesday = 2 nights.
 
 ### Recurrence constraint
 
-`overnightCanRepeat(unit)` returns `false` if `nightCount >= 7`. Stays of 7 or more nights cannot be set to repeat. The UI disables the repeat option silently (no explanation shown to the user).
+Stays of **7 or more nights cannot be set to repeat**. The repeat option is silently disabled in the UI for these stays. (No explanation is currently shown to the sitter — a known gap.)
 
-### Agenda display
+### How overnight stays appear in the agenda
 
-`buildAgenda()` explodes each overnight occurrence into one entry per night:
-
-- A 3-night stay (Mon check-in, Thu check-out) creates 3 agenda entries: Mon (Night 1 of 3), Tue (Night 2 of 3), Wed (Night 3 of 3).
-- Each entry carries `nightIndex` and `totalNights` for display labeling.
-
-### Recurrence expansion
-
-In `expandUnit()`, overnight services with `frequency: 'weekly'` repeat the whole stay starting on the same day-of-week, stepping by `everyNWeeks` weeks. `weekDays` is not used.
+Each night of a stay gets its own entry in the agenda. A 3-night stay (Mon check-in, Thu check-out) creates three rows: Mon (Night 1 of 3), Tue (Night 2 of 3), Wed (Night 3 of 3).
 
 ---
 
 ## 8. Change Review & Confirmation
 
-All edits are staged (draft state) before being committed. The **SummarySheet** lets the sitter review everything at once.
+All edits are staged as a draft before being committed. The review sheet lets the sitter see everything at once before it takes effect.
 
-### Detecting changes (`computeScheduleDiff`)
+### How changes are detected
 
-`computeScheduleDiff(savedUnits, draftUnits)` compares the committed and draft unit arrays and returns:
+`computeScheduleDiff(savedUnits, draftUnits)` compares the saved and draft rule arrays and categorizes changes:
 
-| Output field | What it contains |
-|-------------|-----------------|
-| `added` | New units not in saved state; each carries `chargeAmount` |
-| `removed` | Units removed from saved state; each carries `refundAmount` |
-| `modified` | Units present in both but with structural changes (e.g., `repeatEndDate` set) |
-| `skipped` | New entries added to `skippedKeys` in kept units; each carries `refundAmount` |
-| `overridden` | New or changed entries in `overrides` for kept units; carries `newTime` |
+| Category | What it means |
+|---|---|
+| `added` | New rules not in the saved state, each with a charge amount |
+| `removed` | Rules that were deleted, each with a refund amount |
+| `modified` | Rules present in both but structurally changed (e.g., an end date was set) |
+| `skipped` | Dates newly added to a rule's skip list, each with a refund amount if the session was paid |
+| `overridden` | Per-date changes (e.g., a new start time for a single session) |
 | `refundTotal` | Total refund across removed + skipped |
 | `chargeTotal` | Total charge across added |
-| `netAmount` | `chargeTotal − refundTotal` (positive = net charge, negative = net refund, 0 = no impact) |
-| `totalCount` | Total number of change items |
+| `netAmount` | `chargeTotal − refundTotal`. Positive = net charge, negative = net refund, 0 = no impact |
 
-**Key design decision:** The paid boundary is always derived from `savedUnits`, not the draft. This prevents false charges when a sitter moves a walk within the same paid week.
+**Key rule:** The paid boundary is always derived from the saved state, not the draft. This ensures moving sessions within an already-paid week doesn't create false charges.
 
-**Continuation units are not flagged as "added":** The diff uses `serviceId + date` (not unit ID) to match occurrences. When a rule is split, continuation units have new IDs but their occurrences map to existing saved occurrences — so they show as "Updated" rather than "Added."
+**Continuation rules are not counted as "new":** When a rule is split (e.g., to change "this and all future"), the continuation rule gets a new ID — but its sessions match sessions that already existed. The diff compares by service + date (not ID), so these sessions show as "Updated" rather than "Added."
 
-### SummarySheet display
+### What the review sheet shows
 
-The SummarySheet presents changes grouped and sorted by date. Each row shows:
-- Service name and date
-- What changed (time, service type, etc.)
-- Per-occurrence financial impact (refund or charge)
+Changes are listed in date order. Each row shows:
+- The service name and date
+- What changed (e.g., time shift)
+- The financial impact for that session (refund or charge)
 
-At the bottom, the net financial impact is shown (e.g., "Net refund: $40" or "Net charge: $20"). If `netAmount === 0`, no financial row is shown.
+At the bottom, the net total is displayed. If the net is $0, no financial row is shown.
 
-### Confirming changes
+### Confirming vs. discarding
 
-On confirm:
-1. `savedUnitsRef.current` is updated to the draft units.
-2. A `savedVersion` counter is incremented to re-trigger memos that depend on saved state.
-3. `onScheduleChange(text, committedUnits)` is called, emitting the change summary to the parent (`App.jsx`).
+On **confirm**: the draft becomes the new saved state, and a summary message is sent to the conversation.
 
-On dismiss (before confirming), `units` is reset to `savedUnitsRef.current` — all draft changes are discarded.
+On **discard** (before confirming): all draft changes are thrown away and the schedule reverts to the last saved state.
 
 ---
 
 ## 9. Known Edge Cases & Gaps
 
-### Confirmed edge cases (accepted behavior)
+### Accepted behaviors
 
 **Week spanning a month boundary**
-When a week (Mon–Sun) straddles two calendar months (e.g., March 30–April 5), `AgendaView` shows "Week of Mar 30" under both the March and April month headers. The data is correct; this is a display quirk accepted as-is.
+When a week straddles two calendar months (e.g., March 30–April 5), `AgendaView` shows "Week of Mar 30" under both the March and April month headers. The data is correct; this is a display quirk accepted as-is.
 
 **Same-week move = $0 net**
-Moving a service within the same already-paid week nets to $0. This is intentional. The paid boundary is fixed from saved state, not recalculated from draft.
+Moving a session within the same already-paid week nets to $0. This is intentional. The paid boundary is fixed from the saved state, not recalculated from the draft.
 
-**Continuation units after a rule split**
-When "edit this and following" splits a rule, new units get new IDs. The diff algorithm compares by `serviceId + date`, not ID, to avoid false "Removed" flags for continuations. UI tracks them via `_continuation` and `_parentTime` flags.
+**Rule splitting after "this and all future"**
+When a sitter changes the time starting from a specific session, the rule is split into two or three units. These get new IDs but their sessions are matched to existing ones by service + date, not ID. The `_continuation` and `_parentTime` flags on these units drive agenda badge display — they would not survive serialization to a real backend.
 
 **PROTO_TODAY anchor**
 `PROTO_TODAY = new Date()` is evaluated once when the `owners.js` module loads. All schedule math is relative to that moment. There is no way to mock or override the current date in the prototype.
 
-**120-occurrence hard cap**
-`expandUnit()` silently stops after 120 occurrences. For long-running high-frequency rules, this could truncate future dates. No user-visible indication is shown.
+**120-session hard cap**
+`expandUnit()` silently stops generating sessions after 120. For long-running, high-frequency rules, future dates could be truncated. No indication is shown to the sitter.
 
 ---
 
-### Potential gaps to review
+### Known gaps to address
 
-**No conflict detection in the UI**
-`overlaps()` exists in `scheduleHelpers.js` and checks for same-type + same-day + same-time collisions, but it is not called during the add or edit flows. A sitter can create two dog walks at the same time on the same day without warning.
+**No conflict detection**
+`overlaps()` exists in `scheduleHelpers.js` and can detect sessions of the same type at the same time on the same day. It is not called during add or edit flows. A sitter can currently create two walks at the same time without any warning.
 
-**No "unskip" UI**
-Once a date is added to `skippedKeys`, there is no way for the sitter to restore it. The data model supports it (remove the key from `skippedKeys`), but the UI has no flow for this.
+**No unskip flow**
+Once a date is skipped, there is no way to restore it through the UI. The data model supports it (remove the date from `skippedKeys`), but the flow hasn't been built.
 
 **Overnight >6 nights: silent restriction**
-`overnightCanRepeat()` returns false for stays of 7+ nights, disabling the repeat option in the UI. No explanation is shown to the user. If a sitter is confused why they cannot set a 7-night stay to repeat, there is no hint.
+When a stay is 7 or more nights, the repeat option is disabled without explanation. A sitter may not understand why they can't set it to repeat.
 
 **`everyNWeeks` not supported for monthly frequency**
-The data model has `everyNWeeks`, but `expandUnit()` uses `addMonths(cur, 1)` unconditionally for monthly recurrence — `everyNWeeks` is ignored. "Every 2 months" is not supported even though the field exists.
+The data model has `everyNWeeks`, but the monthly recurrence logic always steps by exactly one month. "Every 2 months" is not supported even though the field exists.
 
-**UI flags not backend-safe**
-`_parentTime` and `_continuation` are set on units to drive agenda badging logic. They are present in the draft unit state but would not survive serialization to a real backend unless explicitly handled. Any API layer would need to strip or map these before persisting.
+**`weekDays` not cleared when switching to monthly**
+Monthly recurrence doesn't use `weekDays`, but the field is not cleared when a sitter switches from weekly to monthly. Stale data sits in the unit silently.
 
-**No validation on `weekDays` for monthly frequency**
-Monthly recurrence does not use `weekDays`, but the field is not cleared when switching frequency from `weekly` to `monthly`. Stale `weekDays` data sits in the unit silently.
-
-**Paid-through date is today's week, not relationship-based**
-`getPaidThruSunday()` always returns the Sunday of the current week, regardless of when the relationship started or how billing actually works. This is a prototype simplification. In production, the paid-through date would likely come from a billing record.
+**Paid-through date is always this week**
+`getPaidThruSunday()` always returns the Sunday of the current week, regardless of when the relationship started or how billing actually works. In production, the paid-through date would come from a billing record.
 
 ---
 
-## 10. User Story Candidates
+## 10. What's Ready to Build Next
 
-These stories are derived directly from the system behavior and are ready to become tickets or acceptance criteria.
+The data model and schedule logic already support the following. None of these require structural changes — they need UI to expose them.
 
-### Schedule viewing
-- As a sitter, I can view a client's full schedule as a day-by-day agenda grouped by week and month.
-- As a sitter, I can see past occurrences alongside upcoming ones to understand the full relationship history.
+### Per-unit service type selection
 
-### Adding services
-- As a sitter, I can add a one-time service for a specific date.
-- As a sitter, I can add a recurring service (weekly, bi-weekly, or monthly).
-- As a sitter, I can select multiple days of the week for a weekly recurring service (e.g., Mon + Wed + Fri).
-- As a sitter, I can add an overnight service (boarding or house sitting) with a check-in and check-out date.
-- As a sitter, I can add a recurring overnight service as long as the stay is 6 nights or fewer.
+The `serviceId` field on each unit can be any of the five service types. The underlying data, recurrence, and billing logic all handle each type correctly. What's missing is a service-type picker in the add/edit form so sitters can choose which service they're adding.
 
-### Editing services
-- As a sitter, I can change the time, duration, or pets for a single occurrence without affecting the rest of the series.
-- As a sitter, I can change the time, duration, or pets for a single occurrence and all future occurrences in one action.
+### Per-unit pet selection
 
-### Cancelling services
-- As a sitter, I can cancel a single occurrence.
-- As a sitter, I can cancel all occurrences from a specific date forward.
-- As a sitter, I can cancel an entire recurring rule.
-- As a sitter, I can choose to "keep paid" when cancelling paid future occurrences, so they remain on the schedule without issuing a refund.
+Each unit has a `petIds` array that controls which pets are included in that booking. Currently the UI defaults to all pets in the relationship. Adding a pet toggle to the add/edit form would let sitters configure this per unit.
 
-### Billing and review
-- As a sitter, I can review all pending changes (additions, removals, time edits) before confirming.
-- As a sitter, I can see the financial impact (refund or charge) of each change before confirming.
-- As a sitter, I can see the net total (refund or charge) before confirming all changes at once.
-- As a sitter, I can discard all pending changes and revert to the last saved state.
+### Frequency and weekday customization
 
-### Incomplete service resolution
-- As a sitter, I can mark a past occurrence as completed or cancelled directly from the schedule.
+The `frequency`, `weekDays`, and `everyNWeeks` fields are fully supported in the data model and recurrence engine. The add form can be extended to let sitters choose: once, weekly (with day selection), bi-weekly, or monthly.
+
+### Duration selection
+
+`durationMins` is stored per unit and used in billing and display. Exposing a duration picker (30, 45, 60, 120 min for walks and drop-ins; 4, 8, 12 hr for daycare) in the add/edit form is straightforward.
+
+### Editing service type, pets, or duration on existing units
+
+The "edit this and all future" flow already supports changing these fields — `overrideFromDate()` handles the rule split. The UI currently only exposes time editing in this flow. Expanding the edit form to include service type, pets, and duration would unlock per-unit and per-date granularity.
+
+### Unskip a session
+
+The data model supports unskipping — it's just removing a date from `skippedKeys`. A UI flow to show skipped sessions and let the sitter restore them is ready to build.
