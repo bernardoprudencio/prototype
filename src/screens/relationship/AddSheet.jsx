@@ -26,12 +26,13 @@ const SERVICE_ICONS = {
   dog_walking:   <SvcIcon src={walkingIcon} />,
 }
 
-export default function AddSheet({onAdd, onClose, existing, allPets, defaultServiceId}) {
+export default function AddSheet({onAdd, onClose, existing, allPets, defaultServiceId, defaultDurationMins}) {
   const initialSvc = defaultServiceId ? SERVICES.find(s => s.id === defaultServiceId) : null
   const pets       = allPets || PETS_SEED
   const makeInitUnit = svcObj => {
-    const today = new Date()
-    return {...defaultUnit(svcObj.id, {petIds: pets.map(p => p.id)}), frequency:"weekly", weekDays:[today.getDay()], startDate:dateKey(today)}
+    const today            = new Date()
+    const durationOverride = (defaultDurationMins && svcObj.id !== 'doggy_daycare') ? {durationMins: defaultDurationMins} : {}
+    return {...defaultUnit(svcObj.id, {petIds: pets.map(p => p.id), ...durationOverride}), frequency:"weekly", weekDays:[today.getDay()], startDate:dateKey(today)}
   }
   const [addView,     setAddView]     = useState(initialSvc ? "form" : "pick")
   const [svc,         setSvc]         = useState(initialSvc)

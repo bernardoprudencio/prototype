@@ -300,6 +300,7 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
           existing={units}
           allPets={pets}
           defaultServiceId={units[0]?.serviceId}
+          defaultDurationMins={units[0]?.durationMins}
         />
       )}
       {showManage && (

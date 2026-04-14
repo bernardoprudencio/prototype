@@ -30,7 +30,7 @@ export default function ManageSheet({units, pets, onUnitsChange, onClose, onAdd}
       const yesterdayKey = dateKey(addDays(todayMid, -1))
       onUnitsChange([
         ...units.map(x => x.id !== updated.id ? x : {...x, repeatEndDate: yesterdayKey}),
-        {...updated, id: newId(), startDate: todayKey},
+        {...updated, id: newId(), startDate: todayKey, _continuation: true},
       ])
     } else {
       onUnitsChange(units.map(x => x.id === updated.id ? updated : x))
