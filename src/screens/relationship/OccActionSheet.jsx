@@ -24,6 +24,8 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
     ? `${fmtDate(occ.start)} to ${fmtDate(occ.end)} · ${occ.totalNights || nightCount(occ.unit)} night${(occ.totalNights || nightCount(occ.unit)) !== 1 ? "s" : ""}`
     : `${fmtDateLong(occ.start)} · ${fmtTime(occ.unit.startTime)} to ${fmtTime(endT)}`
   const svcName = shortSvcName(occ.svc)
+  const dayLabel = occ.start.toLocaleDateString('en-US', { weekday: 'long' })
+  const followingDetail = `${fmtTime(occ.unit.startTime)} ${svcName}s on ${dayLabel}`
 
   const headerRow = label => (
     <Row label={label} sublabel={dateLabel} rightItem={<PetAvatar size={48} images={occPets.map(p => p.img)}/>} firstRow/>
@@ -62,7 +64,7 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
         {headerRow(`Edit ${svcName}`)}
         <div style={{marginBottom:8}}/>
         <UnitEditor unit={draft} onChange={setDraft} allUnits={[]} allPets={allPets} timeOnly/>
-        <div onClick={handleRemove} style={{display:"flex",alignItems:"center",gap:10,minHeight:48,paddingTop:4,paddingBottom:12,cursor:"pointer"}}>
+        <div onClick={handleRemove} style={{display:"flex",alignItems:"center",gap:10,minHeight:48,paddingTop:4,paddingBottom:20,cursor:"pointer"}}>
           <CancelIcon color={R.red}/>
           <p style={{...textStyles.text200,color:R.red,margin:0}}>Remove {svcName}</p>
         </div>
@@ -76,8 +78,8 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
     <BottomSheet onDismiss={onClose}>
       {headerRow(`Edit ${svcName}`)}
       <RadioRow label={`This ${svcName} only`} value="this" selected={scope} onSelect={setScope}/>
-      <RadioRow label={`This and following ${svcName}s`} value="following" selected={scope} onSelect={setScope}/>
-      <div style={{marginTop:8}}>
+      <RadioRow label={`This and following ${svcName}s`} sublabel={followingDetail} value="following" selected={scope} onSelect={setScope}/>
+      <div style={{marginTop:16}}>
         <Button variant="primary" size="small" fullWidth onClick={() => {scope === "this" ? onOverride(occ, draft) : onOverrideFromDate(occ, draft); onClose()}}>Save changes</Button>
         <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
       </div>
@@ -85,7 +87,6 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
   )
 
   if(view === "removeScope") {
-    const followingLabel = `This and following ${svcName}s`
     const handleConfirm = () => {
       if(scope === "this") { onSkip(occ.key, true); onClose() }
       else { applyRemoveFollowing(); onClose() }
@@ -94,8 +95,8 @@ export default function OccActionSheet({occ, allPets, onSaveUnit, onSkip, onOver
       <BottomSheet onDismiss={onClose}>
         {headerRow(`Remove ${svcName}`)}
         <RadioRow label={`This ${svcName} only`} value="this" selected={scope} onSelect={setScope}/>
-        <RadioRow label={followingLabel} value="following" selected={scope} onSelect={setScope}/>
-        <div style={{marginTop:8}}>
+        <RadioRow label={`This and following ${svcName}s`} sublabel={followingDetail} value="following" selected={scope} onSelect={setScope}/>
+        <div style={{marginTop:16}}>
           <Button variant="primary" size="small" fullWidth onClick={handleConfirm}>Save changes</Button>
           <div style={{marginTop:12}}><Button variant="default" size="small" fullWidth onClick={onClose}>Close</Button></div>
         </div>
