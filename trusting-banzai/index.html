@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rover - Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+    <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+    <script>
+      (function() {
+        var p = new URLSearchParams(window.location.search);
+        var captureId = p.get('figmacapture');
+        var endpoint  = p.get('figmaendpoint');
+        var delay     = parseInt(p.get('figmadelay') || '1000', 10);
+        if (!captureId || !endpoint) return;
+        function tryCapture(attempts) {
+          if (window.figma && window.figma.captureForDesign) {
+            setTimeout(function() {
+              window.figma.captureForDesign({ captureId: captureId, endpoint: endpoint, selector: 'body' });
+            }, delay);
+          } else if (attempts > 0) {
+            setTimeout(function() { tryCapture(attempts - 1); }, 200);
+          }
+        }
+        tryCapture(30);
+      })();
+    </script>
+    <script type="module" crossorigin src="/prototype/trusting-banzai/assets/index-KREBRVZV.js"></script>
+    <link rel="stylesheet" crossorigin href="/prototype/trusting-banzai/assets/index-CgEOySBa.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
