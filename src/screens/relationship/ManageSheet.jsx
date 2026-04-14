@@ -21,8 +21,6 @@ export default function ManageSheet({units, pets, onUnitsChange, onClose, onAdd}
   const unitLabel = id => ({ dog_walking: 'walk', drop_in: 'visit', doggy_daycare: 'day', boarding: 'night', house_sitting: 'night' })[id] ?? (SERVICES.find(s => s.id === id)?.label ?? id).toLowerCase()
 
   const recurring       = units.filter(u => u.frequency !== "once")
-  const removeUnit      = id => { onUnitsChange(units.filter(x => x.id !== id)) }
-  const refundAndDelete = id => { onUnitsChange(units.filter(x => x.id !== id)) }
   const updateUnit      = updated => {
     const orig         = units.find(x => x.id === updated.id)
     const todayMid     = new Date(PROTO_TODAY); todayMid.setHours(0,0,0,0)
