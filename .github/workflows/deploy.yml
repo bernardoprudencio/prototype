@@ -7,6 +7,7 @@ on:
       - new-modification
       - ongoing-relationships
       - user-testing-ongoing-relationships-v1
+      - claude/trusting-banzai
 
 permissions:
   contents: write
@@ -74,4 +75,17 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           destination_dir: user-testing-ongoing-relationships-v1
+          keep_files: true
+
+      - name: Build (claude/trusting-banzai)
+        if: github.ref == 'refs/heads/claude/trusting-banzai'
+        run: VITE_BASE=/prototype/trusting-banzai/ npm run build
+
+      - name: Deploy claude/trusting-banzai → subdirectory
+        if: github.ref == 'refs/heads/claude/trusting-banzai'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: trusting-banzai
           keep_files: true
