@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { R, fontFamily } from './theme'
 import { textStyles } from '../../tokens'
-import { computeScheduleDiff, shortRuleLabel, expandUnit, isPaidOcc, getPaidThruSunday, unitTotalCost } from '../../lib/scheduleHelpers'
+import { computeScheduleDiff, shortRuleLabel, expandUnit, isPaidOcc, getPaidThruSunday, getWeekMonday, unitTotalCost } from '../../lib/scheduleHelpers'
 import { parseDate, dateKey, addDays, fmtDate, fmtDateLong, fmtTime } from '../../lib/dateUtils'
 import { PROTO_TODAY } from '../../data/owners'
 import { SERVICES } from '../../data/services'
@@ -23,13 +23,14 @@ function fmtDays(days) {
 }
 
 function computeWeekBilling(savedUnits, draftUnits, petsArr) {
-  const paidThru = getPaidThruSunday()
-  const todayMid = new Date(PROTO_TODAY); todayMid.setHours(0, 0, 0, 0)
+  const paidThru   = getPaidThruSunday()
+  const weekMonday = getWeekMonday(PROTO_TODAY)
 
+  // All walks within the current Mon–Sun billing week (past + future)
   const weekOccs = units =>
     units.flatMap(u =>
       expandUnit(u)
-        .filter(o => !o.skipped && isPaidOcc(o.start, paidThru) && o.start >= todayMid)
+        .filter(o => !o.skipped && o.start >= weekMonday && o.start <= paidThru)
         .map(o => ({ unit: u, occ: o }))
     )
 
@@ -85,6 +86,7 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
 
   const isEmpty = totalCount === 0
   const { savedTotal, draftTotal, net, lineItems, hasActivity } = computeWeekBilling(savedUnits, draftUnits, pets)
+  const hasFinancialActivity = hasActivity || chargeTotal > 0 || refundTotal > 0
 
   // --- Approach A: group "remove from date forward" into semantic rows ---
   // Handles chained removals (e.g. remove Mon, then Wed from same rule) by building
@@ -424,7 +426,7 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
 
   const handlePrimaryAction = () => {
     if (view === 'review') {
-      if (hasActivity) { setView('confirm'); return }
+      if (hasFinancialActivity) { setView('confirm'); return }
       handleConfirm()
       return
     }
@@ -460,7 +462,7 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
 
     return (
       <BottomSheet variant="full" onDismiss={() => setView('review')} header={header}>
-        {hasActivity ? (
+        {hasFinancialActivity ? (
           <div style={{ background: R.bg, borderRadius: 8, padding: 16, marginBottom: 24 }}>
             <p style={{ ...textStyles.heading200, color: R.navy, margin: '0 0 12px' }}>This week's summary</p>
 
@@ -614,7 +616,7 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
         <Row key={item.key} label={item.label} sublabel={item.sublabel} sublabel2={item.contLabel} />
       ))}
       <div style={{ marginTop: 24 }}>
-        <Button variant="primary" size="small" fullWidth onClick={handlePrimaryAction}>{hasActivity ? 'Review charges and refunds' : 'Confirm changes'}</Button>
+        <Button variant="primary" size="small" fullWidth onClick={handlePrimaryAction}>{hasFinancialActivity ? 'Review charges and refunds' : 'Confirm changes'}</Button>
         <div style={{ marginTop: 12 }}>
           <Button variant="default" size="small" fullWidth onClick={onBack}>Go back</Button>
         </div>

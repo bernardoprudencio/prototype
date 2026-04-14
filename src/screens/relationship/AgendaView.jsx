@@ -157,7 +157,7 @@ export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, 
             const isFullyPast      = isPaid && !isCurrentWk
             const isGapWeek        = entries === null
             const fmtMoney         = n => `$${n.toFixed(2)}`
-            const weekTotal        = isGapWeek ? 0 : entries.reduce((sum, [,occs]) => sum + occs.reduce((s, occ) => s + unitTotalCost(occ.unit), 0), 0)
+            const weekTotal        = isGapWeek ? 0 : entries.reduce((sum, [,occs]) => sum + occs.reduce((s, occ) => addedUnitIds?.has(occ.unit.id) ? s : s + unitTotalCost(occ.unit), 0), 0)
             const incompleteCount  = isGapWeek || !isFullyPast ? 0 : entries.reduce((sum, [,occs]) => sum + occs.filter(occ => occ.key === incompleteKey).length, 0)
             const paymentLabel     = isGapWeek
               ? `There are no ${emptyWeekSvc} this week`
