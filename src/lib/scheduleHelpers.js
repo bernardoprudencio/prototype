@@ -286,6 +286,31 @@ export function computeScheduleDiff(savedUnits, draftUnits) {
     }
   }
 
+  // Additional refunds for paid occurrences orphaned by a newly set repeatEndDate.
+  // endRuleFromDate() skips only the boundary date; subsequent paid occurrences within
+  // the billing window drop silently. Capture them here unless an added unit covers them.
+  const draftAddedOccKeys = new Set(
+    addedUnits.flatMap(u =>
+      expandUnit(u).filter(o => !o.skipped).map(o => `${u.serviceId}-${dateKey(o.start)}`)
+    )
+  )
+  for (const id of keptIds) {
+    const saved = savedUnits.find(u => u.id === id)
+    const draft = draftUnits.find(u => u.id === id)
+    if (!draft.repeatEndDate) continue
+    if (saved.repeatEndDate && saved.repeatEndDate <= draft.repeatEndDate) continue
+    const draftEndDate = parseDate(draft.repeatEndDate)
+    const savedPaidBeyond = expandUnit(saved).filter(
+      o => !o.skipped && isPaidOcc(o.start, paidThru) && o.start >= todayMid && o.start > draftEndDate
+    )
+    for (const occ of savedPaidBeyond) {
+      const dk = dateKey(occ.start)
+      if ((draft.skippedKeys || []).includes(dk)) continue
+      if (draftAddedOccKeys.has(`${saved.serviceId}-${dk}`)) continue
+      skipped.push({ unit: draft, dk, refundAmount: unitTotalCost(draft) })
+    }
+  }
+
   const refundTotal = removed.reduce((s, r) => s + r.refundAmount, 0) +
                       skipped.reduce((s, sk) => s + sk.refundAmount, 0)
   const chargeTotal = added.reduce((s, a) => s + a.chargeAmount, 0)
