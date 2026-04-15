@@ -3,7 +3,7 @@ import { colors, typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, CalendarScreen, AvailabilityScreen } from './screens'
+import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, CalendarScreen, AvailabilityScreen, DailyView } from './screens'
 import GoogleCalendarFlow from './screens/GoogleCalendarFlow'
 import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeekSlots, getFullCurrentWeekSlots } from './data/owners'
 import { petImages } from './assets/images'
@@ -37,6 +37,8 @@ export default function App() {
   const [ownerWeeks, setOwnerWeeks]               = useState({})  // { ownerId: weeks[] }
   const [ownerSameSchedule, setOwnerSameSchedule] = useState({})  // { ownerId: bool }
   const [ownerCurrentWeeks, setOwnerCurrentWeeks] = useState({})  // { ownerId: days[] }
+
+  const [selectedDay, setSelectedDay]   = useState(null)
 
   const [gcalFlow, setGcalFlow]         = useState(null)   // null | 'sheet' | 'oauth' | 'picker' | 'success'
   const [gcalConnected, setGcalConnected] = useState(false)
@@ -184,6 +186,17 @@ export default function App() {
             onOpenAvailability={() => navigateTo('availability', 'forward')}
             showAlert={calendarAlert}
             onAlertDismiss={() => setCalendarAlert(false)}
+            onDaySelect={(date) => {
+              setSelectedDay(date)
+              navigateTo('day-detail', 'forward')
+            }}
+          />
+        )}
+        {screen === 'day-detail' && (
+          <DailyView
+            date={selectedDay}
+            onBack={goBack}
+            onOpenAvailability={() => navigateTo('availability', 'forward')}
           />
         )}
         {screen === 'availability' && (

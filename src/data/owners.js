@@ -17,7 +17,7 @@ const toMins = (str) => {
   return h * 60 + m
 }
 
-const formatTimeRange = (startTime, durationMins) => {
+export const formatTimeRange = (startTime, durationMins) => {
   const total = toMins(startTime) + durationMins
   const endH   = Math.floor(total / 60)
   const endM   = total % 60
@@ -187,6 +187,20 @@ export const getFullCurrentWeekSlots = (owner) => {
       slots: times.map((time, si) => ({ id: `${owner.id}-cw-d${i + 1}-s${si + 1}`, time })),
     }
   })
+}
+
+// All walks for a given date, across all owners
+export function getWalksForDate(date) {
+  const dayName = DAY_NAMES[date.getDay()]
+  return Object.values(OWNERS).flatMap(owner =>
+    owner.template
+      .filter(entry => entry.day === dayName)
+      .map(entry => ({
+        owner,
+        time: entry.time,
+        timeRange: formatTimeRange(entry.time, owner.serviceDuration),
+      }))
+  )
 }
 
 // Upcoming 5 weeks starting next Monday, derived from owner template

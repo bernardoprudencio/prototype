@@ -36,7 +36,7 @@ function getCalendarWeeks(year, month) {
 const STRIPE_GRAY = 'repeating-linear-gradient(-45deg, #D7DCE0 0px, #D7DCE0 4px, #F4F5F6 4px, #F4F5F6 8px)'
 const STRIPE_RED  = 'repeating-linear-gradient(-45deg, #FFC8BC 0px, #FFC8BC 4px, #FFE5DF 4px, #FFE5DF 8px)'
 
-function DayCell({ date, isPast }) {
+function DayCell({ date, isPast, onClick }) {
   if (!date) return <div style={{ flex: 1, aspectRatio: '1', minWidth: 0 }} />
 
   const state = isPast ? 'default' : getDayState(date)
@@ -44,14 +44,19 @@ function DayCell({ date, isPast }) {
   const textColor = isPast
     ? colors.disabledText
     : state === 'booked' ? colors.primary : colors.tertiary
+  const isClickable = !isPast
 
   return (
-    <div style={{
-      flex: 1, aspectRatio: '1', borderRadius: 8,
-      background: bg, display: 'flex', alignItems: 'center',
-      justifyContent: 'center', overflow: 'hidden',
-      minWidth: 0, position: 'relative',
-    }}>
+    <div
+      onClick={isClickable ? onClick : undefined}
+      style={{
+        flex: 1, aspectRatio: '1', borderRadius: 8,
+        background: bg, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', overflow: 'hidden',
+        minWidth: 0, position: 'relative',
+        cursor: isClickable ? 'pointer' : 'default',
+      }}
+    >
       <span style={{
         fontFamily: typography.fontFamily,
         fontSize: 14, fontWeight: 600,
@@ -170,13 +175,13 @@ function GlossarySheet({ onClose }) {
   )
 }
 
-export default function CalendarScreen({ onTabChange, onOpenAvailability, showAlert, onAlertDismiss }) {
+export default function CalendarScreen({ onTabChange, onOpenAvailability, showAlert, onAlertDismiss, onDaySelect }) {
   const [showGlossary, setShowGlossary] = useState(false)
 
   const today     = new Date()
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   const year      = today.getFullYear()
-  const months    = Array.from({ length: 3 }, (_, i) =>
+  const months    = Array.from({ length: 12 }, (_, i) =>
     new Date(year, today.getMonth() + i, 1)
   )
 
@@ -223,7 +228,7 @@ export default function CalendarScreen({ onTabChange, onOpenAvailability, showAl
                   <div key={wi} style={{ display: 'flex', gap: 6 }}>
                     {week.map((date, di) => {
                       const isPast = date && date < todayStart
-                      return <DayCell key={di} date={date} isPast={isPast} />
+                      return <DayCell key={di} date={date} isPast={isPast} onClick={() => onDaySelect?.(date)} />
                     })}
                   </div>
                 ))}
