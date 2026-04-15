@@ -41,6 +41,7 @@ export default function App() {
   const [gcalFlow, setGcalFlow]         = useState(null)   // null | 'sheet' | 'oauth' | 'picker' | 'success'
   const [gcalConnected, setGcalConnected] = useState(false)
   const [gcalCalendar, setGcalCalendar]   = useState('Personal')
+  const [calendarAlert, setCalendarAlert] = useState(false)
 
   const getEffectiveOwner = (owner) => {
     const tpl = ownerTemplates[owner.id]
@@ -181,11 +182,13 @@ export default function App() {
           <CalendarScreen
             onTabChange={(tab) => { if (tab === 'home') navigateTo('home', 'back') }}
             onOpenAvailability={() => navigateTo('availability', 'forward')}
+            showAlert={calendarAlert}
+            onAlertDismiss={() => setCalendarAlert(false)}
           />
         )}
         {screen === 'availability' && (
           <AvailabilityScreen
-            onBack={() => goBack()}
+            onBack={() => { setCalendarAlert(true); goBack() }}
             onGoogleCalendar={() => setGcalFlow('sheet')}
             gcalConnected={gcalConnected}
             gcalCalendar={gcalCalendar}
