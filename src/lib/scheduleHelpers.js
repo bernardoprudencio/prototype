@@ -141,11 +141,14 @@ export function expandUnit(unit) {
       while (cur <= horizon && occs.length < MAX) { occs.push(makeOcc(cur, dateKey(cur))); cur = addWeeks(cur, step) }
     } else {
       const days = (unit.weekDays && unit.weekDays.length) > 0 ? unit.weekDays : [base.getDay()]
+      const allDowOccs = []
       days.forEach(dow => {
         const diff = ((dow - base.getDay()) + 7) % 7
         let cur = addDays(base, diff)
-        while (cur <= horizon && occs.length < MAX) { occs.push(makeOcc(cur, dateKey(cur))); cur = addWeeks(cur, step) }
+        while (cur <= horizon) { allDowOccs.push(makeOcc(cur, dateKey(cur))); cur = addWeeks(cur, step) }
       })
+      allDowOccs.sort((a, b) => a.start - b.start)
+      occs.push(...allDowOccs.slice(0, MAX))
     }
     occs.sort((a, b) => a.start - b.start)
   } else if (unit.frequency === 'monthly') {

@@ -75,10 +75,11 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
   }
 
   const cancelDayFromDate = occ => {
-    const parentUnit  = occ.parentUnit || occ.unit
-    const occDow      = occ.start.getDay()
-    const newWeekDays = (parentUnit.weekDays || []).filter(d => d !== occDow)
-    const dk          = dateKey(occ.start)
+    const parentUnit    = occ.parentUnit || occ.unit
+    const occDow        = occ.start.getDay()
+    const newWeekDays   = (parentUnit.weekDays || []).filter(d => d !== occDow)
+    const dk            = dateKey(occ.start)
+    const isSavedParent = savedUnitsRef.current.some(u => u.id === parentUnit.id)
     setUnits(prev => {
       const updated = prev.map(u =>
         u.id !== parentUnit.id ? u : {...u, repeatEndDate: dateKey(addDays(occ.start, -1))}
@@ -95,7 +96,9 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
           everyNWeeks: parentUnit.everyNWeeks,
         }),
         repeatEndDate: parentUnit.repeatEndDate || "",
-        _continuation: true,
+        // Only mark as continuation when the parent was a saved unit — for unsaved
+        // (draft-only) parents both split pieces should appear as "Added".
+        ...(isSavedParent && { _continuation: true }),
       }
       return [...updated, newUnit]
     })
@@ -246,9 +249,14 @@ const RelationshipScreen = forwardRef(function RelationshipScreen({initialPets, 
     return map
   }, [units, savedVersion])
   const { removedOccKeys, agendaWithRemoved } = useMemo(() => {
-    // Compare by (serviceId + date) so continuation units (new IDs) don't cause false "removed" flags
+    // Compare by (serviceId + date) so continuation units (new IDs) don't cause false "removed" flags.
+    // Exclude pure new additions (not in savedIds, not a _parentTime or _continuation split) so they
+    // don't mask genuinely removed occurrences from saved units that happen to fall on the same date.
+    const savedUnitIds = new Set(savedUnitsRef.current.map(u => u.id))
     const draftByDateSvc = new Set(
-      units.flatMap(u => expandUnit(u).filter(o => !o.skipped).map(o => `${u.serviceId}-${dateKey(o.start)}`))
+      units
+        .filter(u => savedUnitIds.has(u.id) || u._parentTime || u._continuation)
+        .flatMap(u => expandUnit(u).filter(o => !o.skipped).map(o => `${u.serviceId}-${dateKey(o.start)}`))
     )
     const savedOccs   = savedUnitsRef.current.flatMap(u => expandUnit(u).filter(o => !o.skipped))
     const removedOccs = savedOccs.filter(o => !draftByDateSvc.has(`${o.parentUnit.serviceId}-${dateKey(o.start)}`))
