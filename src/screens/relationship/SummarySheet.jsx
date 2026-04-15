@@ -375,15 +375,13 @@ export default function SummarySheet({ savedUnits, draftUnits, pets, onConfirm, 
     .filter(({ draft }) => !consumedModifiedIds.has(draft.id))
     .forEach(({ saved, draft }) => {
       if (!saved.repeatEndDate && draft.repeatEndDate) {
-        const matchedSkip = skipped.find(({ unit: su, dk }) =>
+        const matchedSkips = skipped.filter(({ unit: su, dk }) =>
           !consumedSkipKeys.has(`${su.id}-${dk}`) &&
-          su.id === draft.id &&
-          dk === draft.repeatEndDate
+          su.id === draft.id
         )
-        if (matchedSkip) {
-          consumedSkipKeys.add(`${matchedSkip.unit.id}-${matchedSkip.dk}`)
-          endedRuleRefunds.set(draft.id, matchedSkip.refundAmount || 0)
-        }
+        matchedSkips.forEach(({ unit: su, dk }) => consumedSkipKeys.add(`${su.id}-${dk}`))
+        const totalRefund = matchedSkips.reduce((s, sk) => s + (sk.refundAmount || 0), 0)
+        if (matchedSkips.length > 0) endedRuleRefunds.set(draft.id, totalRefund)
       }
     })
 
