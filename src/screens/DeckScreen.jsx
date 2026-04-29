@@ -245,15 +245,9 @@ function SlideCurrentFlow() {
         <FlowArrow />
         <FlowCard day="Sun → Mon+" title="Payout / refund lands" desc="A full week (or more) after the service." miniature={<PayoutMini />} />
       </div>
-      <div style={{
-        marginTop: 24, padding: '14px 20px', borderRadius: 10,
-        background: 'rgba(46,103,209,0.08)', border: `1px solid rgba(46,103,209,0.2)`,
-        maxWidth: 920,
-      }}>
-        <p style={{ ...body, fontSize: 15, margin: 0 }}>
-          <b>~50% of stays only "resolve" because the sitter ignores everything</b> — the owner gets auto‑refunded, the sitter doesn't get paid, and nobody's confidence improves.
-        </p>
-      </div>
+      <p style={{ ...muted, fontSize: 14, marginTop: 28, maxWidth: 900 }}>
+        Five touchpoints, two channels (email + CX), zero in‑app affordance — and the owner waits the longest.
+      </p>
     </div>
   )
 }
@@ -337,9 +331,8 @@ function SlideDemo() {
       {/* Phone-shaped iframe */}
       <div style={{
         flexShrink: 0,
+        width: 375,
         height: '100%',
-        aspectRatio: '390 / 812',
-        maxWidth: '100%',
         background: '#1F2124',
         borderRadius: 32, overflow: 'hidden',
         border: '8px solid #1F2124',
