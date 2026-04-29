@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { colors, typography, shadows } from '../tokens'
-import { BellIcon, ChevronUpIcon, ChevronDownIcon, EditIcon, MoreIcon } from '../assets/icons'
+import { BellIcon, ChevronUpIcon, ChevronDownIcon, EditIcon } from '../assets/icons'
 import { petImages } from '../assets/images'
 import { formatHeaderDate } from '../hooks/useDate'
 import { Button, PetAvatar, UserAvatar, TabBar, HomeCard, Row } from '../components'
@@ -11,11 +11,15 @@ const PROMO_CARDS = [
   { bg: colors.cyan100, title: 'Share more, earn more', desc: 'Earn a $100 reward for every two customers you invite who book.', cta: 'Start Sharing', img: petImages.promo2 },
 ]
 
-export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, loadTime }) {
+export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onOpenDeck, loadTime }) {
   const [incompleteOpen, setIncompleteOpen] = useState(true)
 
   const visibleCards = INCOMPLETE_CARDS.filter(c => !resolvedCards[c.id])
   const hasIncomplete = visibleCards.length > 0
+
+  // Hide the deck entry point when the prototype is rendered inside an
+  // iframe (e.g. the demo slide of the deck itself) to avoid recursion.
+  const inEmbed = typeof window !== 'undefined' && window.self !== window.top
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
@@ -37,6 +41,30 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '24px 16px' }}>
         <p style={{ fontFamily: typography.fontFamily, fontSize: 14, color: colors.tertiary, margin: '0 0 8px' }}>Updated at {loadTime}</p>
 
+        {/* ─── Deck entry row (hidden when embedded inside the deck) ─── */}
+        {!inEmbed && (
+          <button
+            onClick={onOpenDeck}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+              padding: '14px 16px', marginBottom: 8,
+              background: colors.yellow100, border: `1px solid ${colors.yellow200}`,
+              borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+              fontFamily: typography.fontFamily,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontWeight: 700, fontSize: 14, color: colors.primary, margin: 0 }}>
+                Project review
+              </p>
+              <p style={{ fontSize: 12, color: colors.tertiary, margin: '2px 0 0' }}>
+                Open the Product &amp; Design leadership deck
+              </p>
+            </div>
+            <span style={{ fontSize: 18, color: colors.primary, flexShrink: 0 }}>→</span>
+          </button>
+        )}
+
         {/* ─── Incomplete section ─── */}
         {hasIncomplete && (
           <>
@@ -46,7 +74,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
                   Incomplete ({visibleCards.length})
                 </p>
                 <p style={{ fontFamily: typography.fontFamily, fontSize: 14, color: colors.tertiary, margin: '4px 0 0' }}>
-                  Complete all services to get paid on time.
+                  Review all services to get paid on time.
                 </p>
               </div>
               <div style={{ flexShrink: 0 }}>{incompleteOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}</div>
@@ -62,10 +90,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
                       rightItem={<PetAvatar size={48} images={[petImages[card.petKey]]} />}
                       firstRow
                     />
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <Button variant="default" style={{ flex: 1 }} onClick={() => onOpenReviewSheet(card)}>Review and complete</Button>
-                      <Button variant="default" icon={<MoreIcon size={16} />} onClick={() => onOpenActionSheet(card)} />
-                    </div>
+                    <Button variant="default" fullWidth onClick={() => onOpenReviewSheet(card)}>Review and submit</Button>
                   </div>
                 ))}
               </div>
@@ -81,7 +106,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
             time="9:00 – 10:00 AM" service="Dog walking"
             address="123 Fourth Ave, Seattle, WA" petNames="Koni, Burley"
             petImages={[petImages.koni, petImages.burley]}
-            buttonLabel="Start Rover Card"
+            buttonLabel="Open Rover Card"
             onClick={onNavigateConversation}
           />
           <HomeCard

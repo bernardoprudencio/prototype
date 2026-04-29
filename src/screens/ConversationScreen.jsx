@@ -97,10 +97,10 @@ export default function ConversationScreen({ onBack, conversation }) {
               <>
                 <DayDivider label="Today" />
                 {resolution === 'completed' && (
-                  <BannerBlock text={`Walk from ${card.dateLabel} was marked as complete on ${timestamp}.`} />
+                  <BannerBlock text={`${card.service} from ${card.dateLabel} was marked as complete at ${timestamp}.`} />
                 )}
                 {resolution === 'cancelled' && (
-                  <BannerBlock text={`Walk from ${card.dateLabel} was cancelled on ${timestamp}. A refund of ${card.cost} has been processed.`} />
+                  <BannerBlock text={`Looks like your ${card.service} on ${card.dateLabel} didn't happen. We'll issue a ${card.cost} refund once all services this week are submitted.`} />
                 )}
               </>
             )}
@@ -131,10 +131,10 @@ export default function ConversationScreen({ onBack, conversation }) {
               <>
                 <DayDivider label="Today" />
                 {resolution === 'completed' && (
-                  <BannerBlock text={`Walk from ${card.dateLabel} was marked as complete on ${timestamp}.`} />
+                  <BannerBlock text={`${card.service} from ${card.dateLabel} was marked as complete at ${timestamp}.`} />
                 )}
                 {resolution === 'cancelled' && (
-                  <BannerBlock text={`Walk from ${card.dateLabel} was cancelled on ${timestamp}. A refund of ${card.cost} has been processed.`} />
+                  <BannerBlock text={`Looks like your ${card.service} on ${card.dateLabel} didn't happen. We'll issue a ${card.cost} refund once all services this week are submitted.`} />
                 )}
               </>
             )}

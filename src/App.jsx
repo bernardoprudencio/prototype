@@ -3,7 +3,7 @@ import { colors, typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet } from './components'
-import { HomeScreen, ConversationScreen } from './screens'
+import { HomeScreen, ConversationScreen, DeckScreen } from './screens'
 
 export default function App() {
   const [screen, setScreen]             = useState('home')
@@ -41,22 +41,24 @@ export default function App() {
   }
 
   return (
-    <div className="phone-shell" style={{ fontFamily: typography.fontFamily }}>
-      {/* Screen layer */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        transition: 'transform 0.25s ease, opacity 0.2s ease',
-        transform: transition
-          ? (direction === 'forward' ? 'translateX(-30%)' : 'translateX(30%)')
-          : 'translateX(0)',
-        opacity: transition ? 0 : 1,
-      }}>
+    <>
+      <div className="phone-shell" style={{ fontFamily: typography.fontFamily }}>
+        {/* Screen layer */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          transition: 'transform 0.25s ease, opacity 0.2s ease',
+          transform: transition
+            ? (direction === 'forward' ? 'translateX(-30%)' : 'translateX(30%)')
+            : 'translateX(0)',
+          opacity: transition ? 0 : 1,
+        }}>
         {screen === 'home' && (
           <HomeScreen
             resolvedCards={resolvedCards}
             loadTime={loadTime}
             onOpenActionSheet={(card) => setActionSheetCard(card)}
             onOpenReviewSheet={(card) => setReviewSheetCard(card)}
+            onOpenDeck={() => setScreen('deck')}
             onNavigateConversation={() => {
               setConversation({ type: 'today' })
               navigateTo('conversation', 'forward')
@@ -95,5 +97,8 @@ export default function App() {
         onCancelRefund={() => handleCancelRefund(reviewSheetCard)}
       />
     </div>
+
+    {screen === 'deck' && <DeckScreen onClose={() => setScreen('home')} />}
+    </>
   )
 }

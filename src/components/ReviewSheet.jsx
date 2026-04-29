@@ -10,6 +10,8 @@ export default function ReviewSheet({ visible, card, onClose, onComplete, onCanc
 
   if (!visible || !card) return null
 
+  const ownerFirstName = (card.client || '').split(' ')[0]
+
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 50,
@@ -35,12 +37,12 @@ export default function ReviewSheet({ visible, card, onClose, onComplete, onCanc
         />
 
         <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 16, color: colors.primary, margin: '0 0 12px' }}>
-          Have you completed the walk?
+          Did the walk happen?
         </p>
 
-        {/* No / Yes toggle — Kibble Chip pattern */}
+        {/* Yes / No toggle — Kibble Chip pattern */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {['no', 'yes'].map((opt) => {
+          {['yes', 'no'].map((opt) => {
             const selected = answer === opt
             return (
               <button
@@ -70,13 +72,17 @@ export default function ReviewSheet({ visible, card, onClose, onComplete, onCanc
         <p style={{ fontFamily: typography.fontFamily, fontSize: 14, lineHeight: 1.5, color: colors.tertiary, margin: '0 0 20px' }}>
           {answer === 'yes'
             ? "There's no Rover Card, so your client won't see updates about their pet. We'll let them know the service is complete."
-            : `A refund of ${card.cost} will automatically be processed.`}
+            : `${ownerFirstName} will be refunded ${card.cost} for this service once all services of the week are submitted.`}
         </p>
 
-        {answer === 'yes'
-          ? <Button variant="primary" fullWidth style={{ marginBottom: 12 }} onClick={onComplete}>Mark as complete</Button>
-          : <Button variant="destructive" fullWidth style={{ marginBottom: 12 }} onClick={onCancelRefund}>Cancel and refund</Button>
-        }
+        <Button
+          variant="primary"
+          fullWidth
+          style={{ marginBottom: 12 }}
+          onClick={answer === 'yes' ? onComplete : onCancelRefund}
+        >
+          Submit
+        </Button>
         <Button variant="default" fullWidth onClick={onClose}>Close</Button>
       </div>
     </div>
