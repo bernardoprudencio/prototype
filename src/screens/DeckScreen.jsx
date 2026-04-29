@@ -128,6 +128,130 @@ function SlideNumbers() {
   )
 }
 
+function FlowCard({ day, title, desc, miniature }) {
+  return (
+    <div style={{
+      flex: 1, minWidth: 0,
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <p style={{
+        ...muted, fontSize: 12, fontWeight: 700, letterSpacing: '0.06em',
+        textTransform: 'uppercase', color: stage.accent, margin: 0,
+      }}>{day}</p>
+      <div style={{
+        background: stage.card, border: `1px solid ${stage.rule}`, borderRadius: 10,
+        padding: 12, height: 110, overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {miniature}
+      </div>
+      <p style={{ ...body, fontSize: 14, fontWeight: 700, margin: 0 }}>{title}</p>
+      <p style={{ ...muted, fontSize: 12, margin: 0 }}>{desc}</p>
+    </div>
+  )
+}
+
+function FlowArrow() {
+  return (
+    <div style={{
+      flexShrink: 0, alignSelf: 'flex-start', marginTop: 50,
+      color: stage.muted, fontSize: 22,
+    }}>→</div>
+  )
+}
+
+const EmailMini = () => (
+  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 10, color: stage.ink, margin: 0, lineHeight: 1.2 }}>
+      Your payment is being held
+    </p>
+    <div style={{ height: 1, background: stage.rule }} />
+    <p style={{ fontFamily: typography.fontFamily, fontSize: 8, color: stage.muted, margin: 0, lineHeight: 1.3 }}>
+      Oops—it looks like a Rover Card was not completed…
+    </p>
+    <p style={{ fontFamily: typography.fontFamily, fontSize: 8, color: stage.accent, margin: 'auto 0 0', lineHeight: 1.2 }}>
+      click here →
+    </p>
+  </div>
+)
+
+const LandingMini = () => (
+  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 10, color: stage.ink, margin: 0, textAlign: 'center' }}>
+      Incomplete Services
+    </p>
+    <div style={{ height: 1, background: stage.rule }} />
+    <p style={{ fontFamily: typography.fontFamily, fontSize: 8, color: stage.muted, margin: 0, lineHeight: 1.3 }}>
+      Tue · Nov 14<br/>Wed · Nov 15
+    </p>
+    <div style={{
+      marginTop: 'auto', background: '#1B6C42', color: stage.card,
+      borderRadius: 4, padding: '4px 6px', textAlign: 'center',
+      fontFamily: typography.fontFamily, fontSize: 8, fontWeight: 700,
+    }}>
+      I didn't perform these
+    </div>
+  </div>
+)
+
+const CxMini = () => (
+  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+    <div style={{
+      width: 32, height: 32, borderRadius: 99,
+      background: stage.bg, color: stage.card,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 12,
+    }}>CX</div>
+    <p style={{ fontFamily: typography.fontFamily, fontSize: 9, color: stage.muted, margin: 0, textAlign: 'center', lineHeight: 1.3 }}>
+      Limited to <b style={{ color: stage.ink }}>5 fixes</b><br/>per provider / week
+    </p>
+  </div>
+)
+
+const NotesMini = () => (
+  <div style={{
+    width: '100%', height: '100%', background: '#1F2124',
+    color: stage.card, borderRadius: 6, padding: 8,
+    display: 'flex', flexDirection: 'column', gap: 4,
+  }}>
+    <p style={{ fontFamily: typography.fontFamily, fontSize: 8, color: '#9EA5AC', margin: 0 }}>Staff Notes</p>
+    <p style={{ fontFamily: typography.fontFamily, fontSize: 8, margin: 0, lineHeight: 1.3 }}>
+      [cx] Missing RC, 5th time. <span style={{ color: '#FFB4B4' }}>FINAL WARNING.</span>
+    </p>
+  </div>
+)
+
+const PayoutMini = () => (
+  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 4 }}>
+    <p style={{ fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 22, color: stage.ink, margin: 0 }}>+7 days</p>
+    <p style={{ fontFamily: typography.fontFamily, fontSize: 9, color: stage.muted, margin: 0, textAlign: 'center', lineHeight: 1.3 }}>
+      after the original<br/>service date
+    </p>
+  </div>
+)
+
+function SlideCurrentFlow() {
+  return (
+    <div>
+      <SlideHeader eyebrowText="Today's flow" title="The path to resolve a missing Rover Card" />
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
+        <FlowCard day="Mon" title='"Payment held" email' desc="Generic, weekly, sent to every sitter with missing cards." miniature={<EmailMini />} />
+        <FlowArrow />
+        <FlowCard day="Tue+" title="Email landing page" desc="One CTA — admit the services didn't happen." miniature={<LandingMini />} />
+        <FlowArrow />
+        <FlowCard day="Tue+" title="…or contact CX" desc="Capped at 5 manual fixes per provider per week." miniature={<CxMini />} />
+        <FlowArrow />
+        <FlowCard day="Wed+" title="CX fixes manually" desc="Internal notes track repeat offenders and warnings." miniature={<NotesMini />} />
+        <FlowArrow />
+        <FlowCard day="Sun → Mon+" title="Payout / refund lands" desc="A full week (or more) after the service." miniature={<PayoutMini />} />
+      </div>
+      <p style={{ ...muted, fontSize: 14, marginTop: 28, maxWidth: 900 }}>
+        Five touchpoints, two channels (email + CX), zero in‑app affordance — and the owner waits the longest.
+      </p>
+    </div>
+  )
+}
+
 function SlideHypothesis() {
   return (
     <div>
@@ -203,27 +327,47 @@ function SlideWalkthrough() {
 function SlideDemo() {
   const src = import.meta.env.BASE_URL
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
-      <div>
-        <p style={eyebrow}>Live demo</p>
-        <h2 style={{ ...titleFont, fontSize: 32, lineHeight: 1.2, margin: '8px 0 0' }}>
-          Click around — the prototype is embedded below
-        </h2>
-      </div>
+    <div style={{ display: 'flex', gap: 40, height: '100%', alignItems: 'stretch', flexWrap: 'wrap' }}>
+      {/* Phone-shaped iframe */}
       <div style={{
-        flex: 1, minHeight: 0,
-        background: '#000', borderRadius: 12, overflow: 'hidden',
-        border: `1px solid ${stage.rule}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+        height: '100%',
+        aspectRatio: '390 / 812',
+        maxWidth: '100%',
+        background: '#1F2124',
+        borderRadius: 32, overflow: 'hidden',
+        border: '8px solid #1F2124',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.35)',
       }}>
         <iframe
           src={src}
           title="Incomplete Cards prototype"
           style={{
-            width: 390, height: '100%', maxHeight: 812,
-            border: 0, background: '#fff', borderRadius: 8,
+            width: '100%', height: '100%',
+            border: 0, background: '#fff', display: 'block',
           }}
         />
+      </div>
+
+      {/* Right-side talking points */}
+      <div style={{
+        flex: 1, minWidth: 280,
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 24,
+      }}>
+        <div>
+          <p style={eyebrow}>Live demo</p>
+          <h2 style={{ ...titleFont, fontSize: 38, lineHeight: 1.1, margin: '8px 0 0' }}>
+            Try the flow
+          </h2>
+        </div>
+        <Bullets items={[
+          'Tap "Review and submit" on the Incomplete card.',
+          '"Did the walk happen?" — pick Yes or No, then Submit.',
+          'See the system message land in the conversation.',
+        ]} />
+        <p style={{ ...muted, fontSize: 14, margin: 0 }}>
+          The phone on the left is the live prototype — interact directly.
+        </p>
       </div>
     </div>
   )
@@ -341,7 +485,7 @@ function SlideNext() {
 }
 
 const SLIDES = [
-  SlideTitle, SlideTLDR, SlideProblem, SlideNumbers, SlideHypothesis,
+  SlideTitle, SlideTLDR, SlideProblem, SlideCurrentFlow, SlideNumbers, SlideHypothesis,
   SlideSolution, SlideWalkthrough, SlideDemo, SlideDecisions, SlideRisks,
   SlideRollout, SlideMetrics, SlideNext,
 ]
