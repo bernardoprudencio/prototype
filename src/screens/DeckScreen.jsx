@@ -118,12 +118,12 @@ function SlideNumbers() {
     <div>
       <SlideHeader eyebrowText="By the numbers" title="The cost of the current flow" />
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <Stat value="10%" label="of weekly recurring stays have ≥1 missing Rover Card (20% at Christmas)" />
-        <Stat value="8–9%" label="of recurring bookings see delayed payouts and refunds each week" />
-        <Stat value="50%" label="of stays with missing Rover Cards are never paid out" />
-        <Stat value="5%" label="of cases get manually resolved by CX today" />
+        <Stat value="57%" label="of providers had at least one delayed payment in the last 6 months" />
+        <Stat value="~2.6k" label="providers per week are paid two weeks late after a missed Rover Card" />
+        <Stat value="~80%" label="of delayed payments only resolve after a full 2-week wait" />
+        <Stat value="~10%" label="of weekly recurring stays have ≥1 missing Rover Card (up to 20% at Christmas)" />
       </div>
-      <p style={{ ...muted, marginTop: 24 }}>Source: 1P doc · Mode dashboard</p>
+      <p style={{ ...muted, marginTop: 24 }}>Source: Mode dashboard · last 6 months</p>
     </div>
   )
 }
@@ -235,19 +235,25 @@ function SlideCurrentFlow() {
     <div>
       <SlideHeader eyebrowText="Today's flow" title="The path to resolve a missing Rover Card" />
       <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
-        <FlowCard day="Mon" title='"Payment held" email' desc="Generic, weekly, sent to every sitter with missing cards." miniature={<EmailMini />} />
+        <FlowCard day="Mon" title='"Payment held" email' desc="Sent every Monday to every sitter with missing cards." miniature={<EmailMini />} />
         <FlowArrow />
-        <FlowCard day="Tue+" title="Email landing page" desc="One CTA — admit the services didn't happen." miniature={<LandingMini />} />
+        <FlowCard day="Tue+" title="Email landing page" desc="~16% of stays resolve here — sitter confirms units weren't delivered." miniature={<LandingMini />} />
         <FlowArrow />
-        <FlowCard day="Tue+" title="…or contact CX" desc="Capped at 5 manual fixes per provider per week." miniature={<CxMini />} />
+        <FlowCard day="Tue+" title="…or contact CX" desc="~4% of stays — capped at 5 manual fixes per provider per week." miniature={<CxMini />} />
         <FlowArrow />
         <FlowCard day="Wed+" title="CX fixes manually" desc="Internal notes track repeat offenders and warnings." miniature={<NotesMini />} />
         <FlowArrow />
         <FlowCard day="Sun → Mon+" title="Payout / refund lands" desc="A full week (or more) after the service." miniature={<PayoutMini />} />
       </div>
-      <p style={{ ...muted, fontSize: 14, marginTop: 28, maxWidth: 900 }}>
-        Five touchpoints, two channels (email + CX), zero in‑app affordance — and the owner waits the longest.
-      </p>
+      <div style={{
+        marginTop: 24, padding: '14px 20px', borderRadius: 10,
+        background: 'rgba(46,103,209,0.08)', border: `1px solid rgba(46,103,209,0.2)`,
+        maxWidth: 920,
+      }}>
+        <p style={{ ...body, fontSize: 15, margin: 0 }}>
+          <b>~50% of stays only "resolve" because the sitter ignores everything</b> — the owner gets auto‑refunded, the sitter doesn't get paid, and nobody's confidence improves.
+        </p>
+      </div>
     </div>
   )
 }
@@ -470,14 +476,15 @@ function SlideNext() {
     <div>
       <SlideHeader eyebrowText="What's next" title="Beyond v1" />
       <Bullets items={[
-        "v2 — revisit immediate refunds with fee‑impact data from Mode.",
+        "Milestone 2 — parity between completed and missed cards, more actions, and clearer sectioning on Home.",
+        "Revisit immediate refunds with fee‑impact data from Mode.",
         "Deprecate the Monday \"Action required\" email entirely once in‑app coverage is high.",
         "Make Rover Cards optional for established recurring relationships.",
       ]} />
-      <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${stage.rule}` }}>
+      <div style={{ marginTop: 28, paddingTop: 20, borderTop: `1px solid ${stage.rule}` }}>
         <p style={{ ...muted, marginBottom: 8 }}>Read more</p>
         <p style={{ ...body, fontSize: 18, color: stage.accent }}>
-          1P · Functional Specs · RFC · Figma (UX2‑7159) · #temp‑action‑missing‑rover‑cards
+          1P · Functional Specs · RFC · Figma (UX2‑7159) · Q2 design explorations · #temp‑action‑missing‑rover‑cards
         </p>
       </div>
     </div>
