@@ -240,9 +240,9 @@ function SlideCurrentFlow() {
       <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
         <FlowCard day="Mon" title='"Payment held" email' desc="Sent every Monday to every sitter with missing cards." miniature={<EmailMini />} />
         <FlowArrow />
-        <FlowCard day="Tue+" title="Email landing page" desc="~16% of stays — sitter confirms before the deadline." miniature={<LandingMini />} />
+        <FlowCard day="Tue+" title="Email landing page" desc="~16% of these stays — sitter confirms before the deadline." miniature={<LandingMini />} />
         <FlowArrow />
-        <FlowCard day="Tue+" title="…or contact CX" desc="~5% of stays — capped at 5 manual fixes per provider per week." miniature={<CxMini />} />
+        <FlowCard day="Tue+" title="…or contact CX" desc="~5% of these stays — capped at 5 manual fixes per provider per week." miniature={<CxMini />} />
         <FlowArrow />
         <FlowCard day="Wed+" title="CX fixes manually" desc="Internal notes track repeat offenders and warnings." miniature={<NotesMini />} />
         <FlowArrow />
@@ -254,7 +254,10 @@ function SlideCurrentFlow() {
           textTransform: 'uppercase', margin: 0,
         }}>Where stays end up today</p>
         <p style={{ ...body, fontSize: 15, marginTop: 6 }}>
-          ~16% resolve on time · ~30% resolve late (delayed payouts) · ~49% are never resolved by the sitter (owner auto‑refunded) · the rest fall through CX.
+          ~10% of stays have a missing Rover Card each week (up to ~20% during Christmas). Among these:
+        </p>
+        <p style={{ ...body, fontSize: 15, marginTop: 4 }}>
+          ~20% are paid out on time · ~30% experience a delayed payout · ~50% are never paid out (owner auto‑refunded).
         </p>
       </div>
     </div>
