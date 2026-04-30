@@ -138,7 +138,7 @@ function FlowCard({ day, title, desc, miniature }) {
       display: 'flex', flexDirection: 'column', gap: 10,
     }}>
       <p style={{
-        ...muted, fontSize: 12, fontWeight: 700, letterSpacing: '0.06em',
+        ...muted, fontSize: 13, fontWeight: 700, letterSpacing: '0.06em',
         textTransform: 'uppercase', color: stage.accent, margin: 0,
       }}>{day}</p>
       <div style={{
@@ -148,8 +148,8 @@ function FlowCard({ day, title, desc, miniature }) {
       }}>
         {miniature}
       </div>
-      <p style={{ ...body, fontSize: 14, fontWeight: 700, margin: 0 }}>{title}</p>
-      <p style={{ ...muted, fontSize: 12, margin: 0 }}>{desc}</p>
+      <p style={{ ...body, fontSize: 16, fontWeight: 700, margin: 0 }}>{title}</p>
+      <p style={{ ...muted, fontSize: 14, margin: 0 }}>{desc}</p>
     </div>
   )
 }
@@ -250,13 +250,13 @@ function SlideCurrentFlow() {
       </div>
       <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${stage.rule}`, maxWidth: 1000 }}>
         <p style={{
-          ...muted, fontSize: 12, fontWeight: 700, letterSpacing: '0.06em',
+          ...muted, fontSize: 13, fontWeight: 700, letterSpacing: '0.06em',
           textTransform: 'uppercase', margin: 0,
         }}>Where stays end up today</p>
-        <p style={{ ...body, fontSize: 15, marginTop: 6 }}>
+        <p style={{ ...body, fontSize: 17, marginTop: 6 }}>
           ~10% of stays have a missing Rover Card each week (up to ~20% during Christmas). Among these:
         </p>
-        <p style={{ ...body, fontSize: 15, marginTop: 4 }}>
+        <p style={{ ...body, fontSize: 17, marginTop: 4 }}>
           ~20% are paid out on time · ~30% experience a delayed payout · ~50% are never paid out (owner auto‑refunded).
         </p>
       </div>
@@ -326,7 +326,7 @@ function SlideWalkthrough() {
             background: stage.card, border: `1px solid ${stage.rule}`,
             display: 'flex', flexDirection: 'column', gap: 10,
           }}>
-            <p style={{ ...muted, fontSize: 14, fontWeight: 700, color: stage.accent }}>STEP {i + 1}</p>
+            <p style={{ ...muted, fontSize: 15, fontWeight: 700, color: stage.accent }}>STEP {i + 1}</p>
             <p style={{ ...body, fontWeight: 700, fontSize: 24 }}>{t}</p>
             <p style={muted}>{d}</p>
           </div>
