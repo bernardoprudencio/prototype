@@ -410,7 +410,7 @@ function SlideDecisions() {
     { t: 'No immediate refunds in v1', d: 'Defer to end‑of‑week processing — accepted 2026‑04‑29 after Ion / Jake / Bernardo discussion.' },
     { t: 'No "More" actions menu on cards', d: 'Single "Review and submit" CTA; multi‑action affordance returns in a later round.' },
     { t: '"No" is pre‑selected', d: '95% of missing Rover Cards turn out to be services that didn\'t happen — match the most likely answer.' },
-    { t: '7‑day visibility window', d: 'Cards stay visible until resolved or 7 days after the booking ends — no permanent backlog.' },
+    { t: '2‑week visibility window', d: 'Cards from the prior week appear with Monday\'s "payment held" email and stay visible for 2 weeks — matches the existing email window, no permanent backlog.' },
   ]
   return (
     <div>
