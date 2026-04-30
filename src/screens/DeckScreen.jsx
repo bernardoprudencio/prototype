@@ -112,143 +112,7 @@ function SlideProblem() {
         "Owners' refunds are held alongside the sitter's payout for up to two weeks.",
         "Confusion and frustration with the recurring feature — and ultimately off-platform attrition.",
       ]} />
-    </div>
-  )
-}
-
-function SlideNumbers() {
-  return (
-    <div>
-      <SlideHeader eyebrowText="By the numbers" title="The cost of the current flow" />
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <Stat value="57%" label="of providers had at least one delayed payment in the last 6 months" />
-        <Stat value="~2.6k" label="providers per week are paid two weeks late after a missed Rover Card" />
-        <Stat value="~50%" label="of delayed payments only resolve after a full 2-week wait" />
-        <Stat value="~10%" label="of weekly recurring stays have ≥1 missing Rover Card (up to 20% at Christmas)" />
-      </div>
-      <p style={{ ...muted, marginTop: 24 }}>Source: Mode dashboard · last 6 months</p>
-    </div>
-  )
-}
-
-function FlowCard({ day, title, desc, miniature }) {
-  return (
-    <div style={{
-      flex: 1, minWidth: 0,
-      display: 'flex', flexDirection: 'column', gap: 10,
-    }}>
-      <p style={{
-        ...muted, fontSize: 13, fontWeight: 700, letterSpacing: '0.06em',
-        textTransform: 'uppercase', color: stage.accent, margin: 0,
-      }}>{day}</p>
-      <div style={{
-        background: stage.card, border: `1px solid ${stage.rule}`, borderRadius: 10,
-        padding: 12, height: 110, overflow: 'hidden',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {miniature}
-      </div>
-      <p style={{ ...body, fontSize: 16, fontWeight: 700, margin: 0 }}>{title}</p>
-      <p style={{ ...muted, fontSize: 14, margin: 0 }}>{desc}</p>
-    </div>
-  )
-}
-
-function FlowArrow() {
-  return (
-    <div style={{
-      flexShrink: 0, alignSelf: 'flex-start', marginTop: 50,
-      color: stage.muted, fontSize: 22,
-    }}>→</div>
-  )
-}
-
-const EmailMini = () => (
-  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: 4 }}>
-    <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 10, color: stage.ink, margin: 0, lineHeight: 1.2 }}>
-      Your payment is being held
-    </p>
-    <div style={{ height: 1, background: stage.rule }} />
-    <p style={{ fontFamily: typography.fontFamily, fontSize: 8, color: stage.muted, margin: 0, lineHeight: 1.3 }}>
-      Oops—it looks like a Rover Card was not completed…
-    </p>
-    <p style={{ fontFamily: typography.fontFamily, fontSize: 8, color: stage.accent, margin: 'auto 0 0', lineHeight: 1.2 }}>
-      click here →
-    </p>
-  </div>
-)
-
-const LandingMini = () => (
-  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: 4 }}>
-    <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 10, color: stage.ink, margin: 0, textAlign: 'center' }}>
-      Incomplete Services
-    </p>
-    <div style={{ height: 1, background: stage.rule }} />
-    <p style={{ fontFamily: typography.fontFamily, fontSize: 8, color: stage.muted, margin: 0, lineHeight: 1.3 }}>
-      Tue · Nov 14<br/>Wed · Nov 15
-    </p>
-    <div style={{
-      marginTop: 'auto', background: '#1B6C42', color: stage.card,
-      borderRadius: 4, padding: '4px 6px', textAlign: 'center',
-      fontFamily: typography.fontFamily, fontSize: 8, fontWeight: 700,
-    }}>
-      I didn't perform these
-    </div>
-  </div>
-)
-
-const CxMini = () => (
-  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-    <div style={{
-      width: 32, height: 32, borderRadius: 99,
-      background: stage.bg, color: stage.card,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 12,
-    }}>CX</div>
-    <p style={{ fontFamily: typography.fontFamily, fontSize: 9, color: stage.muted, margin: 0, textAlign: 'center', lineHeight: 1.3 }}>
-      Limited to <b style={{ color: stage.ink }}>5 fixes</b><br/>per provider / week
-    </p>
-  </div>
-)
-
-const NotesMini = () => (
-  <div style={{
-    width: '100%', height: '100%', background: '#1F2124',
-    color: stage.card, borderRadius: 6, padding: 8,
-    display: 'flex', flexDirection: 'column', gap: 4,
-  }}>
-    <p style={{ fontFamily: typography.fontFamily, fontSize: 8, color: '#9EA5AC', margin: 0 }}>Staff Notes</p>
-    <p style={{ fontFamily: typography.fontFamily, fontSize: 8, margin: 0, lineHeight: 1.3 }}>
-      [cx] Missing RC, 5th time. <span style={{ color: '#FFB4B4' }}>FINAL WARNING.</span>
-    </p>
-  </div>
-)
-
-const PayoutMini = () => (
-  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 4 }}>
-    <p style={{ fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 22, color: stage.ink, margin: 0 }}>+7 days</p>
-    <p style={{ fontFamily: typography.fontFamily, fontSize: 9, color: stage.muted, margin: 0, textAlign: 'center', lineHeight: 1.3 }}>
-      after the original<br/>service date
-    </p>
-  </div>
-)
-
-function SlideCurrentFlow() {
-  return (
-    <div>
-      <SlideHeader eyebrowText="Today's flow" title="The path to resolve a missing Rover Card" />
-      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
-        <FlowCard day="Mon" title='"Payment held" email' desc="Sent every Monday to every sitter with missing cards." miniature={<EmailMini />} />
-        <FlowArrow />
-        <FlowCard day="Tue+" title="Email landing page" desc="~16% of these stays — sitter confirms before the deadline." miniature={<LandingMini />} />
-        <FlowArrow />
-        <FlowCard day="Tue+" title="…or contact CX" desc="~5% of these stays — capped at 5 manual fixes per provider per week." miniature={<CxMini />} />
-        <FlowArrow />
-        <FlowCard day="Wed+" title="CX fixes manually" desc="Internal notes track repeat offenders and warnings." miniature={<NotesMini />} />
-        <FlowArrow />
-        <FlowCard day="Sun → Mon+" title="Payout / refund lands" desc="A full week (or more) after the service." miniature={<PayoutMini />} />
-      </div>
-      <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${stage.rule}`, maxWidth: 1000 }}>
+      <div style={{ marginTop: 36, paddingTop: 16, borderTop: `1px solid ${stage.rule}`, maxWidth: 1000 }}>
         <p style={{
           ...muted, fontSize: 13, fontWeight: 700, letterSpacing: '0.06em',
           textTransform: 'uppercase', margin: 0,
@@ -518,7 +382,7 @@ function SlideNext() {
 }
 
 const SLIDES = [
-  SlideTitle, SlideTLDR, SlideProblem, SlideCurrentFlow, SlideNumbers, SlideHypothesis,
+  SlideTitle, SlideTLDR, SlideProblem, SlideHypothesis,
   SlideSolution, SlideWalkthrough, SlideDemo, SlideDecisions, SlideRisks,
   SlideRollout, SlideMetrics, SlideNext,
 ]
