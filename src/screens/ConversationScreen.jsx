@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { colors, typography, shadows } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
-import { peopleImages } from '../assets/images'
+import { peopleImages, petImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
 import { useApp } from '../context/AppContext'
 import { OWNERS } from '../data/owners'
+import { CHAT_HISTORY } from '../data/threads'
+import { getOwnerRelUnit } from '../data/scheduleData'
 
 const fmtDayChange = (c, withDate) => {
   const label = withDate ? `${c.day}, ${c.date}` : c.day
@@ -27,11 +29,29 @@ const DayDivider = ({ label }) => (
 
 const Gap = ({ h = 12 }) => <div style={{ height: h }} />
 
+// Pets per owner — used by agenda-mode schedule navigation.
+const ownerPets = (ownerId) => {
+  if (ownerId === 'james') return [{ id: 1, name: 'Archie', emoji: '🐕', img: petImages.archie }]
+  if (ownerId === 'sarah') return [{ id: 1, name: 'Milo',   emoji: '🐕', img: petImages.milo }]
+  return [
+    { id: 1, name: 'Koni',   emoji: '🐕', img: petImages.koni },
+    { id: 2, name: 'Burley', emoji: '🐕', img: petImages.burley },
+  ]
+}
+
 export default function ConversationScreen() {
   const navigate = useNavigate()
   const { ownerId } = useParams()
   const { state } = useLocation()
-  const { resolvedCards, scheduleChanges: scheduleChangesMap, templateChanges: templateChangesMap, currentWeekChanges: currentWeekChangesMap } = useApp()
+  const {
+    resolvedCards,
+    scheduleChanges: scheduleChangesMap,
+    templateChanges: templateChangesMap,
+    currentWeekChanges: currentWeekChangesMap,
+    liveEvents: liveEventsMap,
+    ownerUnits,
+    scheduleMode,
+  } = useApp()
 
   const type = state?.type ?? 'today'
   const card = state?.card ?? null
@@ -45,9 +65,26 @@ export default function ConversationScreen() {
   const scheduleChanges    = scheduleChangesMap[ownerId]    ?? []
   const templateChanges    = templateChangesMap[ownerId]    ?? []
   const currentWeekChanges = currentWeekChangesMap[ownerId] ?? []
+  const liveEvents         = liveEventsMap?.[ownerId]       ?? []
 
   const onBack = () => navigate(-1)
-  const onModifySchedule = () => navigate(`/conversation/${ownerId}/schedule`)
+
+  const onOpenSchedule = () => {
+    if (scheduleMode === 'agenda') {
+      const pets = ownerPets(ownerId)
+      const units = ownerUnits[ownerId] ?? [getOwnerRelUnit(owner, pets.map(p => p.id))]
+      navigate(`/conversation/${ownerId}/schedule`, {
+        state: {
+          pets,
+          units,
+          ownerName: owner?.name ?? '',
+          ownerFirstName: owner?.name?.split(' ')[0] ?? '',
+        },
+      })
+    } else {
+      navigate(`/conversation/${ownerId}/schedule`)
+    }
+  }
 
   const messagesEndRef = useRef(null)
   const [text, setText] = useState('')
@@ -73,7 +110,9 @@ export default function ConversationScreen() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [sentMessages])
+  }, [sentMessages, liveEvents.length])
+
+  const history = CHAT_HISTORY[ownerId] ?? []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
@@ -96,88 +135,29 @@ export default function ConversationScreen() {
         </div>
         <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, paddingTop: 12, overflowX: 'auto', paddingBottom: 14, marginBottom: -14 }}>
           <Button variant="primary" style={{ boxShadow: shadows.medium, flexShrink: 0 }}>Leave feedback</Button>
-          <Button variant="default" style={{ flexShrink: 0 }} onClick={onModifySchedule}>Modify schedule</Button>
+          <Button variant="default" style={{ flexShrink: 0 }} onClick={onOpenSchedule}>
+            {scheduleMode === 'agenda' ? 'Manage schedule' : 'Modify schedule'}
+          </Button>
           <Button variant="default" style={{ flexShrink: 0 }}>Details</Button>
         </div>
       </div>
 
       {/* ─── Messages ─── */}
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>
+        {history.map((item, i) => {
+          if (item.type === 'divider') return <DayDivider key={`h-${i}`} label={item.label} />
+          if (item.type === 'bubble')  return <ChatBubble key={`h-${i}`} message={item.text} time={item.time} isOwner={item.isOwner} showCheck={item.showCheck} />
+          if (item.type === 'banner')  return <BannerBlock key={`h-${i}`} text={item.text} link={item.link} />
+          if (item.type === 'gap')     return <Gap key={`h-${i}`} h={item.h} />
+          return null
+        })}
 
-        {/* ── Owen · Koni & Burley · Today's walk ── */}
-        {isToday && (
-          <>
-            <DayDivider label="Yesterday" />
-            <ChatBubble message="Hey! Are we still on for tomorrow at 9?" time="4:32 PM" />
-            <ChatBubble message="Absolutely! See you then 🐾" time="4:35 PM" isOwner showCheck />
+        {/* ── Mode A: change summaries (only render when modification mode populated them) ── */}
+        {!isToday && (resolution || scheduleChanges.length > 0 || currentWeekChanges.length > 0 || templateChanges.length > 0) && <DayDivider label="Today" />}
+        {resolution === 'completed' && card && <BannerBlock text={`Walk from ${card.dateLabel} was marked as complete on ${timestamp}.`} />}
+        {resolution === 'cancelled' && card && <BannerBlock text={`Walk from ${card.dateLabel} was cancelled on ${timestamp}. A refund of ${card.cost} has been processed.`} />}
 
-            <DayDivider label="Today" />
-            <ChatBubble message="Morning! Leashes are on the hook by the door. Burley's been a bit hyper today 😄" time="8:52 AM" />
-            <ChatBubble message="On my way! Be there in a few." time="8:55 AM" isOwner showCheck />
-            <Gap />
-            <BannerBlock text="Walk started at 9:04 AM, Mar 19" link="See Rover Card" />
-            <Gap />
-            <ChatBubble message="Both doing great! Koni's leading the way and Burley found a stick he absolutely won't let go of 😂" time="9:28 AM" isOwner showCheck />
-            <ChatBubble message="Haha that's so Burley. Thank you for the update!" time="9:31 AM" />
-            <Gap h={4} />
-            <BannerBlock text="Walk ended at 10:01 AM, Mar 19" link="See Rover Card" />
-            <Gap />
-            <ChatBubble message="They look completely worn out, thank you! 🐾" time="10:05 AM" />
-            <ChatBubble message="Ha! They definitely earned it. See you next week!" time="10:07 AM" isOwner showCheck />
-          </>
-        )}
-
-        {/* ── James · Archie · Yesterday's missed walk ── */}
-        {!isToday && card?.id === 'archie' && (
-          <>
-            <DayDivider label="Yesterday" />
-            <ChatBubble message="Hey! Are you still on for noon today?" time="11:30 AM" />
-            <ChatBubble message="Yes! Heading over around 11:55." time="11:32 AM" isOwner showCheck />
-            <ChatBubble message="Just a heads up — Archie gets a bit shy with strangers at first" time="11:45 AM" />
-            <ChatBubble message="Good to know, I'll take it slow with him 🐾" time="11:48 AM" isOwner showCheck />
-            <ChatBubble message="He warms up fast once he's outside. The trail behind the building is his favorite" time="11:51 AM" />
-            <Gap h={16} />
-            <BannerBlock text="Walk started at 12:02 PM, Mar 18" link="See Rover Card" />
-            <Gap h={24} />
-            <BannerBlock text="Walk ended at 12:31 PM, Mar 18" link="See Rover Card" />
-            <Gap h={16} />
-            <ChatBubble message="Thanks! How did he do?" time="1:15 PM" />
-            <ChatBubble message="He was great once he warmed up! Really loved sniffing around the trail" time="1:18 PM" isOwner showCheck />
-            <ChatBubble message="Ha, that sounds exactly like him. Thanks again!" time="1:20 PM" />
-            {(resolution || scheduleChanges?.length > 0 || currentWeekChanges?.length > 0) && <DayDivider label="Today" />}
-            {resolution === 'completed' && <BannerBlock text={`Walk from ${card.dateLabel} was marked as complete on ${timestamp}.`} />}
-            {resolution === 'cancelled' && <BannerBlock text={`Walk from ${card.dateLabel} was cancelled on ${timestamp}. A refund of ${card.cost} has been processed.`} />}
-          </>
-        )}
-
-        {/* ── Sarah · Milo · Overdue walk from Mar 12 ── */}
-        {!isToday && card?.id === 'koni-late' && (
-          <>
-            <DayDivider label="Mar 12" />
-            <ChatBubble message="Hi! Quick note — Milo's leash is in the basket by the front door" time="3:42 PM" />
-            <ChatBubble message="Perfect, heading over now!" time="3:45 PM" isOwner showCheck />
-            <ChatBubble message="He loves the park on Cedar St if you have time 🐾" time="3:47 PM" />
-            <ChatBubble message="We'll definitely head there!" time="3:48 PM" isOwner showCheck />
-            <Gap h={16} />
-            <BannerBlock text="Walk started at 4:03 PM, Mar 12" link="See Rover Card" />
-            <Gap h={24} />
-            <BannerBlock text="Walk ended at 4:33 PM, Mar 12" link="See Rover Card" />
-            <Gap h={16} />
-            <ChatBubble message="Thank you! Was he a good boy?" time="5:01 PM" />
-            <ChatBubble message="He was amazing! Made a few friends at the park 🐾" time="5:04 PM" isOwner showCheck />
-            <ChatBubble message="Oh that makes me so happy, thank you!" time="5:06 PM" />
-
-            <DayDivider label="Mar 13" />
-            <ChatBubble message="Hi! Just checking in — I didn't get a Rover Card notification. Was one started?" time="10:12 AM" />
-
-            {(resolution || scheduleChanges?.length > 0 || currentWeekChanges?.length > 0) && <DayDivider label="Today" />}
-            {resolution === 'completed' && <BannerBlock text={`Walk from ${card.dateLabel} was marked as complete on ${timestamp}.`} />}
-            {resolution === 'cancelled' && <BannerBlock text={`Walk from ${card.dateLabel} was cancelled on ${timestamp}. A refund of ${card.cost} has been processed.`} />}
-          </>
-        )}
-
-        {/* ── Schedule update message — no divider, already placed above ── */}
-        {scheduleChanges?.length > 0 && (
+        {scheduleChanges.length > 0 && (
           <ChatBubble
             message={[
               'I made changes to the upcoming schedule. Here\'s a summary:',
@@ -189,10 +169,9 @@ export default function ConversationScreen() {
           />
         )}
 
-        {templateChanges?.length > 0 && !isToday && !scheduleChanges?.length && !resolution && !currentWeekChanges?.length && <DayDivider label="Today" />}
-        {templateChanges?.map((changes, i) => (
+        {templateChanges.map((changes, i) => (
           <ChatBubble
-            key={i}
+            key={`tpl-${i}`}
             message={[
               'I updated the weekly schedule template. Here\'s a summary:',
               ...changes.map(c => fmtDayChange(c, false)),
@@ -203,9 +182,9 @@ export default function ConversationScreen() {
           />
         ))}
 
-        {currentWeekChanges?.map((changes, i) => (
+        {currentWeekChanges.map((changes, i) => (
           <ChatBubble
-            key={i}
+            key={`cw-${i}`}
             message={[
               'I made changes to this week\'s schedule. Here\'s a summary:',
               ...changes.map(c => fmtDayChange(c, true)),
@@ -215,6 +194,23 @@ export default function ConversationScreen() {
             showCheck
           />
         ))}
+
+        {/* ── Mode B: agenda live events (messages + scheduleChange + resolution banners) ── */}
+        {liveEvents.length > 0 && scheduleChanges.length === 0 && templateChanges.length === 0 && currentWeekChanges.length === 0 && !resolution && <DayDivider label="Today" />}
+        {liveEvents.map(event => {
+          if (event.type === 'message') {
+            return <ChatBubble key={event.id} message={event.text} time={event.time} isOwner showCheck />
+          }
+          if (event.type === 'resolution') {
+            return event.resolution === 'completed'
+              ? <BannerBlock key={event.id} text={`Walk from ${event.card?.dateLabel ?? ''} was marked as complete on ${event.timestamp}.`} />
+              : <BannerBlock key={event.id} text={`Walk from ${event.card?.dateLabel ?? ''} was cancelled on ${event.timestamp}. A refund of ${event.card?.cost ?? ''} has been processed.`} />
+          }
+          if (event.type === 'scheduleChange') {
+            return <BannerBlock key={event.id} text={event.text} />
+          }
+          return null
+        })}
 
         {sentMessages.map(msg => (
           <ChatBubble key={msg.id} message={msg.text} time={msg.time} isOwner showCheck />

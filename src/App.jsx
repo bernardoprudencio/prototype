@@ -4,13 +4,13 @@ import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen, RelationshipPage } from './screens'
+import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
 
 export default function App() {
   const navigate = useNavigate()
-  const { setResolvedCards } = useApp()
+  const { setResolvedCards, scheduleMode } = useApp()
 
   const [sheetItem, setSheetItem]             = useState(null)
   const [reviewSheetCard, setReviewSheetCard] = useState(null)
@@ -67,6 +67,7 @@ export default function App() {
         } />
         <Route path="/contacts" element={<RebookScreen />} />
         <Route path="/more" element={<MoreScreen />} />
+        <Route path="/inbox" element={<InboxScreen />} />
       </Routes>
 
       {/* ── Conversation overlay (z-10) ── */}
@@ -88,11 +89,22 @@ export default function App() {
         <Route path="*" element={null} />
       </Routes>
 
-      {/* ── Schedule + CurrentWeek (z-20 siblings) ── */}
+      {/* ── Testing mode overlay (z-15) ── */}
       <Routes>
-        <Route path="/conversation/:ownerId/schedule/*" element={
+        <Route path="/testing-mode" element={
+          <SlideOverlay zIndex={15}>
+            <TestingModeScreen />
+          </SlideOverlay>
+        } />
+      </Routes>
+
+      {/* ── Schedule + CurrentWeek (z-20 siblings).
+           In Modification mode, /schedule renders ScheduleScreen (5-week calendar).
+           In Agenda mode, /schedule renders ScheduleOverlay (RelationshipManagement + sheets). ── */}
+      <Routes>
+        <Route path="/conversation/:ownerId/schedule" element={
           <SlideOverlay zIndex={20}>
-            <ScheduleScreen />
+            {scheduleMode === 'agenda' ? <ScheduleOverlay /> : <ScheduleScreen />}
           </SlideOverlay>
         } />
         <Route path="/conversation/:ownerId/current-week" element={

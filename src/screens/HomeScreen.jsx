@@ -14,7 +14,7 @@ const PROMO_CARDS = [
   { bg: colors.cyan100, title: 'Share more, earn more', desc: 'Earn a $100 reward for every two customers you invite who book.', cta: 'Start Sharing', img: petImages.promo2 },
 ]
 
-const TAB_PATHS = { home: '/', rebook: '/contacts', more: '/more' }
+const TAB_PATHS = { home: '/', inbox: '/inbox', rebook: '/contacts', more: '/more' }
 
 export default function HomeScreen({ onOpenActionSheet, onOpenReviewSheet, onOpenTodaySheet, loadTime }) {
   const navigate = useNavigate()

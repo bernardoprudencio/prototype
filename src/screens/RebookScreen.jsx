@@ -6,7 +6,7 @@ import { Chip, Button, TabBar } from '../components'
 import { CLIENTS, SITTERS, SORT_OPTIONS, sortClients } from '../data/contacts'
 import RebookUserCard from './RebookUserCard'
 
-const TAB_PATHS = { home: '/', rebook: '/contacts', more: '/more' }
+const TAB_PATHS = { home: '/', inbox: '/inbox', rebook: '/contacts', more: '/more' }
 
 const RadioMark = ({ selected }) => (
   <div style={{

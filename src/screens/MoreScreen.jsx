@@ -1,11 +1,11 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { colors, typography, radius, shadows } from '../tokens'
-import { ChevronRightIcon } from '../assets/icons'
+import { ChevronRightIcon, SettingsIcon } from '../assets/icons'
 import { TabBar } from '../components'
 import { SITTER_MORE_MENU, SITTER_MORE_MENU_BANNER } from '../data/moreMenu'
 
-const TAB_PATHS = { home: '/', rebook: '/contacts', more: '/more' }
+const TAB_PATHS = { home: '/', inbox: '/inbox', rebook: '/contacts', more: '/more' }
 
 // Mirrors roverdotcom/web .../components/buttons/MenuRow:
 // height 56, pt 8, px 20, icon 24, ml 12, title default weight 16/24,
@@ -130,6 +130,15 @@ export default function MoreScreen() {
             ))}
           </div>
         ))}
+
+        {/* ── Prototype-only entry point for testing variants ── */}
+        <div style={{ height: 24 }} />
+        <MenuRow
+          Icon={SettingsIcon}
+          title="Testing mode"
+          subtitle="Configure prototype variants"
+          onPress={() => navigate('/testing-mode')}
+        />
       </div>
 
       <TabBar activeTab="more" onTabSelect={onTabSelect} />

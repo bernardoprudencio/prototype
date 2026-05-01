@@ -89,6 +89,12 @@ export const OWNERS = {
   },
 }
 
+// Seed pets used by the agenda-mode RelationshipManagement screens (UnitEditor, AddSheet).
+export const PETS_SEED = [
+  { id: 1, name: 'Louie', breed: 'German Shepherd', emoji: '🐕' },
+  { id: 2, name: 'Mochi', breed: 'Scottish Fold',   emoji: '🐈' },
+]
+
 // ── Derived helpers ────────────────────────────────────────────────────────────
 
 // Today's walks across all owners, sorted by start time.
