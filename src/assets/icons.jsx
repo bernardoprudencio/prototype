@@ -136,6 +136,13 @@ export const TrashIcon = () => (
   </svg>
 )
 
+// Production @rover/icons :: dropdown-small.svg — used in Kibble ContactsOrder filter row.
+export const DropdownSmallIcon = ({ size = 24, color = c.primary }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color} aria-hidden="true" style={{ flexShrink: 0 }}>
+    <path d="M10.102 12h11.796a1.5 1.5 0 0 1 1.13 2.488l-5.899 6.74a1.5 1.5 0 0 1-2.117.142c-.073-.068-.073-.068-.14-.142l-5.899-6.74A1.5 1.5 0 0 1 10.103 12z"/>
+  </svg>
+)
+
 export const SuccessIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
     <path d="M12 24C5.37258 24 0 18.6274 0 12C0 5.37258 5.37258 0 12 0C18.6274 0 24 5.37258 24 12C24 18.6274 18.6274 24 12 24ZM12 22.5C17.799 22.5 22.5 17.799 22.5 12C22.5 6.20101 17.799 1.5 12 1.5C6.20101 1.5 1.5 6.20101 1.5 12C1.5 17.799 6.20101 22.5 12 22.5ZM16.6555 7.04272C16.9081 6.7144 17.379 6.65298 17.7073 6.90553C18.0356 7.15808 18.097 7.62897 17.8445 7.95728L10.3445 17.7073C10.0684 18.0661 9.5398 18.1005 9.21967 17.7803L6.21967 14.7803C5.92678 14.4874 5.92678 14.0126 6.21967 13.7197C6.51256 13.4268 6.98744 13.4268 7.28033 13.7197L9.67633 16.1157L16.6555 7.04272Z" fill="#1B6C42"/>
