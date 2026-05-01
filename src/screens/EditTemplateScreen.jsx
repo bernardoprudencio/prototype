@@ -1,8 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { colors, typography, radius, shadows } from '../tokens'
 import { Button, PetAvatar } from '../components'
 import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../assets/icons'
 import Chip from '../components/Chip'
+import { useApp } from '../context/AppContext'
+import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks } from '../data/owners'
+
+const DAYS_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+
+const nextMonday = () => {
+  const d = new Date(PROTO_TODAY)
+  const daysUntil = (1 - d.getDay() + 7) % 7 || 7
+  d.setDate(d.getDate() + daysUntil + 7)
+  return d
+}
 
 // ── Responsive hook ────────────────────────────────────────────────────────────
 const useIsDesktop = () => {
@@ -397,7 +409,47 @@ function DayRow({ dayLabel, times, onAddTime, onRemoveTime, onRemoveDay, showTra
 }
 
 // ── EditTemplateScreen ────────────────────────────────────────────────────────
-export default function EditTemplateScreen({ owner, startDate, sublabel, onSave, onBack, initialSameSchedule = false }) {
+export default function EditTemplateScreen() {
+  const navigate = useNavigate()
+  const { ownerId } = useParams()
+  const {
+    ownerTemplates, setOwnerTemplates,
+    setOwnerWeeks, ownerSameSchedule, setOwnerSameSchedule,
+    addOwnerTemplateChange,
+  } = useApp()
+
+  const baseOwner = OWNERS[ownerId] ?? OWNERS.owen
+  const tpl = ownerTemplates[ownerId]
+  const owner = tpl ? { ...baseOwner, template: tpl } : baseOwner
+  const initialSameSchedule = ownerSameSchedule[ownerId] ?? false
+  const startDate = nextMonday()
+  const sublabel = 'Changes here affect all future weeks.'
+
+  const onBack = () => navigate(-1)
+  const onSave = ({ selectedDays, daySchedules, sameSchedule }) => {
+    const sortedDays = [...selectedDays].sort((a, b) => DAYS_ORDER.indexOf(a) - DAYS_ORDER.indexOf(b))
+    const newTemplate = sortedDays.flatMap(day =>
+      (daySchedules[day] || []).map(time => ({ day, time }))
+    )
+
+    const oldTemplate = ownerTemplates[ownerId] || baseOwner.template
+    const allDays = [...new Set([...oldTemplate.map(t => t.day), ...sortedDays])]
+    const templateChanges = allDays.flatMap(day => {
+      const oldTimes = oldTemplate.filter(t => t.day === day).map(t => t.time)
+      const newTimes = selectedDays.includes(day) ? (daySchedules[day] || []) : []
+      const removed = oldTimes.filter(t => !newTimes.includes(t))
+      const added   = newTimes.filter(t => !oldTimes.includes(t))
+      return (removed.length || added.length) ? [{ day, removed, added }] : []
+    })
+
+    const mergedWeeks = getOwnerUpcomingWeeks({ ...baseOwner, template: newTemplate })
+
+    setOwnerTemplates(prev => ({ ...prev, [ownerId]: newTemplate }))
+    setOwnerWeeks(prev => ({ ...prev, [ownerId]: mergedWeeks }))
+    setOwnerSameSchedule(prev => ({ ...prev, [ownerId]: sameSchedule }))
+    addOwnerTemplateChange(ownerId, templateChanges)
+  }
+
   const isDesktop = useIsDesktop()
   // Init selected days and per-day schedules from owner template
   const initSelectedDays = () => [...new Set(owner.template.map(t => t.day))]

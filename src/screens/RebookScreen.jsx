@@ -1,9 +1,12 @@
 import React, { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { colors, typography, radius, shadows } from '../tokens'
 import { DropdownSmallIcon } from '../assets/icons'
 import { Chip, Button, TabBar } from '../components'
 import { CLIENTS, SITTERS, SORT_OPTIONS, sortClients } from '../data/contacts'
 import RebookUserCard from './RebookUserCard'
+
+const TAB_PATHS = { home: '/', rebook: '/contacts', more: '/more' }
 
 const RadioMark = ({ selected }) => (
   <div style={{
@@ -83,7 +86,13 @@ function SortSheet({ visible, value, onPick, onClose }) {
   )
 }
 
-export default function RebookScreen({ onTabSelect }) {
+export default function RebookScreen() {
+  const navigate = useNavigate()
+  const onTabSelect = (id) => {
+    const path = TAB_PATHS[id]
+    if (path) navigate(path)
+  }
+
   const [section, setSection] = useState('clients')
   const [sortOrder, setSortOrder] = useState('alphabetical')
   const [sortSheetOpen, setSortSheetOpen] = useState(false)
