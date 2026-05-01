@@ -154,7 +154,11 @@ export default function RebookScreen() {
         {/* List */}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {(section === 'clients' ? sortedClients : SITTERS).map(c => (
-            <RebookUserCard key={c.id} contact={c} />
+            <RebookUserCard
+              key={c.id}
+              contact={c}
+              onClick={section === 'clients' ? () => navigate(`/contacts/${c.id}`) : undefined}
+            />
           ))}
         </div>
       </div>

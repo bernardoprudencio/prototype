@@ -4,7 +4,7 @@ import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen } from './screens'
+import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen, RelationshipPage } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
 
@@ -76,6 +76,16 @@ export default function App() {
             <ConversationScreen />
           </SlideOverlay>
         } />
+      </Routes>
+
+      {/* ── Relationship page overlay (z-10, sibling of conversation) ── */}
+      <Routes>
+        <Route path="/contacts/:ownerId" element={
+          <SlideOverlay zIndex={10}>
+            <RelationshipPage />
+          </SlideOverlay>
+        } />
+        <Route path="*" element={null} />
       </Routes>
 
       {/* ── Schedule + CurrentWeek (z-20 siblings) ── */}

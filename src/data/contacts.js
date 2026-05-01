@@ -26,8 +26,8 @@ const formatCAD = (amount) => new Intl.NumberFormat('en-CA', {
 const formatPetNames = (names) => {
   if (!names || names.length === 0) return ''
   if (names.length === 1) return names[0]
-  if (names.length === 2) return `${names[0]} & ${names[1]}`
-  return `${names[0]} & ${names.length - 1} others`
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
 const formatBookingLine = (count, gbv) => {
@@ -35,26 +35,49 @@ const formatBookingLine = (count, gbv) => {
   return gbv == null ? label : `${label} · ${formatCAD(gbv)} complete`
 }
 
-const client = ({ id, displayName, imageUrl = null, petNames = [], bookingCount = 0, gbv = null }) => ({
-  id,
-  displayName,
-  imageUrl,
-  tierName: tierFor(gbv),
-  bookingCount,
-  gbv,
-  subtitleText: formatPetNames(petNames),
-  bookingInfoText: formatBookingLine(bookingCount, gbv),
-})
+const client = ({ id, displayName, imageUrl = null, petNames = [], bookingCount = 0, gbv = null, cancelledBookings = null, hasUpcoming = true }) => {
+  // No-tier clients pass an explicit cancelledBookings list. Per the
+  // CumulativeGrossBookingValueCalculator in roverdotcom/web, cancelled
+  // stays with recaptured deposits are excluded from GBV — so gbv stays
+  // null and no tier pill is shown, but they still count toward
+  // bookingCount (matches `relationship.bookedStayCount`).
+  const count = cancelledBookings ? cancelledBookings.length : bookingCount
+  return {
+    id,
+    displayName,
+    imageUrl,
+    tierName: tierFor(gbv),
+    bookingCount: count,
+    gbv,
+    cancelledBookings,
+    hasUpcoming,
+    subtitleText: formatPetNames(petNames),
+    bookingInfoText: formatBookingLine(count, gbv),
+  }
+}
 
 export const CLIENTS = [
   client({ id: 'owen',    displayName: 'Owen O.',          imageUrl: peopleImages.owen,    petNames: ['Koni', 'Burley'],            bookingCount: 12, gbv: 3580 }),
-  client({ id: 'james',   displayName: 'James T.',         imageUrl: peopleImages.james,   petNames: ['Archie'],                    bookingCount: 6,  gbv: 1240 }),
-  client({ id: 'sarah',   displayName: 'Sarah S.',         imageUrl: peopleImages.sarah,   petNames: ['Milo'],                      bookingCount: 3 }),
-  client({ id: 'marcus',  displayName: 'Marcus B.',        imageUrl: peopleImages.marcus,  petNames: ['Biscuit', 'Pepper', 'Luna'], bookingCount: 1 }),
-  client({ id: 'priya',   displayName: 'Priya R.',         imageUrl: peopleImages.priya,   petNames: ['Pickle'],                    bookingCount: 3 }),
+  client({ id: 'james',   displayName: 'James T.',         imageUrl: peopleImages.james,   petNames: ['Archie'],                    bookingCount: 3,  gbv: 320,  hasUpcoming: false }),
+  // No tier: every walking booking was cancelled (deposit recaptured → excluded from GBV).
+  client({ id: 'sarah',   displayName: 'Sarah S.',         imageUrl: peopleImages.sarah,   petNames: ['Milo'], cancelledBookings: [
+    { serviceKey: 'dog_walking', price: 25 },
+    { serviceKey: 'dog_walking', price: 25 },
+    { serviceKey: 'dog_walking', price: 25 },
+  ] }),
+  client({ id: 'marcus',  displayName: 'Marcus B.',        imageUrl: peopleImages.marcus,  petNames: ['Biscuit', 'Pepper', 'Luna'], cancelledBookings: [
+    { serviceKey: 'dog_walking', price: 25 },
+  ] }),
+  client({ id: 'priya',   displayName: 'Priya R.',         imageUrl: peopleImages.priya,   petNames: ['Pickle'], cancelledBookings: [
+    { serviceKey: 'dog_walking', price: 25 },
+    { serviceKey: 'drop_in_visits', price: 30 },
+    { serviceKey: 'dog_walking', price: 25 },
+  ] }),
   client({ id: 'lena',    displayName: 'Lena K.',          imageUrl: peopleImages.lena,    petNames: ['Mochi', 'Yuzu'],             bookingCount: 24, gbv: 5640 }),
-  client({ id: 'diego',   displayName: 'Diego M.',         imageUrl: null,                 petNames: ['Toby'],                      bookingCount: 4,  gbv: 880 }),
-  client({ id: 'amelia',  displayName: 'Amelia Wentworth', imageUrl: peopleImages.amelia,  petNames: ['Olive', 'Henry'],            bookingCount: 8,  gbv: 1920 }),
+  // gbv is intentionally just below Tier 3 ($999) so the upcoming booking
+  // crosses the milestone — exercises the willCross callout copy.
+  client({ id: 'diego',   displayName: 'Diego M.',         imageUrl: null,                 petNames: ['Toby'],                      bookingCount: 4,  gbv: 960 }),
+  client({ id: 'amelia',  displayName: 'Amelia W.',        imageUrl: peopleImages.amelia,  petNames: ['Olive', 'Henry'],            bookingCount: 8,  gbv: 1920, hasUpcoming: false }),
   client({ id: 'nora',    displayName: 'Nora P.',          imageUrl: peopleImages.nora,    petNames: ['Bean'],                      bookingCount: 5,  gbv: 400 }),
   client({ id: 'takashi', displayName: 'Takashi I.',       imageUrl: peopleImages.takashi, petNames: ['Sushi'],                     bookingCount: 2,  gbv: 750 }),
 ]
