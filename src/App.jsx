@@ -3,7 +3,7 @@ import { colors, typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen } from './screens'
+import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen } from './screens'
 import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeekSlots, getFullCurrentWeekSlots } from './data/owners'
 import { petImages } from './assets/images'
 
@@ -49,6 +49,12 @@ export default function App() {
         ? (conv.owner ?? OWNERS.owen)
         : (OWNERS[conv.card?.clientKey] ?? OWNERS.owen)
     return getEffectiveOwner(base)
+  }
+
+  const handleTabSelect = (tabId) => {
+    if (tabId !== 'home' && tabId !== 'rebook') return
+    if (tabId === screen) return
+    navigateTo(tabId, 'forward')
   }
 
   const navigateTo = (target, dir = 'forward') => {
@@ -161,6 +167,7 @@ export default function App() {
             onOpenActionSheet={openIncompleteSheet}
             onOpenReviewSheet={(card) => setReviewSheetCard(card)}
             onOpenTodaySheet={openTodaySheet}
+            onTabSelect={handleTabSelect}
             onNavigateConversation={(walk) => {
               setConversation({ type: 'today', owner: walk.owner })
               navigateTo('conversation', 'forward')
@@ -170,6 +177,9 @@ export default function App() {
               navigateTo('conversation', 'forward')
             }}
           />
+        )}
+        {screen === 'rebook' && (
+          <RebookScreen onTabSelect={handleTabSelect} />
         )}
         {screen === 'conversation' && (
           <ConversationScreen
