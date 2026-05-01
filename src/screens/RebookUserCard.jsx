@@ -2,6 +2,7 @@ import React from 'react'
 import { colors, typography } from '../tokens'
 import { ChevronRightIcon } from '../assets/icons'
 import { personPlaceholder } from '../assets/images'
+import Pill from '../components/Pill'
 
 // Kibble's <Avatar> falls back to PersonPlaceholder
 // (react-lib/src/images/placeholders/person-placeholder.png) when imageUrl
@@ -18,31 +19,22 @@ const Avatar = ({ src, size = 32 }) => (
   </div>
 )
 
-// Mirrors RebookUserCard.tsx: bg = theme.colors.text.success, text = primary_inverse,
-// borderRadius="secondary" (4px), px=2x py=1x (8/4), Text size=100 semibold.
-const TierPill = ({ name }) => (
-  <span style={{
-    display: 'inline-flex', alignItems: 'center',
-    background: colors.success, color: colors.white,
-    fontFamily: typography.fontFamily, fontWeight: 600, fontSize: 12, lineHeight: '16px',
-    padding: '4px 8px', borderRadius: 4, flexShrink: 0,
-  }}>
-    {name}
-  </span>
-)
-
 const truncate = {
   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
 }
 
-export default function RebookUserCard({ contact }) {
+export default function RebookUserCard({ contact, onClick }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 16px',
-      borderBottom: `1px solid ${colors.border}`,
-      background: colors.white,
-    }}>
+    <div
+      role={onClick ? 'button' : undefined}
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 16px',
+        borderBottom: `1px solid ${colors.border}`,
+        background: colors.white,
+        cursor: onClick ? 'pointer' : 'default',
+      }}>
       <Avatar src={contact.imageUrl} size={32} />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -70,7 +62,7 @@ export default function RebookUserCard({ contact }) {
         )}
       </div>
 
-      {contact.tierName && <TierPill name={contact.tierName} />}
+      {contact.tierName && <Pill>{contact.tierName}</Pill>}
       <ChevronRightIcon />
     </div>
   )

@@ -5,6 +5,9 @@ export const colors = {
   secondary: '#404347',
   tertiary: '#62686E',
   success: '#1B6C42',
+  successLight: '#C6E5D2',
+  successBg: '#EFF7F2',
+  errorBg: '#FBECEA',
   link: '#2E67D1',
   white: '#FFFFFF',
 
