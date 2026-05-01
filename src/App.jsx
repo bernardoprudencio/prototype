@@ -3,7 +3,7 @@ import { colors, typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen } from './screens'
+import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen } from './screens'
 import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeekSlots, getFullCurrentWeekSlots } from './data/owners'
 import { petImages } from './assets/images'
 
@@ -52,9 +52,10 @@ export default function App() {
   }
 
   const handleTabSelect = (tabId) => {
-    if (tabId !== 'home' && tabId !== 'rebook') return
+    if (tabId !== 'home' && tabId !== 'rebook' && tabId !== 'more') return
     if (tabId === screen) return
-    navigateTo(tabId, 'forward')
+    const dir = tabId === 'home' ? 'back' : 'forward'
+    navigateTo(tabId, dir)
   }
 
   const navigateTo = (target, dir = 'forward') => {
@@ -180,6 +181,9 @@ export default function App() {
         )}
         {screen === 'rebook' && (
           <RebookScreen onTabSelect={handleTabSelect} />
+        )}
+        {screen === 'more' && (
+          <MoreScreen onTabSelect={handleTabSelect} />
         )}
         {screen === 'conversation' && (
           <ConversationScreen
