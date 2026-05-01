@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { colors, typography, shadows, radius } from '../tokens'
 import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../assets/icons'
 import { Button, PetAvatar, Chip } from '../components'
 import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeek } from '../data/owners'
+import { useApp } from '../context/AppContext'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const CheckIcon = () => (
@@ -738,7 +740,28 @@ function SuccessBanner({ onDismiss }) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
-export default function ScheduleScreen({ onBack, owner = {}, onEditTemplate, initialWeeks: initialWeeksProp, onWeeksChange, onManageCurrentWeek, currentWeekDays }) {
+export default function ScheduleScreen() {
+  const navigate = useNavigate()
+  const { ownerId } = useParams()
+  const {
+    ownerTemplates, ownerWeeks, setOwnerWeeks, ownerCurrentWeeks,
+    setOwnerScheduleChanges,
+  } = useApp()
+
+  const baseOwner = OWNERS[ownerId] ?? OWNERS.owen
+  const tpl = ownerTemplates[ownerId]
+  const owner = tpl ? { ...baseOwner, template: tpl } : baseOwner
+
+  const onBack = (savedChangesValue) => {
+    if (savedChangesValue?.length) setOwnerScheduleChanges(ownerId, savedChangesValue)
+    navigate(-1)
+  }
+  const onEditTemplate = () => navigate(`/conversation/${ownerId}/schedule/edit-template`)
+  const onManageCurrentWeek = () => navigate(`/conversation/${ownerId}/current-week`)
+  const onWeeksChange = (newBase) => setOwnerWeeks(prev => ({ ...prev, [ownerId]: newBase }))
+  const currentWeekDays = ownerCurrentWeeks[ownerId] ?? null
+  const initialWeeksProp = ownerWeeks[ownerId]
+
   const isDesktop = useIsDesktop()
   const [initialWeeks] = useState(() => initialWeeksProp || getOwnerUpcomingWeeks(owner))
   const [weeks, setWeeks] = useState(() => cloneWeeks(initialWeeks))

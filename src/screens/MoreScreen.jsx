@@ -1,8 +1,11 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { colors, typography, radius, shadows } from '../tokens'
 import { ChevronRightIcon } from '../assets/icons'
 import { TabBar } from '../components'
 import { SITTER_MORE_MENU, SITTER_MORE_MENU_BANNER } from '../data/moreMenu'
+
+const TAB_PATHS = { home: '/', rebook: '/contacts', more: '/more' }
 
 // Mirrors roverdotcom/web .../components/buttons/MenuRow:
 // height 56, pt 8, px 20, icon 24, ml 12, title default weight 16/24,
@@ -94,7 +97,13 @@ const PromoBanner = ({ banner }) => (
   </div>
 )
 
-export default function MoreScreen({ onTabSelect }) {
+export default function MoreScreen() {
+  const navigate = useNavigate()
+  const onTabSelect = (id) => {
+    const path = TAB_PATHS[id]
+    if (path) navigate(path)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
       <div style={{ borderBottom: `1px solid ${colors.border}`, padding: '24px 20px 16px', flexShrink: 0 }}>

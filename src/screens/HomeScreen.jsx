@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { colors, typography, shadows } from '../tokens'
 import { BellIcon, ChevronUpIcon, ChevronDownIcon, EditIcon, MoreIcon } from '../assets/icons'
 import { petImages } from '../assets/images'
@@ -6,16 +7,30 @@ import { formatHeaderDate } from '../hooks/useDate'
 import { Button, PetAvatar, UserAvatar, TabBar, Row } from '../components'
 import { INCOMPLETE_CARDS } from '../data/bookings'
 import { getTodayWalks } from '../data/owners'
+import { useApp } from '../context/AppContext'
 
 const PROMO_CARDS = [
   { bg: colors.yellow100, title: 'Promote your profile', desc: 'Invite new pet parents and grow your business.', cta: 'Learn how', img: petImages.promo1 },
   { bg: colors.cyan100, title: 'Share more, earn more', desc: 'Earn a $100 reward for every two customers you invite who book.', cta: 'Start Sharing', img: petImages.promo2 },
 ]
 
-export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onNavigateToCard, onOpenTodaySheet, loadTime, ownerCurrentWeeks, onTabSelect }) {
+const TAB_PATHS = { home: '/', rebook: '/contacts', more: '/more' }
+
+export default function HomeScreen({ onOpenActionSheet, onOpenReviewSheet, onOpenTodaySheet, loadTime }) {
+  const navigate = useNavigate()
+  const { resolvedCards, ownerCurrentWeeks } = useApp()
   const [incompleteOpen, setIncompleteOpen] = useState(true)
 
   const todayWalks = getTodayWalks(ownerCurrentWeeks)
+
+  const onTabSelect = (id) => {
+    const path = TAB_PATHS[id]
+    if (path) navigate(path)
+  }
+  const onNavigateConversation = (walk) =>
+    navigate(`/conversation/${walk.owner.id}`, { state: { type: 'today' } })
+  const onNavigateToCard = (card) =>
+    navigate(`/conversation/${card.clientKey}`, { state: { type: 'incomplete', cardId: card.id, card } })
 
   const visibleCards = INCOMPLETE_CARDS.filter(c => !resolvedCards[c.id])
   const hasIncomplete = visibleCards.length > 0

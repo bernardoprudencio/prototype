@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { colors, typography, radius, shadows } from '../tokens'
 import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../assets/icons'
 import { Button, PetAvatar, Chip } from '../components'
-import { OWNERS, PROTO_TODAY } from '../data/owners'
+import { OWNERS, PROTO_TODAY, getFullCurrentWeekSlots } from '../data/owners'
+import { useApp } from '../context/AppContext'
 
 // ── Responsive hook ────────────────────────────────────────────────────────────
 const useIsDesktop = () => {
@@ -392,7 +394,26 @@ function DayRow({ day, onAddTime, onRemoveSlot, disabled }) {
 }
 
 // ── CurrentWeekScreen ──────────────────────────────────────────────────────────
-export default function CurrentWeekScreen({ owner, initialDays, onSave, onBack }) {
+export default function CurrentWeekScreen() {
+  const navigate = useNavigate()
+  const { ownerId } = useParams()
+  const {
+    ownerTemplates, ownerCurrentWeeks, setOwnerCurrentWeeks,
+    addOwnerCurrentWeekChange,
+  } = useApp()
+
+  const baseOwner = OWNERS[ownerId] ?? OWNERS.owen
+  const tpl = ownerTemplates[ownerId]
+  const owner = tpl ? { ...baseOwner, template: tpl } : baseOwner
+
+  const initialDays = ownerCurrentWeeks[ownerId] ?? getFullCurrentWeekSlots(baseOwner)
+
+  const onBack = () => navigate(-1)
+  const onSave = (diff, updatedDays) => {
+    setOwnerCurrentWeeks(prev => ({ ...prev, [ownerId]: updatedDays }))
+    addOwnerCurrentWeekChange(ownerId, diff)
+  }
+
   const isDesktop = useIsDesktop()
   const [days, setDays]           = useState(() => cloneDays(initialDays))
   const [baseDays, setBaseDays]   = useState(() => cloneDays(initialDays))

@@ -1,135 +1,38 @@
 import React, { useState } from 'react'
-import { colors, typography } from './tokens'
+import { Routes, Route, useNavigate } from 'react-router-dom'
+import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
-import { ActionSheet, ReviewSheet } from './components'
+import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
 import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen } from './screens'
-import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeekSlots, getFullCurrentWeekSlots } from './data/owners'
 import { petImages } from './assets/images'
-
-const DAYS_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
-
-const nextMonday = () => {
-  const d = new Date(PROTO_TODAY)
-  const daysUntil = (1 - d.getDay() + 7) % 7 || 7
-  d.setDate(d.getDate() + daysUntil + 7)
-  return d
-}
-
-// Template changes fully override upcoming weeks — regenerate from scratch
-const applyTemplateToWeeks = (newTemplate, owner) =>
-  getOwnerUpcomingWeeks({ ...owner, template: newTemplate })
+import { useApp } from './context/AppContext'
 
 export default function App() {
-  const [screen, setScreen]         = useState('home')
-  const [sheetItem, setSheetItem]   = useState(null)
+  const navigate = useNavigate()
+  const { setResolvedCards } = useApp()
+
+  const [sheetItem, setSheetItem]             = useState(null)
   const [reviewSheetCard, setReviewSheetCard] = useState(null)
-  const [resolvedCards, setResolvedCards] = useState({})
-  const [conversation, setConversation]   = useState(null)
-  const [transition, setTransition]     = useState(false)
-  const [direction, setDirection]       = useState('forward')
-  const [screenHistory, setScreenHistory] = useState([])
+
   const loadTime = useLoadTime()
-
-  // Per-owner template overrides and persisted upcoming weeks
-  const [ownerTemplates, setOwnerTemplates]       = useState({})  // { ownerId: [{day, time}] }
-  const [ownerWeeks, setOwnerWeeks]               = useState({})  // { ownerId: weeks[] }
-  const [ownerSameSchedule, setOwnerSameSchedule] = useState({})  // { ownerId: bool }
-  const [ownerCurrentWeeks, setOwnerCurrentWeeks] = useState({})  // { ownerId: days[] }
-
-  const getEffectiveOwner = (owner) => {
-    const tpl = ownerTemplates[owner.id]
-    return tpl ? { ...owner, template: tpl } : owner
-  }
-
-  const getOwner = (conv) => {
-    const base = !conv
-      ? OWNERS.owen
-      : conv.type === 'today'
-        ? (conv.owner ?? OWNERS.owen)
-        : (OWNERS[conv.card?.clientKey] ?? OWNERS.owen)
-    return getEffectiveOwner(base)
-  }
-
-  const handleTabSelect = (tabId) => {
-    if (tabId !== 'home' && tabId !== 'rebook' && tabId !== 'more') return
-    if (tabId === screen) return
-    setScreenHistory([])
-    setScreen(tabId)
-  }
-
-  const navigateTo = (target, dir = 'forward') => {
-    if (dir === 'forward') {
-      setScreenHistory(prev => [...prev, screen])
-    }
-    setDirection(dir)
-    setTransition(true)
-    setTimeout(() => {
-      setScreen(target)
-      setTransition(false)
-    }, 200)
-  }
-
-  const goBack = () => {
-    const prev = screenHistory[screenHistory.length - 1] ?? 'home'
-    setScreenHistory(h => h.slice(0, -1))
-    setDirection('back')
-    setTransition(true)
-    setTimeout(() => {
-      setScreen(prev)
-      setTransition(false)
-    }, 200)
-  }
 
   const handleComplete = (card) => {
     const ts = formatActionTimestamp()
     setResolvedCards(prev => ({ ...prev, [card.id]: { resolution: 'completed', timestamp: ts } }))
     setReviewSheetCard(null)
-    setConversation({ type: 'incomplete', card, resolution: 'completed', timestamp: ts })
-    setTimeout(() => navigateTo('conversation', 'forward'), 200)
+    navigate(`/conversation/${card.clientKey}`, {
+      state: { type: 'incomplete', cardId: card.id, card },
+    })
   }
 
   const handleCancelRefund = (card) => {
     const ts = formatActionTimestamp()
     setResolvedCards(prev => ({ ...prev, [card.id]: { resolution: 'cancelled', timestamp: ts } }))
     setReviewSheetCard(null)
-    setConversation({ type: 'incomplete', card, resolution: 'cancelled', timestamp: ts })
-    setTimeout(() => navigateTo('conversation', 'forward'), 200)
-  }
-
-  const handleTemplateSave = (ownerId, { selectedDays, daySchedules, sameSchedule }) => {
-    const sortedDays = [...selectedDays].sort((a, b) => DAYS_ORDER.indexOf(a) - DAYS_ORDER.indexOf(b))
-    const newTemplate = sortedDays.flatMap(day =>
-      (daySchedules[day] || []).map(time => ({ day, time }))
-    )
-
-    const owner = OWNERS[ownerId]
-    const oldTemplate = ownerTemplates[ownerId] || owner.template
-
-    // Compute diff for conversation message
-    const allDays = [...new Set([...oldTemplate.map(t => t.day), ...sortedDays])]
-    const templateChanges = allDays.flatMap(day => {
-      const oldTimes = oldTemplate.filter(t => t.day === day).map(t => t.time)
-      const newTimes = selectedDays.includes(day) ? (daySchedules[day] || []) : []
-      const removed = oldTimes.filter(t => !newTimes.includes(t))
-      const added   = newTimes.filter(t => !oldTimes.includes(t))
-      return (removed.length || added.length) ? [{ day, removed, added }] : []
+    navigate(`/conversation/${card.clientKey}`, {
+      state: { type: 'incomplete', cardId: card.id, card },
     })
-
-    const mergedWeeks = applyTemplateToWeeks(newTemplate, owner)
-
-    setOwnerTemplates(prev => ({ ...prev, [ownerId]: newTemplate }))
-    setOwnerWeeks(prev => ({ ...prev, [ownerId]: mergedWeeks }))
-    setOwnerSameSchedule(prev => ({ ...prev, [ownerId]: sameSchedule }))
-    setConversation(prev => prev ? { ...prev, templateChanges: [...(prev.templateChanges || []), templateChanges] } : prev)
-  }
-
-  const handleCurrentWeekSave = (ownerId, diff, updatedDays) => {
-    setOwnerCurrentWeeks(prev => ({ ...prev, [ownerId]: updatedDays }))
-    setConversation(prev => prev ? {
-      ...prev,
-      currentWeekChanges: [...(prev.currentWeekChanges || []), diff],
-    } : prev)
   }
 
   const openIncompleteSheet = (card) => setSheetItem({
@@ -151,93 +54,54 @@ export default function App() {
   })
 
   return (
-    <div className="phone-shell" style={{ fontFamily: typography.fontFamily }}>
-      <div style={{
-        position: 'absolute', inset: 0,
-        transition: 'transform 0.25s ease, opacity 0.2s ease',
-        transform: transition
-          ? (direction === 'forward' ? 'translateX(-30%)' : 'translateX(30%)')
-          : 'translateX(0)',
-        opacity: transition ? 0 : 1,
-      }}>
-        {screen === 'home' && (
+    <div className="phone-shell" style={{ fontFamily: typography.fontFamily, position: 'relative', overflow: 'hidden' }}>
+      {/* ── Tab routes (base layer) ── */}
+      <Routes>
+        <Route path="/" element={
           <HomeScreen
-            resolvedCards={resolvedCards}
             loadTime={loadTime}
-            ownerCurrentWeeks={ownerCurrentWeeks}
             onOpenActionSheet={openIncompleteSheet}
             onOpenReviewSheet={(card) => setReviewSheetCard(card)}
             onOpenTodaySheet={openTodaySheet}
-            onTabSelect={handleTabSelect}
-            onNavigateConversation={(walk) => {
-              setConversation({ type: 'today', owner: walk.owner })
-              navigateTo('conversation', 'forward')
-            }}
-            onNavigateToCard={(card) => {
-              setConversation({ type: 'incomplete', card })
-              navigateTo('conversation', 'forward')
-            }}
           />
-        )}
-        {screen === 'rebook' && (
-          <RebookScreen onTabSelect={handleTabSelect} />
-        )}
-        {screen === 'more' && (
-          <MoreScreen onTabSelect={handleTabSelect} />
-        )}
-        {screen === 'conversation' && (
-          <ConversationScreen
-            conversation={conversation}
-            onBack={() => goBack()}
-            onModifySchedule={() => navigateTo('schedule', 'forward')}
-          />
-        )}
-        {screen === 'schedule' && (
-          <ScheduleScreen
-            owner={getOwner(conversation)}
-            initialWeeks={ownerWeeks[getOwner(conversation).id]}
-            onWeeksChange={(currentWeeks) => {
-              const ownerId = getOwner(conversation).id
-              setOwnerWeeks(prev => ({ ...prev, [ownerId]: currentWeeks }))
-            }}
-            onBack={(savedChanges) => {
-              if (savedChanges?.length) {
-                setConversation(prev => ({ ...prev, scheduleChanges: savedChanges }))
-              }
-              goBack()
-            }}
-            currentWeekDays={ownerCurrentWeeks[getOwner(conversation).id] ?? null}
-            onEditTemplate={() => navigateTo('edit-template', 'forward')}
-            onManageCurrentWeek={() => navigateTo('current-week', 'forward')}
-          />
-        )}
-        {screen === 'current-week' && (
-          <CurrentWeekScreen
-            owner={getOwner(conversation)}
-            initialDays={
-              ownerCurrentWeeks[getOwner(conversation).id] ??
-              getFullCurrentWeekSlots(OWNERS[getOwner(conversation).id])
-            }
-            onSave={(diff, updatedDays) => {
-              handleCurrentWeekSave(getOwner(conversation).id, diff, updatedDays)
-            }}
-            onBack={() => goBack()}
-          />
-        )}
-        {screen === 'edit-template' && (
-          <EditTemplateScreen
-            owner={getOwner(conversation)}
-            initialSameSchedule={ownerSameSchedule[getOwner(conversation).id] ?? false}
-            startDate={nextMonday()}
-            sublabel="Changes here affect all future weeks."
-            onSave={(templateData) => {
-              handleTemplateSave(getOwner(conversation).id, templateData)
-            }}
-            onBack={() => goBack()}
-          />
-        )}
-      </div>
+        } />
+        <Route path="/contacts" element={<RebookScreen />} />
+        <Route path="/more" element={<MoreScreen />} />
+      </Routes>
 
+      {/* ── Conversation overlay (z-10) ── */}
+      <Routes>
+        <Route path="/conversation/:ownerId/*" element={
+          <SlideOverlay zIndex={10}>
+            <ConversationScreen />
+          </SlideOverlay>
+        } />
+      </Routes>
+
+      {/* ── Schedule + CurrentWeek (z-20 siblings) ── */}
+      <Routes>
+        <Route path="/conversation/:ownerId/schedule/*" element={
+          <SlideOverlay zIndex={20}>
+            <ScheduleScreen />
+          </SlideOverlay>
+        } />
+        <Route path="/conversation/:ownerId/current-week" element={
+          <SlideOverlay zIndex={20}>
+            <CurrentWeekScreen />
+          </SlideOverlay>
+        } />
+      </Routes>
+
+      {/* ── EditTemplate (z-30, on top of Schedule) ── */}
+      <Routes>
+        <Route path="/conversation/:ownerId/schedule/edit-template" element={
+          <SlideOverlay zIndex={30}>
+            <EditTemplateScreen />
+          </SlideOverlay>
+        } />
+      </Routes>
+
+      {/* ── Global modals ── */}
       <ActionSheet
         visible={!!sheetItem}
         type={sheetItem?.type}
@@ -250,17 +114,18 @@ export default function App() {
           const item = sheetItem
           setSheetItem(null)
           if (item.type === 'incomplete') {
-            setConversation({ type: 'incomplete', card: item.card })
+            navigate(`/conversation/${item.card.clientKey}`, {
+              state: { type: 'incomplete', cardId: item.card.id, card: item.card },
+            })
           } else {
-            setConversation({ type: 'today' })
+            const ownerId = item.owner?.id ?? 'owen'
+            navigate(`/conversation/${ownerId}`, { state: { type: 'today' } })
           }
-          setTimeout(() => navigateTo('conversation', 'forward'), 200)
         }}
         onReschedule={() => {
-          const owner = sheetItem.owner
+          const ownerId = sheetItem.owner?.id ?? 'owen'
           setSheetItem(null)
-          setConversation({ type: 'today', owner })
-          setTimeout(() => navigateTo('current-week', 'forward'), 200)
+          navigate(`/conversation/${ownerId}/current-week`, { state: { type: 'today' } })
         }}
         onReviewAndComplete={() => {
           const card = sheetItem.card

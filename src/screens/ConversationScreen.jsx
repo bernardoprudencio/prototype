@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { colors, typography, shadows } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
 import { peopleImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
+import { useApp } from '../context/AppContext'
+import { OWNERS } from '../data/owners'
 
 const fmtDayChange = (c, withDate) => {
   const label = withDate ? `${c.day}, ${c.date}` : c.day
@@ -24,8 +27,28 @@ const DayDivider = ({ label }) => (
 
 const Gap = ({ h = 12 }) => <div style={{ height: h }} />
 
-export default function ConversationScreen({ onBack, onModifySchedule, conversation }) {
-  const { type, card, owner, resolution, timestamp, scheduleChanges, templateChanges, currentWeekChanges } = conversation || {}
+export default function ConversationScreen() {
+  const navigate = useNavigate()
+  const { ownerId } = useParams()
+  const { state } = useLocation()
+  const { resolvedCards, scheduleChanges: scheduleChangesMap, templateChanges: templateChangesMap, currentWeekChanges: currentWeekChangesMap } = useApp()
+
+  const type = state?.type ?? 'today'
+  const card = state?.card ?? null
+  const owner = OWNERS[ownerId] ?? OWNERS.owen
+
+  const cardId = state?.cardId ?? card?.id
+  const resolutionEntry = cardId ? resolvedCards[cardId] : null
+  const resolution = resolutionEntry?.resolution
+  const timestamp = resolutionEntry?.timestamp
+
+  const scheduleChanges    = scheduleChangesMap[ownerId]    ?? []
+  const templateChanges    = templateChangesMap[ownerId]    ?? []
+  const currentWeekChanges = currentWeekChangesMap[ownerId] ?? []
+
+  const onBack = () => navigate(-1)
+  const onModifySchedule = () => navigate(`/conversation/${ownerId}/schedule`)
+
   const messagesEndRef = useRef(null)
   const [text, setText] = useState('')
   const [sentMessages, setSentMessages] = useState([])
@@ -46,7 +69,7 @@ export default function ConversationScreen({ onBack, onModifySchedule, conversat
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-  }, [conversation])
+  }, [ownerId, type, cardId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
