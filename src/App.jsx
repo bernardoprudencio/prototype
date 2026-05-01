@@ -54,8 +54,8 @@ export default function App() {
   const handleTabSelect = (tabId) => {
     if (tabId !== 'home' && tabId !== 'rebook' && tabId !== 'more') return
     if (tabId === screen) return
-    const dir = tabId === 'home' ? 'back' : 'forward'
-    navigateTo(tabId, dir)
+    setScreenHistory([])
+    setScreen(tabId)
   }
 
   const navigateTo = (target, dir = 'forward') => {
