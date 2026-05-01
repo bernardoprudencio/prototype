@@ -3,6 +3,18 @@ import { colors } from '../tokens'
 
 const c = colors
 
+export const DropdownIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M7.57668 9H16.4238C17.0452 9 17.5488 9.50368 17.5488 10.125C17.5488 10.3975 17.4499 10.6607 17.2705 10.8658L12.8469 15.9213C12.4378 16.3889 11.727 16.4363 11.2594 16.0272C11.2042 15.9766 11.2042 15.9766 11.1536 15.9213L6.73003 10.8658C6.32088 10.3982 6.36827 9.68749 6.83586 9.27835C7.04094 9.09891 7.30417 9 7.57668 9Z" fill="#404347"/>
+  </svg>
+)
+
+export const CancelIcon = ({ color = 'currentColor' }) => (
+  <svg width="18" height="18" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path fillRule="evenodd" clipRule="evenodd" d="M16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0ZM6.83278 5.4185C9.28889 3.2888 12.4939 2 16 2C23.732 2 30 8.26801 30 16C30 19.5061 28.7112 22.7111 26.5815 25.1672L6.83278 5.4185ZM5.41856 6.83271C3.28883 9.28884 2 12.4939 2 16C2 23.732 8.26801 30 16 30C19.5061 30 22.7112 28.7112 25.1673 26.5814L5.41856 6.83271Z" fill={color}/>
+  </svg>
+)
+
 const Icon = ({ name, size = 24, color = c.primary, style = {} }) => (
   <i
     className={`rover-icon-${name}`}
