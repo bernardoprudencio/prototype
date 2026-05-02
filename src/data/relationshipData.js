@@ -130,8 +130,35 @@ const buildPastBookings = (client, count, targetGbv) => {
   return bookings
 }
 
+const isoKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+
 const buildUpcomingBookings = (client, count, currentTier) => {
   const out = []
+
+  // Owen gets one demo "active" stay — a 4-night boarding that started 2 days
+  // before PROTO_TODAY, mirroring production's `active_stay` state. Mapped to
+  // serviceStatus 'completed_service_deposit' so it doesn't get categorized as
+  // pending in getInboxThreads.
+  if (client.id === 'owen' && count > 0) {
+    const start = new Date(PROTO_TODAY); start.setHours(0,0,0,0); start.setDate(start.getDate() - 2)
+    const end   = new Date(PROTO_TODAY); end.setHours(0,0,0,0);   end.setDate(end.getDate() + 1)
+    const svc = SERVICES.boarding
+    const span = 4
+    const price = Math.round(svc.daily * span)
+    out.push({
+      id: `${client.id}-up-active`,
+      price: money(price),
+      dates: fmtRange(start, end),
+      startDate: isoKey(start),
+      endDate: isoKey(end),
+      serviceName: svc.name,
+      serviceIcon: svc.icon,
+      earnings: money(price * currentTier.sitterShare),
+      serviceStatus: 'completed_service_deposit',
+      conversationOpk: `${client.id}-conv-up-active`,
+    })
+  }
+
   const cursor = new Date(PROTO_TODAY)
   cursor.setHours(0, 0, 0, 0)
   cursor.setDate(cursor.getDate() + 5)
@@ -153,6 +180,8 @@ const buildUpcomingBookings = (client, count, currentTier) => {
       id: `${client.id}-up-${i + 1}`,
       price: money(price),
       dates: span === 1 ? `${fmt(start)}, ${start.getFullYear()}` : fmtRange(start, end),
+      startDate: isoKey(start),
+      endDate: isoKey(end),
       serviceName: svc.name,
       serviceIcon: svc.icon,
       earnings: money(price * currentTier.sitterShare),

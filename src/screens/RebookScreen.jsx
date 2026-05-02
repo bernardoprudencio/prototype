@@ -117,12 +117,14 @@ export default function RebookScreen() {
         {/* Section chips */}
         <div style={{ display: 'flex', gap: 8, padding: '16px 16px 0' }}>
           <Chip
+            size="small"
             label="Clients"
             selected={section === 'clients'}
             checkmark
             onClick={() => setSection('clients')}
           />
           <Chip
+            size="small"
             label="Sitters"
             selected={section === 'sitters'}
             checkmark

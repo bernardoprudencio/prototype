@@ -23,19 +23,24 @@ const CheckSmIcon = () => (
  *   onClick    {fn}       Called when the chip body is clicked/pressed.
  *   onRemove   {fn}       If provided, shows an × button that calls this on press.
  *   checkmark  {boolean}  If true, shows a checkmark icon when selected (radio-style).
+ *   size       {'default'|'small'}  Default is regular (48 touch target).
+ *                                  'small' is compact for filter rows.
  */
-export default function Chip({ label, selected, onClick, onRemove, checkmark, style }) {
+export default function Chip({ label, selected, onClick, onRemove, checkmark, size = 'default', style }) {
   const [xHover, setXHover] = useState(false)
+  const isSmall = size === 'small'
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 48 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: isSmall ? 32 : 48 }}>
       <div
         onMouseDown={onClick}
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isSmall ? 4 : 8,
           background: selected ? colors.blueLight : colors.white,
           border: `2px solid ${selected ? colors.link : colors.borderInteractive}`,
-          borderRadius: radius.primary, padding: '8px 12px', minWidth: 88,
+          borderRadius: radius.primary,
+          padding: isSmall ? '4px 10px' : '8px 12px',
+          minWidth: isSmall ? 0 : 88,
           cursor: onClick ? 'pointer' : 'default',
           userSelect: 'none', transition: 'border-color 0.1s, background 0.1s',
           ...style,
@@ -43,7 +48,9 @@ export default function Chip({ label, selected, onClick, onRemove, checkmark, st
       >
         {checkmark && selected && <CheckSmIcon />}
         <span style={{
-          fontFamily: typography.fontFamily, fontWeight: 600, fontSize: 14, lineHeight: '20px',
+          fontFamily: typography.fontFamily, fontWeight: 600,
+          fontSize: isSmall ? 13 : 14,
+          lineHeight: isSmall ? '18px' : '20px',
           color: selected ? colors.primary : colors.secondary, whiteSpace: 'nowrap',
         }}>
           {label}

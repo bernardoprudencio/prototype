@@ -2,14 +2,14 @@ import React from 'react'
 import { colors, typography } from '../tokens'
 import {
   HomeFilledIcon, HomeOutlineIcon, InboxIcon,
-  CalendarIcon, RebookIcon, MoreTabIcon,
+  CalendarIcon, PersonIcon, MoreTabIcon,
 } from '../assets/icons'
 
 const TABS = [
   { id: 'home',     label: 'HOME',     Icon: HomeOutlineIcon },
   { id: 'inbox',    label: 'INBOX',    Icon: InboxIcon },
   { id: 'calendar', label: 'CALENDAR', Icon: CalendarIcon },
-  { id: 'rebook',   label: 'CONTACTS', Icon: RebookIcon },
+  { id: 'rebook',   label: 'CONTACTS', Icon: PersonIcon },
   { id: 'more',     label: 'MORE',     Icon: MoreTabIcon },
 ]
 

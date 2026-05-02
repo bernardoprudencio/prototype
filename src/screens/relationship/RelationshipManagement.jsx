@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react'
-import { PETS_SEED, PROTO_TODAY } from '../../data/owners'
+import { PROTO_TODAY } from '../../data/owners'
 import { parseDate, dateKey, fmtDate, fmtRelDate, fmtTime, addDays, isPast, endTimeFromDuration } from '../../lib/dateUtils'
 import { buildAgenda, expandUnit, getWeekMonday, defaultUnit, newId, shortRuleLabel, getRuleImpact } from '../../lib/scheduleHelpers'
 import SummarySheet from './SummarySheet'
@@ -12,7 +12,7 @@ import OccActionSheet from './OccActionSheet'
 import ManageSheet from './ManageSheet'
 
 const RelationshipManagement = forwardRef(function RelationshipManagement({initialPets, initialUnits, ownerFirstName = '', onScheduleChange, onScheduleConfirmed, onReviewComplete, isIncompleteResolved = false}, ref) {
-  const [pets,       setPets]       = useState(initialPets || PETS_SEED)
+  const [pets,       setPets]       = useState(initialPets || [])
   const [units,      setUnits]      = useState(initialUnits || [])
   const [relEndDate, setRelEndDate] = useState("")
   const [showAdd,    setShowAdd]    = useState(false)

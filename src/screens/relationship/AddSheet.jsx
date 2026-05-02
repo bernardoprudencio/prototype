@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { R, fontFamily } from './theme'
 import { SERVICES } from '../../data/services'
-import { PETS_SEED } from '../../data/owners'
 import { parseDate, dateKey, fmtDate, fmtDateLong, fmtTime, addDays, endTimeFromDuration } from '../../lib/dateUtils'
 import { defaultUnit, shortSvcName, getScheduleHorizon } from '../../lib/scheduleHelpers'
 import Button from '../../components/Button'
@@ -28,7 +27,7 @@ const SERVICE_ICONS = {
 
 export default function AddSheet({onAdd, onClose, existing, allPets, defaultServiceId, defaultDurationMins}) {
   const initialSvc = defaultServiceId ? SERVICES.find(s => s.id === defaultServiceId) : null
-  const pets       = allPets || PETS_SEED
+  const pets       = allPets || []
   const makeInitUnit = svcObj => {
     const today            = new Date()
     const durationOverride = (defaultDurationMins && svcObj.id !== 'doggy_daycare') ? {durationMins: defaultDurationMins} : {}
