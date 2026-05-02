@@ -1,6 +1,7 @@
 import React from 'react'
 import { colors, spacing, textStyles } from '../tokens'
 import { peopleImages } from '../assets/images'
+import { getThreadStatusDisplay } from '../lib/threadStatus'
 
 const dateOnly = (ts) => ts.replace(/\s+\d{1,2}:\d{2}\s*(AM|PM)/i, '').trim()
 const buildSnippet = (text, sender) => sender === 'you' ? `You: ${text}` : text
@@ -8,6 +9,7 @@ const buildSnippet = (text, sender) => sender === 'you' ? `You: ${text}` : text
 export default function ThreadRow({ thread, owner, displayMessage, onClick }) {
   const snippet = buildSnippet(displayMessage.text, displayMessage.sender)
   const { serviceLabel, alert } = thread
+  const statusDisplay = getThreadStatusDisplay(thread)
 
   return (
     <div onClick={onClick} style={{ cursor: 'pointer' }}>
@@ -46,7 +48,7 @@ export default function ThreadRow({ thread, owner, displayMessage, onClick }) {
 
           {/* Status */}
           <div style={{ paddingTop: spacing.sm }}>
-            <p style={{ ...textStyles.text100, color: colors.success, margin: 0 }}>Ongoing</p>
+            <p style={{ ...textStyles.text100, color: statusDisplay.color, margin: 0 }}>{statusDisplay.label}</p>
           </div>
 
           {/* Alert banner */}

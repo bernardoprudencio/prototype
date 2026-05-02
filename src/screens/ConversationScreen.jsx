@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { colors, typography, shadows } from '../tokens'
+import { colors, typography, shadows, textStyles } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
-import { peopleImages, petImages } from '../assets/images'
+import { peopleImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
 import { useApp } from '../context/AppContext'
 import { OWNERS } from '../data/owners'
-import { CHAT_HISTORY } from '../data/threads'
+import { getChatHistory, getInboxThreads } from '../data/threads'
+import { getClient } from '../data/contacts'
 import { getOwnerRelUnit } from '../data/scheduleData'
+import { getConversationStatusDisplay } from '../lib/threadStatus'
 
 const fmtDayChange = (c, withDate) => {
   const label = withDate ? `${c.day}, ${c.date}` : c.day
@@ -29,19 +31,9 @@ const DayDivider = ({ label }) => (
 
 const Gap = ({ h = 12 }) => <div style={{ height: h }} />
 
-// Pets per owner — used by agenda-mode schedule navigation.
-const ownerPets = (ownerId) => {
-  if (ownerId === 'james') return [{ id: 1, name: 'Archie', emoji: '🐕', img: petImages.archie }]
-  if (ownerId === 'sarah') return [{ id: 1, name: 'Milo',   emoji: '🐕', img: petImages.milo }]
-  return [
-    { id: 1, name: 'Koni',   emoji: '🐕', img: petImages.koni },
-    { id: 2, name: 'Burley', emoji: '🐕', img: petImages.burley },
-  ]
-}
-
 export default function ConversationScreen() {
   const navigate = useNavigate()
-  const { ownerId } = useParams()
+  const { ownerId, conversationOpk } = useParams()
   const { state } = useLocation()
   const {
     resolvedCards,
@@ -55,7 +47,12 @@ export default function ConversationScreen() {
 
   const type = state?.type ?? 'today'
   const card = state?.card ?? null
-  const owner = OWNERS[ownerId] ?? OWNERS.owen
+  const effectiveOpk = conversationOpk ?? `${ownerId}-conv-recurring`
+  const owner = OWNERS[ownerId] ?? (() => {
+    const c = getClient(ownerId)
+    if (!c) return null
+    return { id: c.id, name: c.displayName, image: c.imageUrl, petNames: c.pets.map(p => p.name).join(', '), petImages: c.pets.map(p => p.image), pets: c.pets }
+  })()
 
   const cardId = state?.cardId ?? card?.id
   const resolutionEntry = cardId ? resolvedCards[cardId] : null
@@ -71,7 +68,7 @@ export default function ConversationScreen() {
 
   const onOpenSchedule = () => {
     if (scheduleMode === 'agenda') {
-      const pets = ownerPets(ownerId)
+      const pets = owner?.pets ?? []
       const units = ownerUnits[ownerId] ?? [getOwnerRelUnit(owner, pets.map(p => p.id))]
       navigate(`/conversation/${ownerId}/schedule`, {
         state: {
@@ -112,7 +109,22 @@ export default function ConversationScreen() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [sentMessages, liveEvents.length])
 
-  const history = CHAT_HISTORY[ownerId] ?? []
+  const history = getChatHistory(effectiveOpk)
+
+  // Resolve the thread for this conversation to derive the header status
+  // ("Booking confirmed" / "Booking ongoing" / etc.). Falls back to a synthetic
+  // "current" thread for owners with no matching inbox entry.
+  const thread = getInboxThreads().find(t => t.conversationOpk === effectiveOpk) ?? { status: 'current' }
+  const statusDisplay = getConversationStatusDisplay(thread)
+
+  if (!owner) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <p style={{ fontFamily: typography.fontFamily, fontSize: 16, color: colors.primary, margin: 0 }}>Conversation not found</p>
+        <Button variant="default" style={{ marginTop: 16 }} onClick={onBack}>Back</Button>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
@@ -129,7 +141,7 @@ export default function ConversationScreen() {
           </div>
           <div style={{ flex: 1, marginLeft: 8, minWidth: 0 }}>
             <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 16, lineHeight: 1.5, color: colors.primary, margin: 0 }}>{clientName}</p>
-            <p style={{ fontFamily: typography.fontFamily, fontSize: 14, lineHeight: 1.25, color: colors.success, margin: 0 }}>Ongoing</p>
+            <p style={{ ...textStyles.text100, color: statusDisplay.color, margin: 0 }}>{statusDisplay.label}</p>
           </div>
           <div style={{ cursor: 'pointer', flexShrink: 0 }}><MoreIcon /></div>
         </div>

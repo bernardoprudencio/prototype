@@ -5,8 +5,10 @@ import { BellIcon, ChevronUpIcon, ChevronDownIcon, EditIcon, MoreIcon } from '..
 import { petImages } from '../assets/images'
 import { formatHeaderDate } from '../hooks/useDate'
 import { Button, PetAvatar, UserAvatar, TabBar, Row } from '../components'
-import { INCOMPLETE_CARDS } from '../data/bookings'
 import { getTodayWalks } from '../data/owners'
+import { getIncompleteCards } from '../data/scheduleData'
+
+const INCOMPLETE_CARDS = getIncompleteCards()
 import { useApp } from '../context/AppContext'
 
 const PROMO_CARDS = [

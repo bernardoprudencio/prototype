@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import { R, fontFamily, labelSt } from './theme'
 import { textStyles } from '../../tokens'
 import { SERVICES, DURATION_SHORT, DURATION_DAYCARE, FREQ, WEEKDAYS } from '../../data/services'
-import { PETS_SEED } from '../../data/owners'
 import { parseDate, dateKey, fmtDate, fmtDateLong, fmtTime, addDays, endTimeFromDuration } from '../../lib/dateUtils'
 import { overnightCanRepeat, expandUnit } from '../../lib/scheduleHelpers'
 import CalInput from '../../components/CalInput'
@@ -51,7 +50,7 @@ export default function UnitEditor({unit, onChange, allUnits, allPets, simplifie
   const isWeekly     = unit.frequency === "weekly"
   const canRepeat    = overnightCanRepeat(unit)
   const durationOpts = isDaycare ? DURATION_DAYCARE : DURATION_SHORT
-  const pets         = allPets || PETS_SEED
+  const pets         = allPets || []
   const toggleWeekDay = d => { const days = unit.weekDays || []; onChange({...unit, weekDays: days.includes(d) ? days.filter(x => x !== d) : [...days, d]}) }
 
   const bookedDates = useMemo(() => {

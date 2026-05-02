@@ -1,4 +1,4 @@
-import { peopleImages, petImages } from '../assets/images'
+import { CLIENTS } from './contacts'
 
 export const PROTO_TODAY = new Date()
 
@@ -26,74 +26,26 @@ const formatTimeRange = (startTime, durationMins) => {
   return `${startTime} – ${endH12}:${endM === 0 ? '00' : endM} ${endP}`
 }
 
-// ── Owner definitions ──────────────────────────────────────────────────────────
-export const OWNERS = {
-  owen: {
-    id: 'owen',
-    name: 'Owen O.',
-    image: peopleImages.owen,
-    service: 'Weekly 60 min walks',
-    serviceDuration: 60,
-    petNames: 'Koni, Burley',
-    petImages: [petImages.koni, petImages.burley],
-    address: '123 Fourth Ave, Seattle, WA',
-    template: [
-      { day: 'Monday',    time: '9:00 AM' },
-      { day: 'Wednesday', time: '9:00 AM' },
-      { day: 'Friday',    time: '9:00 AM' },
-    ],
-    pricing: {
-      pets: [
-        { petName: 'Koni',   rateType: 'Standard rate',      ratePerWalk: 20 },
-        { petName: 'Burley', rateType: 'Additional dog rate', ratePerWalk: 10 },
-      ],
-      addOns: [{ label: '60-min add-on', ratePerWalk: 10 }],
-    },
-  },
-  james: {
-    id: 'james',
-    name: 'James T.',
-    image: peopleImages.james,
-    service: 'Weekly 30 min walks',
-    serviceDuration: 30,
-    petNames: 'Archie',
-    petImages: [petImages.archie],
-    address: '450 Pine St, Seattle, WA',
-    template: [
-      { day: 'Tuesday',  time: '2:00 PM' },
-      { day: 'Thursday', time: '2:00 PM' },
-    ],
-    pricing: {
-      pets: [{ petName: 'Archie', rateType: 'Standard rate', ratePerWalk: 20 }],
-      addOns: [],
-    },
-  },
-  sarah: {
-    id: 'sarah',
-    name: 'Sarah S.',
-    image: peopleImages.sarah,
-    service: 'Weekly 30 min walks',
-    serviceDuration: 30,
-    petNames: 'Milo',
-    petImages: [petImages.milo],
-    address: '88 Union St, Seattle, WA',
-    template: [
-      { day: 'Monday',    time: '4:00 PM' },
-      { day: 'Wednesday', time: '4:00 PM' },
-      { day: 'Friday',    time: '4:00 PM' },
-    ],
-    pricing: {
-      pets: [{ petName: 'Milo', rateType: 'Standard rate', ratePerWalk: 20 }],
-      addOns: [],
-    },
-  },
-}
+// ── Owner derivation ────────────────────────────────────────────────────────
+// An "owner" is a CLIENTS entry that has a `recurringSchedule`. We surface a
+// flatter shape for the screens that pre-date the unified contacts model.
+const deriveOwner = (client) => ({
+  id: client.id,
+  name: client.displayName,
+  image: client.imageUrl,
+  service: client.recurringSchedule.service,
+  serviceDuration: client.recurringSchedule.serviceDuration,
+  petNames: client.pets.map(p => p.name).join(', '),
+  petImages: client.pets.map(p => p.image),
+  pets: client.pets,
+  address: client.recurringSchedule.address,
+  template: client.recurringSchedule.template,
+  pricing: client.recurringSchedule.pricing,
+})
 
-// Seed pets used by the agenda-mode RelationshipManagement screens (UnitEditor, AddSheet).
-export const PETS_SEED = [
-  { id: 1, name: 'Louie', breed: 'German Shepherd', emoji: '🐕' },
-  { id: 2, name: 'Mochi', breed: 'Scottish Fold',   emoji: '🐈' },
-]
+export const OWNERS = Object.fromEntries(
+  CLIENTS.filter(c => c.recurringSchedule).map(c => [c.id, deriveOwner(c)])
+)
 
 // ── Derived helpers ────────────────────────────────────────────────────────────
 

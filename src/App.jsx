@@ -72,6 +72,11 @@ export default function App() {
 
       {/* ── Conversation overlay (z-10) ── */}
       <Routes>
+        <Route path="/conversation/:ownerId/booking/:conversationOpk" element={
+          <SlideOverlay zIndex={10}>
+            <ConversationScreen />
+          </SlideOverlay>
+        } />
         <Route path="/conversation/:ownerId/*" element={
           <SlideOverlay zIndex={10}>
             <ConversationScreen />
