@@ -1,46 +1,78 @@
 import React, { useState } from 'react'
+import { Routes, Route, useNavigate } from 'react-router-dom'
 import { colors, typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
-import { ActionSheet, ReviewSheet } from './components'
+import { ActionSheet, ReviewSheet, TabBar } from './components'
 import { HomeScreen, ConversationScreen, ScheduleScreen } from './screens'
 import { OWNERS } from './data/owners'
 import { petImages } from './assets/images'
+import { useApp } from './context/AppContext'
 
 const TRANSITION_MS = 200
+
+const TAB_ROUTES = {
+  home:     '/',
+  inbox:    '/inbox',
+  calendar: '/',
+  rebook:   '/',
+  more:     '/',
+}
 
 const getOwner = (conv) => {
   if (!conv || conv.type === 'today') return OWNERS.owen
   return OWNERS[conv.card?.clientKey] ?? OWNERS.owen
 }
 
+// Phase 2 placeholder: real InboxScreen (with conversation routing) is wired in Phase 3.
+function InboxPlaceholder({ onTabSelect }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.tertiary, fontFamily: typography.fontFamily }}>
+        Inbox (Phase 3)
+      </div>
+      <TabBar activeTab="inbox" onTabSelect={onTabSelect} />
+    </div>
+  )
+}
+
 export default function App() {
-  const [screen, setScreen]         = useState('home')
-  const [sheetItem, setSheetItem]   = useState(null)
+  const navigate = useNavigate()
+  const {
+    resolvedCards, setResolvedCards,
+    liveEvents, addLiveEvent,
+  } = useApp()
+
+  const [overlay, setOverlay]                 = useState(null)         // null | 'conversation' | 'schedule'
+  const [sheetItem, setSheetItem]             = useState(null)
   const [reviewSheetCard, setReviewSheetCard] = useState(null)
-  const [resolvedCards, setResolvedCards] = useState({})
-  const [conversation, setConversation]   = useState(null)
-  const [liveEvents, setLiveEvents]       = useState([])
-  const [transition, setTransition] = useState(false)
-  const [direction, setDirection]   = useState('forward')
+  const [conversation, setConversation]       = useState(null)
+  const [transition, setTransition]           = useState(false)
+  const [direction, setDirection]             = useState('forward')
+
   const loadTime = useLoadTime()
 
-  const navigateTo = (target, dir = 'forward') => {
+  const animateTo = (target, dir = 'forward') => {
     setDirection(dir)
     setTransition(true)
     setTimeout(() => {
-      setScreen(target)
+      setOverlay(target)
       setTransition(false)
     }, TRANSITION_MS)
+  }
+
+  const onTabSelect = (id) => {
+    const path = TAB_ROUTES[id]
+    if (path) navigate(path)
   }
 
   const handleResolveCard = (card, resolution) => {
     const ts = formatActionTimestamp()
     setResolvedCards(prev => ({ ...prev, [card.id]: { resolution, timestamp: ts } }))
     setReviewSheetCard(null)
-    setLiveEvents(prev => [...prev, { id: Date.now(), type: 'resolution', resolution, timestamp: ts, card }])
+    addLiveEvent(card.clientKey, { id: Date.now(), type: 'resolution', resolution, timestamp: ts, card })
     setConversation({ type: 'incomplete', card })
-    setTimeout(() => navigateTo('conversation', 'forward'), TRANSITION_MS)
+    setTimeout(() => animateTo('conversation', 'forward'), TRANSITION_MS)
   }
 
   const openIncompleteSheet = (card) => setSheetItem({
@@ -60,6 +92,9 @@ export default function App() {
     firstName: walk.owner.name.split(' ')[0],
   })
 
+  const owner = getOwner(conversation)
+  const ownerEvents = liveEvents[owner?.id] ?? []
+
   return (
     <div className="phone-shell" style={{ fontFamily: typography.fontFamily }}>
       <div style={{
@@ -70,40 +105,46 @@ export default function App() {
           : 'translateX(0)',
         opacity: transition ? 0 : 1,
       }}>
-        {screen === 'home' && (
-          <HomeScreen
-            resolvedCards={resolvedCards}
-            loadTime={loadTime}
-            onOpenActionSheet={openIncompleteSheet}
-            onOpenReviewSheet={(card) => setReviewSheetCard(card)}
-            onOpenTodaySheet={openTodaySheet}
-            onNavigateConversation={() => {
-              setConversation({ type: 'today' })
-              navigateTo('conversation', 'forward')
-            }}
-            onNavigateToCard={(card) => {
-              setConversation({ type: 'incomplete', card })
-              navigateTo('conversation', 'forward')
-            }}
-          />
+        {overlay === null && (
+          <Routes>
+            <Route path="/" element={
+              <HomeScreen
+                resolvedCards={resolvedCards}
+                loadTime={loadTime}
+                onOpenActionSheet={openIncompleteSheet}
+                onOpenReviewSheet={(card) => setReviewSheetCard(card)}
+                onOpenTodaySheet={openTodaySheet}
+                onTabSelect={onTabSelect}
+                onNavigateConversation={() => {
+                  setConversation({ type: 'today' })
+                  animateTo('conversation', 'forward')
+                }}
+                onNavigateToCard={(card) => {
+                  setConversation({ type: 'incomplete', card })
+                  animateTo('conversation', 'forward')
+                }}
+              />
+            } />
+            <Route path="/inbox" element={<InboxPlaceholder onTabSelect={onTabSelect} />} />
+          </Routes>
         )}
-        {screen === 'conversation' && (
+        {overlay === 'conversation' && (
           <ConversationScreen
             conversation={conversation}
-            owner={getOwner(conversation)}
-            liveEvents={liveEvents}
-            onLiveEvent={(event) => setLiveEvents(prev => [...prev, event])}
-            onBack={() => navigateTo('home', 'back')}
+            owner={owner}
+            liveEvents={ownerEvents}
+            onLiveEvent={(event) => addLiveEvent(owner?.id, event)}
+            onBack={() => animateTo(null, 'back')}
           />
         )}
-        {screen === 'schedule' && (
+        {overlay === 'schedule' && (
           <ScheduleScreen
-            owner={getOwner(conversation)}
+            owner={owner}
             onBack={(savedChanges) => {
               if (savedChanges?.length) {
-                setLiveEvents(prev => [...prev, { id: Date.now(), type: 'scheduleChange', changes: savedChanges }])
+                addLiveEvent(owner?.id, { id: Date.now(), type: 'scheduleChange', changes: savedChanges })
               }
-              navigateTo('conversation', 'back')
+              animateTo('conversation', 'back')
             }}
           />
         )}
@@ -125,7 +166,7 @@ export default function App() {
           } else {
             setConversation({ type: 'today' })
           }
-          setTimeout(() => navigateTo('conversation', 'forward'), TRANSITION_MS)
+          setTimeout(() => animateTo('conversation', 'forward'), TRANSITION_MS)
         }}
         onReviewAndComplete={() => {
           const card = sheetItem.card

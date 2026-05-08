@@ -14,7 +14,7 @@ const PROMO_CARDS = [
   { bg: colors.cyan100, title: 'Share more, earn more', desc: 'Earn a $100 reward for every two customers you invite who book.', cta: 'Start Sharing', img: petImages.promo2 },
 ]
 
-export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onNavigateToCard, onOpenTodaySheet, loadTime }) {
+export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onNavigateToCard, onOpenTodaySheet, onTabSelect, loadTime }) {
   const [incompleteOpen, setIncompleteOpen] = useState(true)
 
   const visibleCards = INCOMPLETE_CARDS.filter(c => !resolvedCards[c.id])
@@ -125,7 +125,7 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
         </div>
       </div>
 
-      <TabBar activeTab="home" />
+      <TabBar activeTab="home" onTabSelect={onTabSelect} />
     </div>
   )
 }
