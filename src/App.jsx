@@ -1,10 +1,13 @@
-import React, { useState } from 'react'
-import { Routes, Route, useNavigate } from 'react-router-dom'
-import { colors, typography } from './tokens'
+import React, { useState, useEffect, useRef } from 'react'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
-import { ActionSheet, ReviewSheet, TabBar } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen } from './screens'
+import { ActionSheet, ReviewSheet } from './components'
+import {
+  HomeScreen, ConversationScreen, ScheduleScreen,
+  InboxScreen, MoreScreen, RebookScreen, TestingModeScreen,
+} from './screens'
 import { OWNERS } from './data/owners'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
@@ -14,30 +17,25 @@ const TRANSITION_MS = 200
 const TAB_ROUTES = {
   home:     '/',
   inbox:    '/inbox',
-  calendar: '/',
-  rebook:   '/',
-  more:     '/',
+  calendar: '/',       // no calendar screen yet — Phase 4+
+  rebook:   '/contacts',
+  more:     '/more',
 }
+
+// Paths whose pathname is a stable tab destination — used by the
+// /conversation/:id bridge to redirect back to the originating tab.
+const TAB_PATHS = new Set(['/', '/inbox', '/contacts', '/more'])
 
 const getOwner = (conv) => {
-  if (!conv || conv.type === 'today') return OWNERS.owen
-  return OWNERS[conv.card?.clientKey] ?? OWNERS.owen
-}
-
-// Phase 2 placeholder: real InboxScreen (with conversation routing) is wired in Phase 3.
-function InboxPlaceholder({ onTabSelect }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.tertiary, fontFamily: typography.fontFamily }}>
-        Inbox (Phase 3)
-      </div>
-      <TabBar activeTab="inbox" onTabSelect={onTabSelect} />
-    </div>
-  )
+  if (!conv) return OWNERS.owen
+  if (conv.clientKey)      return OWNERS[conv.clientKey]      ?? OWNERS.owen
+  if (conv.card?.clientKey) return OWNERS[conv.card.clientKey] ?? OWNERS.owen
+  return OWNERS.owen
 }
 
 export default function App() {
   const navigate = useNavigate()
+  const location = useLocation()
   const {
     resolvedCards, setResolvedCards,
     liveEvents, addLiveEvent,
@@ -52,6 +50,13 @@ export default function App() {
 
   const loadTime = useLoadTime()
 
+  // Track the most recently visited tab path so the /conversation/:id bridge
+  // can return the URL to the originating tab when the overlay closes.
+  const lastTabPathRef = useRef('/')
+  useEffect(() => {
+    if (TAB_PATHS.has(location.pathname)) lastTabPathRef.current = location.pathname
+  }, [location.pathname])
+
   const animateTo = (target, dir = 'forward') => {
     setDirection(dir)
     setTransition(true)
@@ -60,6 +65,28 @@ export default function App() {
       setTransition(false)
     }, TRANSITION_MS)
   }
+
+  // Bridge: child screens (e.g. InboxScreen) call navigate('/conversation/:id')
+  // expecting main's route-based overlay model. On this branch the conversation
+  // is a state-based overlay, so we intercept that path here, open the overlay,
+  // and replace the URL back to the originating tab so navigation stays sane.
+  useEffect(() => {
+    const m = location.pathname.match(/^\/conversation\/([^/]+)$/)
+    if (!m) return
+    const ownerId = m[1]
+    if (!OWNERS[ownerId]) {
+      navigate(lastTabPathRef.current, { replace: true })
+      return
+    }
+    const navState = location.state ?? {}
+    setConversation({
+      type: navState.type ?? 'today',
+      card: navState.card,
+      clientKey: ownerId,
+    })
+    navigate(lastTabPathRef.current, { replace: true })
+    animateTo('conversation', 'forward')
+  }, [location.pathname])
 
   const onTabSelect = (id) => {
     const path = TAB_ROUTES[id]
@@ -125,7 +152,10 @@ export default function App() {
                 }}
               />
             } />
-            <Route path="/inbox" element={<InboxPlaceholder onTabSelect={onTabSelect} />} />
+            <Route path="/inbox"        element={<InboxScreen />} />
+            <Route path="/contacts"     element={<RebookScreen />} />
+            <Route path="/more"         element={<MoreScreen />} />
+            <Route path="/testing-mode" element={<TestingModeScreen />} />
           </Routes>
         )}
         {overlay === 'conversation' && (
