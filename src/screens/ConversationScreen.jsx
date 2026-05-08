@@ -4,7 +4,7 @@ import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
 import { getOwnerRelUnit } from '../data/scheduleData'
 import { peopleImages, petImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
-import RelationshipScreen from './RelationshipScreen'
+import RelationshipManagement from './relationship/RelationshipManagement'
 
 const DayDivider = ({ label }) => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
@@ -87,7 +87,7 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
       </div>
 
       {/* ─── Schedule tab ─── */}
-      {tab === 'schedule' && <RelationshipScreen initialPets={conversationPets} initialUnits={relUnits} />}
+      {tab === 'schedule' && <RelationshipManagement showFullHistory inlineFooter initialPets={conversationPets} initialUnits={relUnits} />}
 
       {/* ─── Messages ─── */}
       {tab === 'messages' && <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>

@@ -11,7 +11,9 @@ import AddSheet from './AddSheet'
 import OccActionSheet from './OccActionSheet'
 import ManageSheet from './ManageSheet'
 
-const RelationshipManagement = forwardRef(function RelationshipManagement({initialPets, initialUnits, ownerFirstName = '', onScheduleChange, onScheduleConfirmed, onReviewComplete, isIncompleteResolved = false}, ref) {
+const PAST_PAGE = 4
+
+const RelationshipManagement = forwardRef(function RelationshipManagement({initialPets, initialUnits, ownerFirstName = '', onScheduleChange, onScheduleConfirmed, onReviewComplete, isIncompleteResolved = false, showFullHistory = false, inlineFooter = false}, ref) {
   const [pets,       setPets]       = useState(initialPets || PETS_SEED)
   const [units,      setUnits]      = useState(initialUnits || [])
   const [relEndDate, setRelEndDate] = useState("")
@@ -20,6 +22,7 @@ const RelationshipManagement = forwardRef(function RelationshipManagement({initi
   const [showSummary,setShowSummary]= useState(false)
   const [activeOcc,  setActiveOcc]  = useState(null)
   const [reviewOcc,  setReviewOcc]  = useState(null)
+  const [pastWeeksVisible, setPastWeeksVisible] = useState(0)
   const savedUnitsRef  = useRef(initialUnits || [])
   const [savedVersion, setSavedVersion] = useState(0)
   const [scrollToKey, setScrollToKey] = useState(null)
@@ -281,9 +284,30 @@ const RelationshipManagement = forwardRef(function RelationshipManagement({initi
   const effectiveIncompleteKey = (incompleteKey === resolvedIncompleteKey || isIncompleteResolved) ? null : incompleteKey
 
   const thisMonday             = getWeekMonday(PROTO_TODAY)
-  const allPastEntries         = agendaWithRemoved.filter(([dk, occs]) => { const d = parseDate(dk); return isPast(d) && d < thisMonday && occs.some(occ => occ.key === effectiveIncompleteKey) })
+  const baseAllPastEntries     = agendaWithRemoved.filter(([dk]) => { const d = parseDate(dk); return isPast(d) && d < thisMonday })
+  const allPastEntries         = showFullHistory
+    ? baseAllPastEntries
+    : baseAllPastEntries.filter(([, occs]) => occs.some(occ => occ.key === effectiveIncompleteKey))
   const currentWeekPastEntries = agendaWithRemoved.filter(([dk]) => { const d = parseDate(dk); return isPast(d) && d >= thisMonday })
   const allUpcoming            = agendaWithRemoved.filter(([dk]) => !isPast(parseDate(dk)))
+
+  const visiblePastEntries = useMemo(() => {
+    if (!showFullHistory) return allPastEntries
+    const groups = []
+    let lastWk = null
+    allPastEntries.forEach(entry => {
+      const wk = dateKey(getWeekMonday(parseDate(entry[0])))
+      if (wk !== lastWk) { groups.push([]); lastWk = wk }
+      groups[groups.length - 1].push(entry)
+    })
+    return pastWeeksVisible > 0 ? groups.slice(-pastWeeksVisible).flat() : []
+  }, [allPastEntries, pastWeeksVisible, showFullHistory])
+
+  const hiddenPastWeeks = useMemo(() => {
+    if (!showFullHistory) return 0
+    const weeks = new Set(allPastEntries.map(([dk]) => dateKey(getWeekMonday(parseDate(dk)))))
+    return Math.max(0, weeks.size - pastWeeksVisible)
+  }, [allPastEntries, pastWeeksVisible, showFullHistory])
 
   useImperativeHandle(ref, () => ({
     openAdd:    () => setShowAdd(true),
@@ -293,8 +317,13 @@ const RelationshipManagement = forwardRef(function RelationshipManagement({initi
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:R.white,position:"relative"}}>
       <div ref={scrollRef} className="hide-scrollbar" style={{flex:1,overflowY:"auto",padding:"0 16px 0"}}>
+        {showFullHistory && hiddenPastWeeks > 0 && (
+          <Button variant="flat" onClick={() => setPastWeeksVisible(v => v + PAST_PAGE)} style={{width:"100%",margin:"12px 0"}}>
+            Show {Math.min(hiddenPastWeeks, PAST_PAGE)} older week{Math.min(hiddenPastWeeks, PAST_PAGE) !== 1 ? "s" : ""}
+          </Button>
+        )}
         <AgendaView
-          agenda={[...allPastEntries, ...currentWeekPastEntries, ...allUpcoming]}
+          agenda={[...visiblePastEntries, ...currentWeekPastEntries, ...allUpcoming]}
           pets={pets}
           onAdd={() => setShowAdd(true)}
           allEnded={allEnded}
@@ -312,12 +341,19 @@ const RelationshipManagement = forwardRef(function RelationshipManagement({initi
           updatedUnitIds={null}
           onTap={setActiveOcc}
           onReview={setReviewOcc}
+          showPastWeeks={showFullHistory}
         />
       </div>
       {hasChanges && (
         <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:10,background:R.white,borderTop:`1px solid ${R.separator}`,padding:16,display:"flex",gap:12}}>
           <Button variant="primary" style={{flex:1}} onClick={() => setShowSummary(true)}>Save changes</Button>
           <Button variant="default" onClick={() => setUnits(savedUnitsRef.current)}>Dismiss</Button>
+        </div>
+      )}
+      {inlineFooter && !hasChanges && (
+        <div style={{padding:"12px 16px 20px",background:R.white,flexShrink:0,display:"flex",gap:12}}>
+          <Button variant="primary" size="small" onClick={() => setShowAdd(true)} style={{flex:2}}>Add a service</Button>
+          <Button variant="default" size="small" onClick={() => setShowManage(true)} style={{flex:1}}>Manage</Button>
         </div>
       )}
 

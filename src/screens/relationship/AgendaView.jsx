@@ -10,7 +10,7 @@ import { MoreIcon, DropdownIcon, CheckIcon } from '../../assets/icons'
 
 const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
-export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, currentWeekRef, firstUpcomingKey, relEndDate, incompleteKey, ownerFirstName, scrollContainerRef, addedUnitIds, changedUnitIds, overriddenKeys, removedKeys, updatedUnitIds, onTap, onReview}) {
+export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, currentWeekRef, firstUpcomingKey, relEndDate, incompleteKey, ownerFirstName, scrollContainerRef, addedUnitIds, changedUnitIds, overriddenKeys, removedKeys, updatedUnitIds, onTap, onReview, showPastWeeks = false}) {
   const [showJump, setShowJump] = useState(false)
   const [activeMo, setActiveMo] = useState(null)
   const monthRefs = useRef(new Map())
@@ -69,7 +69,7 @@ export default function AgendaView({agenda, pets, onAdd, allEnded, upcomingRef, 
   const weekEntryMap = new Map()
   agenda.forEach(([dayKey, occs]) => {
     const monday = getWeekMonday(parseDate(dayKey))
-    if (monday < thisWeekMonday) return  // skip weeks entirely before the current week
+    if (!showPastWeeks && monday < thisWeekMonday) return  // skip weeks entirely before the current week
     const wk     = dateKey(monday)
     if (!weekEntryMap.has(wk)) weekEntryMap.set(wk, [])
     weekEntryMap.get(wk).push([dayKey, occs])

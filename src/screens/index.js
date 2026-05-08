@@ -1,6 +1,5 @@
 export { default as HomeScreen } from './HomeScreen'
 export { default as ConversationScreen } from './ConversationScreen'
-export { default as RelationshipScreen } from './RelationshipScreen'
 export { default as ScheduleScreen } from './ScheduleScreen'
 export { default as InboxScreen } from './InboxScreen'
 export { default as MoreScreen } from './MoreScreen'
