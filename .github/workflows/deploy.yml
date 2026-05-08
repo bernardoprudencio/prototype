@@ -6,6 +6,7 @@ on:
       - main
       - new-modification
       - ongoing-relationships
+      - proposal-ongoing-relationships
 
 permissions:
   contents: write
@@ -35,6 +36,10 @@ jobs:
         if: github.ref == 'refs/heads/ongoing-relationships'
         run: VITE_BASE=/prototype/ongoing-relationships/ npm run build
 
+      - name: Build (proposal-ongoing-relationships)
+        if: github.ref == 'refs/heads/proposal-ongoing-relationships'
+        run: VITE_BASE=/prototype/proposal-ongoing-relationships/ npm run build
+
       - name: Deploy main → root
         if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4
@@ -60,4 +65,13 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           destination_dir: ongoing-relationships
+          keep_files: true
+
+      - name: Deploy proposal-ongoing-relationships → subdirectory
+        if: github.ref == 'refs/heads/proposal-ongoing-relationships'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: proposal-ongoing-relationships
           keep_files: true
