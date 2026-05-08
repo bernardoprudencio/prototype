@@ -88,7 +88,7 @@ export default function UnitEditor({unit, onChange, allUnits, allPets, simplifie
           </div>
         </div>
       )}
-      {!overnight && !simplified && (
+      {!overnight && (
         <div style={{marginBottom:12}}>
           <label style={labelSt}>{isDaycare ? "Hours" : "Duration"}</label>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -167,11 +167,11 @@ export default function UnitEditor({unit, onChange, allUnits, allPets, simplifie
           <div style={{fontSize:11,color:R.gray,marginTop:5}}>{unit.repeatEndDate ? `Stops after ${fmtDate(parseDate(unit.repeatEndDate))}` : "No end — continues until relationship ends"}</div>
         </div>
       )}
-      {!simplified && <div>
+      <div>
         <label style={labelSt}>For which pets?</label>
         <PetSelector pets={pets} selectedIds={unit.petIds} onChange={ids => onChange({...unit,petIds:ids,petOverride:true})}/>
         {unit.petOverride && <div style={{fontSize:10,color:R.gray,marginTop:5}}>Custom pet selection</div>}
-      </div>}
+      </div>
     </div>
   )
 }
