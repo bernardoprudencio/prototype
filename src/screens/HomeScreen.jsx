@@ -6,8 +6,7 @@ import { formatHeaderDate } from '../hooks/useDate'
 import { Button, PetAvatar, UserAvatar, TabBar, Row } from '../components'
 import { INCOMPLETE_CARDS } from '../data/bookings'
 import { getTodayWalks } from '../data/owners'
-
-const TODAY_WALKS = getTodayWalks()
+import { useApp } from '../context/AppContext'
 
 const PROMO_CARDS = [
   { bg: colors.yellow100, title: 'Promote your profile', desc: 'Invite new pet parents and grow your business.', cta: 'Learn how', img: petImages.promo1 },
@@ -15,7 +14,10 @@ const PROMO_CARDS = [
 ]
 
 export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenReviewSheet, onNavigateConversation, onNavigateToCard, onOpenTodaySheet, onTabSelect, loadTime }) {
+  const { ownerCurrentWeeks } = useApp()
   const [incompleteOpen, setIncompleteOpen] = useState(true)
+
+  const todayWalks = getTodayWalks(ownerCurrentWeeks)
 
   const visibleCards = INCOMPLETE_CARDS.filter(c => !resolvedCards[c.id])
   const hasIncomplete = visibleCards.length > 0
@@ -81,8 +83,8 @@ export default function HomeScreen({ resolvedCards, onOpenActionSheet, onOpenRev
         <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 20, lineHeight: 1.25, color: colors.primary, margin: '24px 0 8px' }}>Today</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {TODAY_WALKS.map((walk, i) => {
-            const blocked = TODAY_WALKS.slice(0, i).some(w => w.owner.id === walk.owner.id)
+          {todayWalks.map((walk, i) => {
+            const blocked = todayWalks.slice(0, i).some(w => w.owner.id === walk.owner.id)
             return (
               <div key={`${walk.owner.id}-${i}`} style={{ border: `1px solid ${colors.border}`, borderRadius: 8, padding: '0 16px 16px', background: colors.white }}>
                 <Row
