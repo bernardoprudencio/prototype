@@ -7,6 +7,7 @@ import { ActionSheet, ReviewSheet } from './components'
 import {
   HomeScreen, ConversationScreen, ScheduleScreen,
   InboxScreen, MoreScreen, RebookScreen, TestingModeScreen,
+  EditTemplateScreen, CurrentWeekScreen,
 } from './screens'
 import { OWNERS } from './data/owners'
 import { petImages } from './assets/images'
@@ -172,6 +173,20 @@ export default function App() {
           <ScheduleScreen
             owner={owner}
             onBack={() => animateTo('conversation', 'back')}
+            onEditTemplate={() => animateTo('editTemplate', 'forward')}
+            onManageCurrentWeek={() => animateTo('currentWeek', 'forward')}
+          />
+        )}
+        {overlay === 'editTemplate' && (
+          <EditTemplateScreen
+            ownerId={owner?.id}
+            onBack={() => animateTo('schedule', 'back')}
+          />
+        )}
+        {overlay === 'currentWeek' && (
+          <CurrentWeekScreen
+            ownerId={owner?.id}
+            onBack={() => animateTo('schedule', 'back')}
           />
         )}
       </div>

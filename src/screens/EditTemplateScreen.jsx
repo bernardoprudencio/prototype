@@ -409,9 +409,10 @@ function DayRow({ dayLabel, times, onAddTime, onRemoveTime, onRemoveDay, showTra
 }
 
 // ── EditTemplateScreen ────────────────────────────────────────────────────────
-export default function EditTemplateScreen() {
+export default function EditTemplateScreen({ ownerId: ownerIdProp, onBack: onBackProp } = {}) {
   const navigate = useNavigate()
-  const { ownerId } = useParams()
+  const params = useParams()
+  const ownerId = ownerIdProp ?? params.ownerId
   const {
     ownerTemplates, setOwnerTemplates,
     setOwnerWeeks, ownerSameSchedule, setOwnerSameSchedule,
@@ -425,7 +426,7 @@ export default function EditTemplateScreen() {
   const startDate = nextMonday()
   const sublabel = 'Changes here affect all future weeks.'
 
-  const onBack = () => navigate(-1)
+  const onBack = onBackProp ?? (() => navigate(-1))
   const onSave = ({ selectedDays, daySchedules, sameSchedule }) => {
     const sortedDays = [...selectedDays].sort((a, b) => DAYS_ORDER.indexOf(a) - DAYS_ORDER.indexOf(b))
     const newTemplate = sortedDays.flatMap(day =>

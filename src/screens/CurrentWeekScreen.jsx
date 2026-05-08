@@ -394,9 +394,10 @@ function DayRow({ day, onAddTime, onRemoveSlot, disabled }) {
 }
 
 // ── CurrentWeekScreen ──────────────────────────────────────────────────────────
-export default function CurrentWeekScreen() {
+export default function CurrentWeekScreen({ ownerId: ownerIdProp, onBack: onBackProp } = {}) {
   const navigate = useNavigate()
-  const { ownerId } = useParams()
+  const params = useParams()
+  const ownerId = ownerIdProp ?? params.ownerId
   const {
     ownerTemplates, ownerCurrentWeeks, setOwnerCurrentWeeks,
     addOwnerCurrentWeekChange,
@@ -408,7 +409,7 @@ export default function CurrentWeekScreen() {
 
   const initialDays = ownerCurrentWeeks[ownerId] ?? getFullCurrentWeekSlots(baseOwner)
 
-  const onBack = () => navigate(-1)
+  const onBack = onBackProp ?? (() => navigate(-1))
   const onSave = (diff, updatedDays) => {
     setOwnerCurrentWeeks(prev => ({ ...prev, [ownerId]: updatedDays }))
     addOwnerCurrentWeekChange(ownerId, diff)
