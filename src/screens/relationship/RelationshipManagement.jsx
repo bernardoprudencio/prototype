@@ -369,7 +369,7 @@ const RelationshipManagement = forwardRef(function RelationshipManagement({initi
           onClose={() => setShowAdd(false)}
           existing={units}
           allPets={pets}
-          defaultServiceId={units[0]?.serviceId}
+          defaultServiceId={showFullHistory ? undefined : units[0]?.serviceId}
           defaultDurationMins={units[0]?.durationMins}
         />
       )}
