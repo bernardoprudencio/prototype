@@ -1,40 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { colors, typography, shadows, radius } from '../tokens'
-import { BackIcon } from '../assets/icons'
+import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../assets/icons'
 import { Button, PetAvatar, Chip } from '../components'
-import { PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeek } from '../data/owners'
+import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeek } from '../data/owners'
+import { useApp } from '../context/AppContext'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
-const TrashIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <path fillRule="evenodd" clipRule="evenodd" d="M5 1.5C5 0.671573 5.67157 0 6.5 0H9.5C10.3284 0 11 0.671573 11 1.5V2H14.5C14.7761 2 15 2.22386 15 2.5C15 2.77614 14.7761 3 14.5 3H1.5C1.22386 3 1 2.77614 1 2.5C1 2.22386 1.22386 2 1.5 2H5V1.5ZM10 1.5V2H6V1.5C6 1.22386 6.22386 1 6.5 1H9.5C9.77614 1 10 1.22386 10 1.5Z" fill="currentColor"/>
-    <path d="M2.99798 4.4547C2.97298 4.17969 2.72977 3.97702 2.45476 4.00202C2.17976 4.02703 1.97708 4.27023 2.00209 4.54524L2.96075 15.0905C3.00757 15.6056 3.43944 16 3.95664 16H12.0434C12.5606 16 12.9925 15.6056 13.0393 15.0905L13.998 4.54524C14.023 4.27023 13.8203 4.02703 13.5453 4.00202C13.2703 3.97702 13.0271 4.17969 13.0021 4.4547L12.0434 15H3.95664L2.99798 4.4547Z" fill="currentColor"/>
-    <path d="M7 5.5V13H6V5.5H7Z" fill="currentColor"/>
-    <path d="M10 13V5.5H9V13H10Z" fill="currentColor"/>
-  </svg>
-)
-
-const CloseSmIcon = ({ hover }) => (
-  <svg width="16" height="16" viewBox="0 0 32 32" fill={hover ? colors.primary : colors.secondary}>
-    <path d="M17.414 16l7.293-7.293a1 1 0 0 0-1.414-1.414L16 14.586 8.707 7.293a1 1 0 0 0-1.414 1.414L14.586 16l-7.293 7.293a1 1 0 0 0 1.414 1.414L16 17.414l7.293 7.293a1 1 0 0 0 1.414-1.414L17.414 16z"/>
-  </svg>
-)
-
 const CheckIcon = () => (
   <svg width="16" height="16" viewBox="0 0 32 32" fill={colors.link} style={{ flexShrink: 0 }}>
     <path d="M26.191 4.412a1 1 0 1 1 1.618 1.176l-16 22a1 1 0 0 1-1.516.12l-6-6a1 1 0 1 1 1.414-1.415l5.173 5.172L26.19 4.412z"/>
-  </svg>
-)
-
-const CautionIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-    <path fillRule="evenodd" clipRule="evenodd" d="M1.36621 23.2499C0.744891 23.2499 0.241211 22.7462 0.241211 22.1249C0.241211 21.9451 0.284335 21.7678 0.366966 21.6081L11.0008 1.0493C11.2863 0.497434 11.965 0.281458 12.5169 0.566907C12.7238 0.6739 12.8923 0.842449 12.9993 1.0493L23.6331 21.6081C23.9186 22.1599 23.7026 22.8387 23.1507 23.1242C22.991 23.2068 22.8137 23.2499 22.6339 23.2499H1.36621ZM12.0001 2.38239L1.98237 21.7499H22.0177L12.0001 2.38239ZM12.0001 8.24991C12.4143 8.24991 12.75 8.5857 12.75 8.99991V14.9999C12.75 15.4141 12.4143 15.7499 12.0001 15.7499C11.5858 15.7499 11.2501 15.4141 11.2501 14.9999V8.99991C11.2501 8.5857 11.5858 8.24991 12.0001 8.24991ZM12.0001 19.8749C11.3787 19.8749 10.8751 19.3712 10.8751 18.7499C10.8751 18.1286 11.3787 17.6249 12.0001 17.6249C12.6214 17.6249 13.125 18.1286 13.125 18.7499C13.125 19.3712 12.6214 19.8749 12.0001 19.8749Z" fill="#BC4338"/>
-  </svg>
-)
-
-const SuccessIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-    <path d="M12 24C5.37258 24 0 18.6274 0 12C0 5.37258 5.37258 0 12 0C18.6274 0 24 5.37258 24 12C24 18.6274 18.6274 24 12 24ZM12 22.5C17.799 22.5 22.5 17.799 22.5 12C22.5 6.20101 17.799 1.5 12 1.5C6.20101 1.5 1.5 6.20101 1.5 12C1.5 17.799 6.20101 22.5 12 22.5ZM16.6555 7.04272C16.9081 6.7144 17.379 6.65298 17.7073 6.90553C18.0356 7.15808 18.097 7.62897 17.8445 7.95728L10.3445 17.7073C10.0684 18.0661 9.5398 18.1005 9.21967 17.7803L6.21967 14.7803C5.92678 14.4874 5.92678 14.0126 6.21967 13.7197C6.51256 13.4268 6.98744 13.4268 7.28033 13.7197L9.67633 16.1157L16.6555 7.04272Z" fill="#1B6C42"/>
   </svg>
 )
 
@@ -212,7 +186,7 @@ function TimeDropdown({ times, selectedTime, onSelect }) {
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '10px 16px', cursor: 'pointer',
-                background: selected ? '#EBF1FB' : hovering ? colors.bgSecondary : 'transparent',
+                background: selected ? colors.blueLight : hovering ? colors.bgSecondary : 'transparent',
                 transition: 'background 0.08s',
               }}
             >
@@ -270,7 +244,7 @@ function DayCard({ dayData, activeSlotId, onOpenDropdown, onRemoveDay, onRemoveS
         <Button
           variant="flat"
           icon={<TrashIcon />}
-          style={{ color: '#BC4338' }}
+          style={{ color: colors.destructive }}
           onClick={e => { e.stopPropagation(); onRemoveDay() }}
         />
       </div>
@@ -380,25 +354,53 @@ const UserInfoCard = ({ name, image, service, petNames }) => (
   </WhiteCard>
 )
 
-const TemplateCard = ({ owner }) => (
+const groupTemplateByDay = (template) => {
+  const map = {}
+  template.forEach(({ day, time }) => {
+    if (!map[day]) map[day] = []
+    map[day].push(time)
+  })
+  return Object.entries(map)
+}
+
+const TemplateCard = ({ owner, onEditTemplate }) => (
   <WhiteCard>
-    <p style={{ ...tx(20, 600, colors.primary), lineHeight: 1.25, marginBottom: 16 }}>Weekly schedule template</p>
+    <p style={{ ...tx(20, 600, colors.primary), lineHeight: 1.25, marginBottom: 16 }}>Schedule template</p>
     <p style={{ ...tx(14, 400, colors.secondary), lineHeight: 1.25, marginBottom: 8 }}>Repeats on</p>
-    {owner.template.map(({ day, time }) => (
+    {groupTemplateByDay(owner.template).map(([day, times]) => (
       <div key={day} style={{ paddingBottom: 24 }}>
         <p style={{ ...tx(16, 600, colors.primary), lineHeight: 1.5, marginBottom: 8 }}>{day}</p>
-        <TimeGrid times={[time]} />
+        <TimeGrid times={times} />
       </div>
     ))}
-    <button style={{ ...tx(14, 600, colors.link), background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', width: '100%', textAlign: 'center', lineHeight: 1.25 }}>
-      Edit weekly schedule template
+    <button
+      onClick={onEditTemplate}
+      style={{ ...tx(14, 600, colors.link), background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', width: '100%', textAlign: 'center', lineHeight: 1.25 }}
+    >
+      Edit schedule template
     </button>
   </WhiteCard>
 )
 
-const CurrentWeekCard = ({ owner }) => {
-  const currentWeekDays = getOwnerCurrentWeek(owner)
-  const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+const parseWeekDate = (dateStr) => {
+  const [mon, day] = dateStr.split(' ')
+  const today = new Date()
+  return new Date(today.getFullYear(), SHORT_MONTHS.indexOf(mon), parseInt(day))
+}
+
+const isMidnightPast = (dateStr) => {
+  const d = parseWeekDate(dateStr)
+  const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0)
+  return d < todayMid
+}
+
+const CurrentWeekCard = ({ owner, onManage, currentWeekDays: savedDays }) => {
+  const originalOwner = OWNERS[owner.id] ?? owner
+  const currentWeekDays = savedDays
+    ? savedDays.filter(d => d.slots.length > 0).map(d => ({ day: d.day, date: d.date, times: d.slots.map(s => s.time) }))
+    : getOwnerCurrentWeek(originalOwner)
   const dow = PROTO_TODAY.getDay()
   const daysFromMonday = dow === 0 ? 6 : dow - 1
   const monday = new Date(PROTO_TODAY)
@@ -406,15 +408,26 @@ const CurrentWeekCard = ({ owner }) => {
   const weekLabel = `${SHORT_MONTHS[monday.getMonth()]} ${monday.getDate()}`
   return (
     <WhiteCard>
-      <p style={{ ...tx(20, 600, colors.primary), lineHeight: 1.25, marginBottom: 4 }}>Happening this week</p>
-      <p style={{ ...tx(14, 400, colors.secondary), lineHeight: 1.25, marginBottom: 16 }}>Week of {weekLabel}</p>
-      {currentWeekDays.map(({ day, date, times }) => (
-        <div key={day} style={{ paddingBottom: 24 }}>
-          <p style={{ ...tx(16, 600, colors.primary), lineHeight: 1.5, marginBottom: 8 }}>{day}, {date}</p>
-          <TimeGrid times={times} />
-        </div>
-      ))}
-      <button style={{ ...tx(14, 600, colors.link), background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', width: '100%', textAlign: 'center', lineHeight: 1.25 }}>
+      <p style={{ ...tx(20, 600, colors.primary), lineHeight: 1.25, marginBottom: 16 }}>Happening this week</p>
+      <p style={{ ...tx(14, 400, colors.secondary), lineHeight: 1.25, marginBottom: 8 }}>Week of {weekLabel}</p>
+      {currentWeekDays.length === 0 ? (
+        <p style={{ ...tx(16, 600, colors.primary), lineHeight: 1.5, marginBottom: 24 }}>No walks this week</p>
+      ) : (
+        currentWeekDays.map(({ day, date, times }) => {
+          const past = isMidnightPast(date)
+          return (
+            <div key={day} style={{ paddingBottom: 24 }}>
+              <p style={{ ...tx(16, 600, colors.primary), lineHeight: 1.5, marginBottom: 8 }}>{day}, {date}</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {times.map((time, i) => (
+                  <p key={i} style={{ ...tx(14, 400, past ? colors.disabledText : colors.primary), margin: 0, textDecoration: past ? 'line-through' : 'none' }}>{time}</p>
+                ))}
+              </div>
+            </div>
+          )
+        })
+      )}
+      <button onClick={onManage} style={{ ...tx(14, 600, colors.link), background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer', width: '100%', textAlign: 'center', lineHeight: 1.25 }}>
         Manage current week
       </button>
     </WhiteCard>
@@ -431,7 +444,7 @@ function ChangeRows({ changes }) {
             {change.day}, {change.date}
           </p>
           {change.removed.map((t, j) => (
-            <p key={`r${j}`} style={{ ...tx(14, 400, '#BC4338'), marginBottom: 2, lineHeight: 1.5 }}>
+            <p key={`r${j}`} style={{ ...tx(14, 400, colors.destructive), marginBottom: 2, lineHeight: 1.5 }}>
               Removed: {t}
             </p>
           ))}
@@ -498,7 +511,7 @@ function CalendarDay({ date, isBooked, onSelect }) {
         width: '100%', height: 44, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', position: 'relative',
         borderRadius: 8, cursor: 'pointer',
-        background: hovered ? '#EBF1FB' : 'transparent',
+        background: hovered ? colors.blueLight : 'transparent',
         transition: 'background 0.1s', userSelect: 'none',
       }}
     >
@@ -726,11 +739,31 @@ function SuccessBanner({ onDismiss }) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
-export default function ScheduleScreen({ onBack, owner = {} }) {
+export default function ScheduleScreen({ onBack: onBackProp, owner: ownerProp = {}, onEditTemplate: onEditTemplateProp, onManageCurrentWeek: onManageCurrentWeekProp }) {
+  const ownerId = ownerProp?.id ?? 'owen'
+  const {
+    ownerTemplates, ownerWeeks, setOwnerWeeks, ownerCurrentWeeks,
+    setOwnerScheduleChanges,
+  } = useApp()
+
+  const baseOwner = OWNERS[ownerId] ?? OWNERS.owen
+  const tpl = ownerTemplates[ownerId]
+  const owner = tpl ? { ...baseOwner, template: tpl } : baseOwner
+
+  const onBack = (savedChangesValue) => {
+    if (savedChangesValue?.length) setOwnerScheduleChanges(ownerId, savedChangesValue)
+    onBackProp?.()
+  }
+  const onEditTemplate = onEditTemplateProp ?? (() => {})
+  const onManageCurrentWeek = onManageCurrentWeekProp ?? (() => {})
+  const onWeeksChange = (newBase) => setOwnerWeeks(prev => ({ ...prev, [ownerId]: newBase }))
+  const currentWeekDays = ownerCurrentWeeks[ownerId] ?? null
+  const initialWeeksProp = ownerWeeks[ownerId]
+
   const isDesktop = useIsDesktop()
-  const [initialWeeks] = useState(() => getOwnerUpcomingWeeks(owner))
+  const [initialWeeks] = useState(() => initialWeeksProp || getOwnerUpcomingWeeks(owner))
   const [weeks, setWeeks] = useState(() => cloneWeeks(initialWeeks))
-  const [baseWeeks, setBaseWeeks] = useState(() => initialWeeks)
+  const [baseWeeks, setBaseWeeks] = useState(() => cloneWeeks(initialWeeks))
   const [openDropdown, setOpenDropdown] = useState(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [showAddDay, setShowAddDay] = useState(false)
@@ -909,9 +942,11 @@ export default function ScheduleScreen({ onBack, owner = {} }) {
 
   const handleConfirm = () => {
     const changes = computeChanges(weeks, initialWeeks)
-    setBaseWeeks(cloneWeeks(weeks))
+    const newBase = cloneWeeks(weeks)
+    setBaseWeeks(newBase)
     setSavedChanges(changes)
     setShowConfirm(false)
+    onWeeksChange?.(newBase)
   }
 
   const handleDismissAll = () => {
@@ -925,8 +960,8 @@ export default function ScheduleScreen({ onBack, owner = {} }) {
   const sidebar = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <UserInfoCard name={owner.name} image={owner.image} service={owner.service} petNames={owner.petNames} />
-      <TemplateCard owner={owner} />
-      <CurrentWeekCard owner={owner} />
+      <TemplateCard owner={owner} onEditTemplate={onEditTemplate} />
+      <CurrentWeekCard owner={owner} onManage={onManageCurrentWeek} currentWeekDays={currentWeekDays} />
     </div>
   )
 
@@ -939,7 +974,7 @@ export default function ScheduleScreen({ onBack, owner = {} }) {
         <Button variant="primary" size="small" onClick={() => setShowAddDay(true)}>Add a day</Button>
       </div>
       <p style={{ ...tx(14, 400, colors.secondary), lineHeight: 1.5, margin: 0 }}>
-        Make changes to accommodate changes in your regular schedule.
+        Adjust your schedule as needed.
       </p>
     </div>
   )
@@ -959,18 +994,17 @@ export default function ScheduleScreen({ onBack, owner = {} }) {
 
   // Footer buttons — only when there are unsaved changes and no confirmed save
   const footer = !savedChanges && hasChanges ? (
-    <div style={{
-      flexShrink: 0, background: colors.white,
-      borderTop: `1px solid ${colors.border}`,
-      padding: '16px 16px 24px',
-      display: 'flex', flexDirection: 'column', gap: 16,
-    }}>
-      <Button variant="primary" size="default" fullWidth onClick={handleSaveChanges}>
-        Save changes
-      </Button>
-      <Button variant="default" size="default" fullWidth onClick={handleDismissAll}>
-        Dismiss all changes
-      </Button>
+    <div style={{ flexShrink: 0, padding: '16px 16px 24px' }}>
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 16,
+      }}>
+        <Button variant="primary" size="default" fullWidth onClick={handleSaveChanges}>
+          Save changes
+        </Button>
+        <Button variant="default" size="default" fullWidth onClick={handleDismissAll}>
+          Dismiss all changes
+        </Button>
+      </div>
     </div>
   ) : null
 
@@ -1010,21 +1044,22 @@ export default function ScheduleScreen({ onBack, owner = {} }) {
 
       {isDesktop ? (
         // ── Desktop: sidebar + right column ────────────────────────────
-        <div style={{
-          flex: 1, overflow: 'hidden', display: 'flex',
+        <div className="hide-scrollbar" style={{
+          flex: 1, overflowY: 'auto', display: 'flex', alignItems: 'flex-start',
           maxWidth: 1140, margin: '0 auto', width: '100%',
           gap: 24, padding: '24px 24px 0', boxSizing: 'border-box',
         }}>
-          {/* Sidebar — scrolls independently */}
-          <div className="hide-scrollbar" style={{ width: 360, flexShrink: 0, overflowY: 'auto', paddingBottom: 24, alignSelf: 'flex-start' }}>
+          {/* Sidebar — scrolls with outer container */}
+          <div style={{ width: 360, flexShrink: 0, paddingBottom: 24 }}>
             {sidebar}
           </div>
 
-          {/* Right column — header fixed, weeks scroll, footer fixed, banners floating */}
+          {/* Right column — sticky, independent week scroll, banners floating */}
           <div ref={panelRef} style={{
             flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
-            background: colors.white, borderRadius: `${radius.primary}px ${radius.primary}px 0 0`,
-            overflow: 'hidden', position: 'relative',
+            background: colors.white, borderRadius: radius.primary,
+            overflow: 'hidden', position: 'sticky', top: 0,
+            height: 'calc(100vh - 56px - 24px)',
           }}>
             <div style={{ flexShrink: 0 }}>{upcomingHeader}</div>
             <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>

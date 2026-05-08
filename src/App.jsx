@@ -171,12 +171,7 @@ export default function App() {
         {overlay === 'schedule' && (
           <ScheduleScreen
             owner={owner}
-            onBack={(savedChanges) => {
-              if (savedChanges?.length) {
-                addLiveEvent(owner?.id, { id: Date.now(), type: 'scheduleChange', changes: savedChanges })
-              }
-              animateTo('conversation', 'back')
-            }}
+            onBack={() => animateTo('conversation', 'back')}
           />
         )}
       </div>
