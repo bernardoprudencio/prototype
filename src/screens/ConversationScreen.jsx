@@ -1,10 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { colors, typography, shadows } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
-import { getOwnerRelUnit } from '../data/scheduleData'
 import { peopleImages, petImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
+import { useApp } from '../context/AppContext'
+import { CHAT_HISTORY } from '../data/threads'
+import { getOwnerRelUnit } from '../data/scheduleData'
 import RelationshipManagement from './relationship/RelationshipManagement'
+
+const fmtDayChange = (c, withDate) => {
+  const label = withDate ? `${c.day}, ${c.date}` : c.day
+  const addedStr = c.added.length ? `added ${c.added.join(', ')}` : ''
+  const removedStr = c.removed.length ? `removed ${c.removed.join(', ')}` : ''
+  let detail
+  if (addedStr && removedStr) detail = `${addedStr} and ${removedStr}`
+  else if (addedStr) detail = addedStr
+  else if (removedStr) detail = removedStr
+  else detail = 'removed'
+  return `${label}: ${detail}`
+}
 
 const DayDivider = ({ label }) => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
@@ -14,11 +28,45 @@ const DayDivider = ({ label }) => (
 
 const Gap = ({ h = 12 }) => <div style={{ height: h }} />
 
-export default function ConversationScreen({ onBack, conversation, owner, liveEvents = [], onLiveEvent }) {
+// Pets per owner — used by the inline Schedule tab's RelationshipManagement.
+const ownerPets = (ownerId) => {
+  if (ownerId === 'james') return [{ id: 1, name: 'Archie', emoji: '🐕', img: petImages.archie }]
+  if (ownerId === 'sarah') return [{ id: 1, name: 'Milo',   emoji: '🐕', img: petImages.milo }]
+  return [
+    { id: 1, name: 'Koni',   emoji: '🐕', img: petImages.koni },
+    { id: 2, name: 'Burley', emoji: '🐕', img: petImages.burley },
+  ]
+}
+
+export default function ConversationScreen({ onBack, onOpenSchedule, conversation, owner, liveEvents = [], onLiveEvent }) {
   const { type, card } = conversation || {}
+  const ownerId = owner?.id
+
+  const {
+    resolvedCards,
+    scheduleChanges: scheduleChangesMap,
+    templateChanges: templateChangesMap,
+    currentWeekChanges: currentWeekChangesMap,
+    scheduleMode,
+  } = useApp()
+
+  const cardId = card?.id
+  const resolutionEntry = cardId ? resolvedCards[cardId] : null
+  const resolution = resolutionEntry?.resolution
+  const timestamp  = resolutionEntry?.timestamp
+
+  const scheduleChanges    = scheduleChangesMap[ownerId]    ?? []
+  const templateChanges    = templateChangesMap[ownerId]    ?? []
+  const currentWeekChanges = currentWeekChangesMap[ownerId] ?? []
+
   const messagesEndRef = useRef(null)
   const [tab, setTab] = useState('messages')
   const [text, setText] = useState('')
+
+  // Schedule tab is the agenda flow (Mode B). In modification mode (Mode A),
+  // hide the tabs and surface the legacy header button → ScheduleScreen overlay.
+  const showTabs   = scheduleMode === 'agenda'
+  const activeTab  = showTabs ? tab : 'messages'
 
   const sendMessage = () => {
     const trimmed = text.trim()
@@ -30,17 +78,12 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
     setText('')
   }
 
-  const isToday = type === 'today'
-  const clientName = isToday ? 'Owen O.' : card?.client
-  const clientImg  = isToday ? peopleImages.owen : peopleImages[card?.clientKey] ?? peopleImages.owen
+  const isToday    = type === 'today'
+  const clientName = isToday ? owner?.name  : card?.client
+  const clientImg  = isToday ? owner?.image : peopleImages[card?.clientKey] ?? peopleImages.owen
 
-  const conversationPets = isToday
-    ? [{ id: 1, name: 'Koni', emoji: '🐕', img: petImages.koni }, { id: 2, name: 'Burley', emoji: '🐕', img: petImages.burley }]
-    : card?.id === 'archie'
-      ? [{ id: 1, name: 'Archie', emoji: '🐕', img: petImages.archie }]
-      : [{ id: 1, name: 'Milo', emoji: '🐕', img: petImages.milo }]
-
-  const relUnits = owner ? [getOwnerRelUnit(owner, conversationPets.map(p => p.id))] : []
+  const conversationPets = ownerPets(ownerId)
+  const relUnits         = owner ? [getOwnerRelUnit(owner, conversationPets.map(p => p.id))] : []
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
@@ -50,13 +93,16 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [liveEvents])
 
+  const history = ownerId ? (CHAT_HISTORY[ownerId] ?? []) : []
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
       {/* ─── Header ─── */}
       <div style={{
         borderBottom: `1px solid ${colors.border}`,
         boxShadow: shadows.headerShadow,
-        padding: '12px 16px 0', flexShrink: 0, zIndex: 3,
+        padding: showTabs ? '12px 16px 0' : '12px 16px',
+        flexShrink: 0, zIndex: 3,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', minHeight: 62, padding: '8px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flexShrink: 0 }} onClick={onBack}>
@@ -69,161 +115,173 @@ export default function ConversationScreen({ onBack, conversation, owner, liveEv
           </div>
           <div style={{ cursor: 'pointer', flexShrink: 0 }}><MoreIcon /></div>
         </div>
+
         <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, paddingTop: 12, overflowX: 'auto', paddingBottom: 14, marginBottom: -14 }}>
           <Button variant="primary" style={{ boxShadow: shadows.medium, flexShrink: 0 }}>Leave feedback</Button>
-<Button variant="default" style={{ flexShrink: 0 }}>Details</Button>
+          {!showTabs && (
+            <Button variant="default" style={{ flexShrink: 0 }} onClick={onOpenSchedule}>Modify schedule</Button>
+          )}
+          <Button variant="default" style={{ flexShrink: 0 }}>Details</Button>
         </div>
 
-        {/* ─── Tab bar ─── */}
-        <div style={{ display: 'flex', marginTop: 14 }}>
-          {[['messages', 'Messages'], ['schedule', 'Schedule']].map(([id, label]) => (
-            <Button key={id} variant="flat" onClick={() => setTab(id)} style={{
-              flex: 1, borderRadius: 0, padding: '11px 0', flexShrink: 1,
-              color: tab === id ? colors.link : colors.tertiary,
-              border: 'none', borderBottom: `2.5px solid ${tab === id ? colors.link : 'transparent'}`,
-            }}>{label}</Button>
-          ))}
-        </div>
+        {showTabs && (
+          <div style={{ display: 'flex', marginTop: 14 }}>
+            {[['messages', 'Messages'], ['schedule', 'Schedule']].map(([id, label]) => (
+              <Button key={id} variant="flat" onClick={() => setTab(id)} style={{
+                flex: 1, borderRadius: 0, padding: '11px 0', flexShrink: 1,
+                color: tab === id ? colors.link : colors.tertiary,
+                border: 'none', borderBottom: `2.5px solid ${tab === id ? colors.link : 'transparent'}`,
+              }}>{label}</Button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ─── Schedule tab ─── */}
-      {tab === 'schedule' && <RelationshipManagement showFullHistory inlineFooter initialPets={conversationPets} initialUnits={relUnits} />}
+      {/* ─── Schedule tab (agenda mode) ─── */}
+      {activeTab === 'schedule' && (
+        <RelationshipManagement
+          showFullHistory
+          inlineFooter
+          initialPets={conversationPets}
+          initialUnits={relUnits}
+          onScheduleChange={(t) => onLiveEvent({ id: Date.now(), type: 'scheduleChange', text: t })}
+        />
+      )}
 
       {/* ─── Messages ─── */}
-      {tab === 'messages' && <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>
+      {activeTab === 'messages' && (
+        <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>
+          {history.map((item, i) => {
+            if (item.type === 'divider') return <DayDivider key={`h-${i}`} label={item.label} />
+            if (item.type === 'bubble')  return <ChatBubble key={`h-${i}`} message={item.text} time={item.time} isOwner={item.isOwner} showCheck={item.showCheck} />
+            if (item.type === 'banner')  return <BannerBlock key={`h-${i}`} text={item.text} link={item.link} />
+            if (item.type === 'gap')     return <Gap key={`h-${i}`} h={item.h} />
+            return null
+          })}
 
-        {/* ── Owen · Koni & Burley · Today's walk ── */}
-        {isToday && (
-          <>
-            <DayDivider label="Yesterday" />
-            <ChatBubble message="Hey! Are we still on for tomorrow at 9?" time="4:32 PM" />
-            <ChatBubble message="Absolutely! See you then 🐾" time="4:35 PM" isOwner showCheck />
+          {/* ── Mode A: change summaries (modification flow) ── */}
+          {!isToday && (resolution || scheduleChanges.length > 0 || templateChanges.length > 0 || currentWeekChanges.length > 0) && <DayDivider label="Today" />}
+          {resolution === 'completed' && card && <BannerBlock text={`Walk from ${card.dateLabel} was marked as complete on ${timestamp}.`} />}
+          {resolution === 'cancelled' && card && <BannerBlock text={`Walk from ${card.dateLabel} was cancelled on ${timestamp}. A refund of ${card.cost} has been processed.`} />}
 
-            <DayDivider label="Today" />
-            <ChatBubble message="Morning! Leashes are on the hook by the door. Burley's been a bit hyper today 😄" time="8:52 AM" />
-            <ChatBubble message="On my way! Be there in a few." time="8:55 AM" isOwner showCheck />
-            <Gap />
-            <BannerBlock text="Walk started at 9:04 AM, Mar 19" link="See Rover Card" />
-            <Gap />
-            <ChatBubble message="Both doing great! Koni's leading the way and Burley found a stick he absolutely won't let go of 😂" time="9:28 AM" isOwner showCheck />
-            <ChatBubble message="Haha that's so Burley. Thank you for the update!" time="9:31 AM" />
-            <Gap h={4} />
-            <BannerBlock text="Walk ended at 10:01 AM, Mar 19" link="See Rover Card" />
-            <Gap />
-            <ChatBubble message="They look completely worn out, thank you! 🐾" time="10:05 AM" />
-            <ChatBubble message="Ha! They definitely earned it. See you next week!" time="10:07 AM" isOwner showCheck />
-          </>
-        )}
+          {scheduleChanges.length > 0 && (
+            <ChatBubble
+              message={[
+                'I made changes to the upcoming schedule. Here\'s a summary:',
+                ...scheduleChanges.map(c => fmtDayChange(c, true)),
+              ].join('\n')}
+              time="Just now"
+              isOwner
+              showCheck
+            />
+          )}
 
-        {/* ── James · Archie · Yesterday's missed walk ── */}
-        {!isToday && card?.id === 'archie' && (
-          <>
-            <DayDivider label="Yesterday" />
-            <ChatBubble message="Hey! Are you still on for noon today?" time="11:30 AM" />
-            <ChatBubble message="Yes! Heading over around 11:55." time="11:32 AM" isOwner showCheck />
-            <ChatBubble message="Just a heads up — Archie gets a bit shy with strangers at first" time="11:45 AM" />
-            <ChatBubble message="Good to know, I'll take it slow with him 🐾" time="11:48 AM" isOwner showCheck />
-            <ChatBubble message="He warms up fast once he's outside. The trail behind the building is his favorite" time="11:51 AM" />
-            <Gap h={16} />
-            <BannerBlock text="Walk started at 12:02 PM, Mar 18" link="See Rover Card" />
-            <Gap h={24} />
-            <BannerBlock text="Walk ended at 12:31 PM, Mar 18" link="See Rover Card" />
-            <Gap h={16} />
-            <ChatBubble message="Thanks! How did he do?" time="1:15 PM" />
-            <ChatBubble message="He was great once he warmed up! Really loved sniffing around the trail" time="1:18 PM" isOwner showCheck />
-            <ChatBubble message="Ha, that sounds exactly like him. Thanks again!" time="1:20 PM" />
-          </>
-        )}
+          {templateChanges.map((changes, i) => (
+            <ChatBubble
+              key={`tpl-${i}`}
+              message={[
+                'I updated the weekly schedule template. Here\'s a summary:',
+                ...changes.map(c => fmtDayChange(c, false)),
+              ].join('\n')}
+              time="Just now"
+              isOwner
+              showCheck
+            />
+          ))}
 
-        {/* ── Sarah · Milo · Overdue walk from Mar 12 ── */}
-        {!isToday && card?.id === 'koni-late' && (
-          <>
-            <DayDivider label="Mar 12" />
-            <ChatBubble message="Hi! Quick note — Milo's leash is in the basket by the front door" time="3:42 PM" />
-            <ChatBubble message="Perfect, heading over now!" time="3:45 PM" isOwner showCheck />
-            <ChatBubble message="He loves the park on Cedar St if you have time 🐾" time="3:47 PM" />
-            <ChatBubble message="We'll definitely head there!" time="3:48 PM" isOwner showCheck />
-            <Gap h={16} />
-            <BannerBlock text="Walk started at 4:03 PM, Mar 12" link="See Rover Card" />
-            <Gap h={24} />
-            <BannerBlock text="Walk ended at 4:33 PM, Mar 12" link="See Rover Card" />
-            <Gap h={16} />
-            <ChatBubble message="Thank you! Was he a good boy?" time="5:01 PM" />
-            <ChatBubble message="He was amazing! Made a few friends at the park 🐾" time="5:04 PM" isOwner showCheck />
-            <ChatBubble message="Oh that makes me so happy, thank you!" time="5:06 PM" />
+          {currentWeekChanges.map((changes, i) => (
+            <ChatBubble
+              key={`cw-${i}`}
+              message={[
+                'I made changes to this week\'s schedule. Here\'s a summary:',
+                ...changes.map(c => fmtDayChange(c, true)),
+              ].join('\n')}
+              time="Just now"
+              isOwner
+              showCheck
+            />
+          ))}
 
-            <DayDivider label="Mar 13" />
-            <ChatBubble message="Hi! Just checking in — I didn't get a Rover Card notification. Was one started?" time="10:12 AM" />
+          {/* ── Mode B: agenda live events (messages, resolutions, scheduleChange bubbles) ── */}
+          {liveEvents.length > 0
+            && scheduleChanges.length === 0
+            && templateChanges.length === 0
+            && currentWeekChanges.length === 0
+            && !resolution && <DayDivider label="Today" />}
 
-          </>
-        )}
+          {liveEvents.map(event => {
+            if (event.type === 'message') {
+              return <ChatBubble key={event.id} message={event.text} time={event.time} isOwner showCheck />
+            }
+            if (event.type === 'resolution') {
+              return event.resolution === 'completed'
+                ? <BannerBlock key={event.id} text={`Walk from ${event.card?.dateLabel ?? ''} was marked as complete on ${event.timestamp}.`} />
+                : <BannerBlock key={event.id} text={`Walk from ${event.card?.dateLabel ?? ''} was cancelled on ${event.timestamp}. A refund of ${event.card?.cost ?? ''} has been processed.`} />
+            }
+            if (event.type === 'scheduleChange') {
+              if (event.text) {
+                return <ChatBubble key={event.id} message={event.text} time="Just now" isOwner showCheck />
+              }
+              if (event.changes) {
+                return (
+                  <ChatBubble
+                    key={event.id}
+                    message={[
+                      'I made changes to the upcoming schedule. Here\'s a summary:',
+                      ...event.changes.map(c => {
+                        const parts = []
+                        c.removed.forEach(t => parts.push(`${c.day}, ${c.date}: removed ${t}`))
+                        c.added.forEach(t => parts.push(`${c.day}, ${c.date}: added ${t}`))
+                        if (!c.removed.length && !c.added.length) parts.push(`${c.day}, ${c.date}: removed`)
+                        return parts.join('\n')
+                      }),
+                    ].join('\n')}
+                    time="Just now"
+                    isOwner
+                    showCheck
+                  />
+                )
+              }
+              return null
+            }
+            return null
+          })}
 
-        {/* ── Live events: resolutions, schedule changes, sent messages — in order ── */}
-        {liveEvents.length > 0 && <DayDivider label="Today" />}
-        {liveEvents.map(event => {
-          if (event.type === 'message') {
-            return <ChatBubble key={event.id} message={event.text} time={event.time} isOwner showCheck />
-          }
-          if (event.type === 'resolution') {
-            return event.resolution === 'completed'
-              ? <BannerBlock key={event.id} text={`Walk from ${event.card.dateLabel} was marked as complete on ${event.timestamp}.`} />
-              : <BannerBlock key={event.id} text={`Walk from ${event.card.dateLabel} was cancelled on ${event.timestamp}. A refund of ${event.card.cost} has been processed.`} />
-          }
-          if (event.type === 'scheduleChange') {
-            return (
-              <ChatBubble
-                key={event.id}
-                message={[
-                  'I made changes to the upcoming schedule. Here\'s a summary:',
-                  ...event.changes.map(c => {
-                    const parts = []
-                    c.removed.forEach(t => parts.push(`${c.day}, ${c.date}: removed ${t}`))
-                    c.added.forEach(t => parts.push(`${c.day}, ${c.date}: added ${t}`))
-                    if (!c.removed.length && !c.added.length) parts.push(`${c.day}, ${c.date}: removed`)
-                    return parts.join('\n')
-                  }),
-                ].join('\n')}
-                time="Just now"
-                isOwner
-                showCheck
-              />
-            )
-          }
-          return null
-        })}
-
-        <div ref={messagesEndRef} />
-      </div>}
+          <div ref={messagesEndRef} />
+        </div>
+      )}
 
       {/* ─── Composer ─── */}
-      {tab === 'messages' && <div style={{
-        borderTop: `1px solid ${colors.border}`, padding: '8px 12px',
-        display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0,
-      }}>
-        <Button variant="default" icon={<ImageIcon />} />
-        <input
-          value={text}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-          placeholder="Message"
-          style={{
-            flex: 1,
-            height: 44,
-            border: `2px solid ${colors.borderInteractive}`,
-            borderRadius: 8,
-            padding: '0 16px',
-            fontFamily: typography.fontFamily,
-            fontSize: 16,
-            color: colors.primary,
-            background: colors.white,
-            outline: 'none',
-            boxSizing: 'border-box',
-          }}
-        />
-        {text.trim() && (
-          <Button variant="primary" icon={<SendIcon />} onClick={sendMessage} />
-        )}
-      </div>}
+      {activeTab === 'messages' && (
+        <div style={{
+          borderTop: `1px solid ${colors.border}`, padding: '8px 12px',
+          display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0,
+        }}>
+          <Button variant="default" icon={<ImageIcon />} />
+          <input
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+            placeholder="Message"
+            style={{
+              flex: 1,
+              height: 44,
+              border: `2px solid ${colors.borderInteractive}`,
+              borderRadius: 8,
+              padding: '0 16px',
+              fontFamily: typography.fontFamily,
+              fontSize: 16,
+              color: colors.primary,
+              background: colors.white,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+          {text.trim() && (
+            <Button variant="primary" icon={<SendIcon />} onClick={sendMessage} />
+          )}
+        </div>
+      )}
     </div>
   )
 }

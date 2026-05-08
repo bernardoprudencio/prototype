@@ -164,6 +164,7 @@ export default function App() {
             owner={owner}
             liveEvents={ownerEvents}
             onLiveEvent={(event) => addLiveEvent(owner?.id, event)}
+            onOpenSchedule={() => animateTo('schedule', 'forward')}
             onBack={() => animateTo(null, 'back')}
           />
         )}
