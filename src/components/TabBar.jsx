@@ -9,11 +9,11 @@ const TABS = [
   { id: 'home',     label: 'HOME',     Icon: HomeOutlineIcon },
   { id: 'inbox',    label: 'INBOX',    Icon: InboxIcon },
   { id: 'calendar', label: 'CALENDAR', Icon: CalendarIcon },
-  { id: 'rebook',   label: 'REBOOK',   Icon: RebookIcon },
+  { id: 'rebook',   label: 'CONTACTS', Icon: RebookIcon },
   { id: 'more',     label: 'MORE',     Icon: MoreTabIcon },
 ]
 
-export default function TabBar({ activeTab = 'home' }) {
+export default function TabBar({ activeTab = 'home', onTabSelect }) {
   return (
     <div style={{
       display: 'flex', borderTop: `1px solid ${colors.border}`,
@@ -23,10 +23,14 @@ export default function TabBar({ activeTab = 'home' }) {
         const isActive = activeTab === id
         const iconColor = isActive ? colors.primary : colors.tertiary
         return (
-          <div key={id} style={{
-            flex: 1, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', padding: '5px 0 4px', cursor: 'pointer',
-          }}>
+          <div
+            key={id}
+            onClick={() => onTabSelect?.(id)}
+            style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', padding: '5px 0 4px', cursor: 'pointer',
+            }}
+          >
             <Icon color={iconColor} />
             <span style={{
               fontFamily: typography.fontFamily, fontWeight: 700,
