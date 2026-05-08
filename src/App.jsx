@@ -3,11 +3,11 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
-import { ActionSheet, ReviewSheet } from './components'
+import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
 import {
   HomeScreen, ConversationScreen, ScheduleScreen,
   InboxScreen, MoreScreen, RebookScreen, TestingModeScreen,
-  EditTemplateScreen, CurrentWeekScreen,
+  EditTemplateScreen, CurrentWeekScreen, RelationshipPage,
 } from './screens'
 import { OWNERS } from './data/owners'
 import { petImages } from './assets/images'
@@ -190,6 +190,16 @@ export default function App() {
           />
         )}
       </div>
+
+      {/* ── Relationship page overlay (z-10) — route-driven from RebookScreen ── */}
+      <Routes>
+        <Route path="/contacts/:ownerId" element={
+          <SlideOverlay zIndex={10}>
+            <RelationshipPage />
+          </SlideOverlay>
+        } />
+        <Route path="*" element={null} />
+      </Routes>
 
       <ActionSheet
         visible={!!sheetItem}
