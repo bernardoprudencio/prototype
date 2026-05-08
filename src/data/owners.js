@@ -1,6 +1,6 @@
 import { peopleImages, petImages } from '../assets/images'
 
-export const PROTO_TODAY = new Date(2026, 2, 20) // Friday, Mar 20, 2026
+export const PROTO_TODAY = new Date()
 
 const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const DAY_NAMES    = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
@@ -42,6 +42,13 @@ export const OWNERS = {
       { day: 'Wednesday', time: '9:00 AM' },
       { day: 'Friday',    time: '9:00 AM' },
     ],
+    pricing: {
+      pets: [
+        { petName: 'Koni',   rateType: 'Standard rate',      ratePerWalk: 20 },
+        { petName: 'Burley', rateType: 'Additional dog rate', ratePerWalk: 10 },
+      ],
+      addOns: [{ label: '60-min add-on', ratePerWalk: 10 }],
+    },
   },
   james: {
     id: 'james',
@@ -56,6 +63,10 @@ export const OWNERS = {
       { day: 'Tuesday',  time: '2:00 PM' },
       { day: 'Thursday', time: '2:00 PM' },
     ],
+    pricing: {
+      pets: [{ petName: 'Archie', rateType: 'Standard rate', ratePerWalk: 20 }],
+      addOns: [],
+    },
   },
   sarah: {
     id: 'sarah',
@@ -71,62 +82,45 @@ export const OWNERS = {
       { day: 'Wednesday', time: '4:00 PM' },
       { day: 'Friday',    time: '4:00 PM' },
     ],
+    pricing: {
+      pets: [{ petName: 'Milo', rateType: 'Standard rate', ratePerWalk: 20 }],
+      addOns: [],
+    },
   },
 }
 
-// ── RelationshipScreen unit helpers ───────────────────────────────────────────
-
-const DAY_TO_DOW = {
-  Sunday:0, Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6
-}
-
-const toHHMM = (time) => {
-  const [timePart, period] = time.split(' ')
-  let [h, m] = timePart.split(':').map(Number)
-  if (period === 'PM' && h !== 12) h += 12
-  if (period === 'AM' && h === 12) h = 0
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
-}
-
-export const getOwnerRelUnit = (owner, petIds = []) => {
-  // Anchor ~4 weeks before PROTO_TODAY (Monday-aligned) so it looks like an established relationship
-  const monday = new Date(PROTO_TODAY)
-  const dow = monday.getDay()
-  monday.setDate(monday.getDate() - (dow === 0 ? 6 : dow - 1) - 28)
-  const startDate = `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`
-
-  return {
-    id: 1,
-    serviceId: 'dog_walking',
-    startDate,
-    endDate: '',
-    repeatEndDate: '',
-    startTime: toHHMM(owner.template[0].time),
-    durationMins: owner.serviceDuration,
-    petIds,
-    frequency: 'weekly',
-    weekDays: owner.template.map(t => DAY_TO_DOW[t.day]),
-    everyNWeeks: 1,
-    skippedKeys: [],
-    overrides: {},
-  }
-}
+// Seed pets used by the agenda-mode RelationshipManagement screens (UnitEditor, AddSheet).
+export const PETS_SEED = [
+  { id: 1, name: 'Louie', breed: 'German Shepherd', emoji: '🐕' },
+  { id: 2, name: 'Mochi', breed: 'Scottish Fold',   emoji: '🐈' },
+]
 
 // ── Derived helpers ────────────────────────────────────────────────────────────
 
-// Today's walks across all owners, sorted by start time
-export const getTodayWalks = () => {
+// Today's walks across all owners, sorted by start time.
+// ownerCurrentWeeks: optional { ownerId: days[] } override from App state.
+export const getTodayWalks = (ownerCurrentWeeks = {}) => {
   const todayName = DAY_NAMES[PROTO_TODAY.getDay()]
   return Object.values(OWNERS)
-    .flatMap(owner =>
-      owner.template
+    .flatMap(owner => {
+      const currentWeekDays = ownerCurrentWeeks[owner.id]
+      if (currentWeekDays) {
+        return currentWeekDays
+          .filter(d => d.day === todayName)
+          .flatMap(d => d.slots.map(s => ({
+            owner,
+            time: s.time,
+            timeRange: formatTimeRange(s.time, owner.serviceDuration),
+          })))
+      }
+      return owner.template
         .filter(t => t.day === todayName)
         .map(t => ({
           owner,
           time: t.time,
           timeRange: formatTimeRange(t.time, owner.serviceDuration),
         }))
-    )
+    })
     .sort((a, b) => toMins(a.time) - toMins(b.time))
 }
 
@@ -144,6 +138,63 @@ export const getOwnerCurrentWeek = (owner) => {
   })
 }
 
+// Slot-based current week for editing (groups multiple times on same day)
+export const getOwnerCurrentWeekSlots = (owner) => {
+  const dow = PROTO_TODAY.getDay()
+  const daysFromMonday = dow === 0 ? 6 : dow - 1
+  const monday = new Date(PROTO_TODAY)
+  monday.setDate(PROTO_TODAY.getDate() - daysFromMonday)
+  monday.setHours(0, 0, 0, 0)
+
+  const grouped = []
+  owner.template.forEach(({ day, time }) => {
+    const existing = grouped.find(g => g.day === day)
+    if (existing) existing.times.push(time)
+    else grouped.push({ day, times: [time] })
+  })
+
+  return grouped.map((group, di) => {
+    const date = new Date(monday)
+    date.setDate(monday.getDate() + DAY_OFFSET[group.day])
+    return {
+      id: `${owner.id}-cw-d${di + 1}`,
+      day: group.day,
+      date: fmt(date),
+      slots: group.times.map((time, si) => ({
+        id: `${owner.id}-cw-d${di + 1}-s${si + 1}`,
+        time,
+      })),
+    }
+  })
+}
+
+// All 7 days of the current week, with template slots pre-populated
+export const getFullCurrentWeekSlots = (owner) => {
+  const dow = PROTO_TODAY.getDay()
+  const daysFromMonday = dow === 0 ? 6 : dow - 1
+  const monday = new Date(PROTO_TODAY)
+  monday.setDate(PROTO_TODAY.getDate() - daysFromMonday)
+  monday.setHours(0, 0, 0, 0)
+
+  const templateByDay = {}
+  owner.template.forEach(({ day, time }) => {
+    if (!templateByDay[day]) templateByDay[day] = []
+    templateByDay[day].push(time)
+  })
+
+  return DAY_NAMES.slice(1).concat('Sunday').map((day, i) => {
+    const date = new Date(monday)
+    date.setDate(monday.getDate() + i)
+    const times = templateByDay[day] || []
+    return {
+      id: `${owner.id}-cw-d${i + 1}`,
+      day,
+      date: fmt(date),
+      slots: times.map((time, si) => ({ id: `${owner.id}-cw-d${i + 1}-s${si + 1}`, time })),
+    }
+  })
+}
+
 // Upcoming 5 weeks starting next Monday, derived from owner template
 export const getOwnerUpcomingWeeks = (owner) => {
   const daysUntilMonday = (1 - PROTO_TODAY.getDay() + 7) % 7 || 7
@@ -151,17 +202,28 @@ export const getOwnerUpcomingWeeks = (owner) => {
   firstMonday.setDate(PROTO_TODAY.getDate() + daysUntilMonday)
   firstMonday.setHours(0, 0, 0, 0)
 
+  // Group template entries by day so multiple times on the same day share one row
+  const grouped = []
+  owner.template.forEach(({ day, time }) => {
+    const existing = grouped.find(g => g.day === day)
+    if (existing) existing.times.push(time)
+    else grouped.push({ day, times: [time] })
+  })
+
   return Array.from({ length: 5 }, (_, w) => {
     const monday = new Date(firstMonday)
     monday.setDate(firstMonday.getDate() + w * 7)
-    const days = owner.template.map((entry, di) => {
+    const days = grouped.map((group, di) => {
       const date = new Date(monday)
-      date.setDate(monday.getDate() + DAY_OFFSET[entry.day])
+      date.setDate(monday.getDate() + DAY_OFFSET[group.day])
       return {
         id: `${owner.id}-w${w + 1}-d${di + 1}`,
-        day: entry.day,
+        day: group.day,
         date: fmt(date),
-        slots: [{ id: `${owner.id}-w${w + 1}-d${di + 1}-s1`, time: entry.time }],
+        slots: group.times.map((time, si) => ({
+          id: `${owner.id}-w${w + 1}-d${di + 1}-s${si + 1}`,
+          time,
+        })),
       }
     })
     return { id: `${owner.id}-w${w + 1}`, label: fmt(monday), days }

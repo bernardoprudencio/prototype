@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { colors, typography, shadows } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
-import { getOwnerRelUnit } from '../data/owners'
+import { getOwnerRelUnit } from '../data/scheduleData'
 import { peopleImages, petImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
 import RelationshipScreen from './RelationshipScreen'
