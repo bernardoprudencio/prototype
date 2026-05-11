@@ -4,7 +4,7 @@ import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen } from './screens'
+import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, BoardingSettingsScreen } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
 
@@ -68,6 +68,8 @@ export default function App() {
         <Route path="/contacts" element={<RebookScreen />} />
         <Route path="/more" element={<MoreScreen />} />
         <Route path="/inbox" element={<InboxScreen />} />
+        <Route path="/service-settings" element={<ServiceSettingsScreen />} />
+        <Route path="/service-settings/boarding" element={<BoardingSettingsScreen />} />
       </Routes>
 
       {/* ── Conversation overlay (z-10) ── */}
