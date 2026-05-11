@@ -125,7 +125,7 @@ export default function MoreScreen() {
                 Icon={item.Icon}
                 title={item.title}
                 subtitle={item.subtitle}
-                onPress={item.onPress}
+                onPress={item.onPress ?? (item.route ? () => navigate(item.route) : undefined)}
               />
             ))}
           </div>

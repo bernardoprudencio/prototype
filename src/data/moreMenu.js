@@ -29,7 +29,7 @@ export const SITTER_MORE_MENU = [
   {
     title: 'Your business',
     items: [
-      { Icon: EditIcon,       title: 'Service settings',     onPress: noop },
+      { Icon: EditIcon,       title: 'Service settings',     route: '/service-settings' },
       { Icon: CreditCardIcon, title: 'Payments',             onPress: noop },
       { Icon: ChartIcon,      title: 'Insights',             onPress: noop },
       { Icon: FavoriteIcon,   title: 'Promote your profile', onPress: noop },
