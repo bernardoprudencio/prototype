@@ -25,23 +25,28 @@ const CheckSmIcon = () => (
  *   checkmark  {boolean}  If true, shows a checkmark icon when selected (radio-style).
  *   size       {'default'|'small'}  Default is regular (48 touch target).
  *                                  'small' is compact for filter rows.
+ *   disabled   {boolean}  Defaults to false. When true, the chip is non-interactive:
+ *                         onClick is not wired, cursor is default, label uses
+ *                         colors.tertiary, border uses colors.borderInteractive,
+ *                         and body opacity is reduced (~0.6) to read as muted.
  */
-export default function Chip({ label, selected, onClick, onRemove, checkmark, size = 'default', style }) {
+export default function Chip({ label, selected, onClick, onRemove, checkmark, size = 'default', style, disabled = false }) {
   const [xHover, setXHover] = useState(false)
   const isSmall = size === 'small'
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: isSmall ? 32 : 48 }}>
       <div
-        onMouseDown={onClick}
+        {...(disabled ? {} : { onMouseDown: onClick })}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isSmall ? 4 : 8,
           background: selected ? colors.blueLight : colors.white,
-          border: `2px solid ${selected ? colors.link : colors.borderInteractive}`,
+          border: `2px solid ${disabled ? colors.borderInteractive : (selected ? colors.link : colors.borderInteractive)}`,
           borderRadius: radius.primary,
           padding: isSmall ? '4px 10px' : '8px 12px',
           minWidth: isSmall ? 0 : 88,
-          cursor: onClick ? 'pointer' : 'default',
+          cursor: disabled ? 'default' : (onClick ? 'pointer' : 'default'),
+          opacity: disabled ? 0.6 : 1,
           userSelect: 'none', transition: 'border-color 0.1s, background 0.1s',
           ...style,
         }}
@@ -51,7 +56,7 @@ export default function Chip({ label, selected, onClick, onRemove, checkmark, si
           fontFamily: typography.fontFamily, fontWeight: 600,
           fontSize: isSmall ? 13 : 14,
           lineHeight: isSmall ? '18px' : '20px',
-          color: selected ? colors.primary : colors.secondary, whiteSpace: 'nowrap',
+          color: disabled ? colors.tertiary : (selected ? colors.primary : colors.secondary), whiteSpace: 'nowrap',
         }}>
           {label}
         </span>
