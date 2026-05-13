@@ -155,6 +155,13 @@ export const SITTER_PROFILE = {
   },
   business: {
     backgroundCheckPassed: true,
+    // Anchored to module-load time (~2 months ago) so the displayed "Passed on"
+    // date always reads as recent relative to today, without being hardcoded.
+    backgroundCheckPassedAt: (() => {
+      const d = new Date()
+      d.setMonth(d.getMonth() - 2)
+      return d
+    })(),
   },
   // Stub destinations — all unused by the prototype today; included so that
   // future wiring of rows to outbound links has a single place to update.
