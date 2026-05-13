@@ -105,6 +105,11 @@ export default function PresentationsScreen() {
           subtitle="Leadership review · April 30, 2026"
           onPress={() => navigate('/presentations/leadership-review')}
         />
+        <MenuRow
+          title="Management hub migration"
+          subtitle="Leadership review · May 14, 2026"
+          onPress={() => navigate('/presentations/mgmt-hub-migration')}
+        />
       </div>
     </div>
   )
