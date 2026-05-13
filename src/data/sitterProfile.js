@@ -149,7 +149,9 @@ export const SITTER_PROFILE = {
   ],
   boarding: BOARDING_SETTINGS,
   profile: {
-    testimonialsComplete: true,
+    petSitting: { testimonialsComplete: true },
+    training:   { testimonialsComplete: false },
+    grooming:   {},
   },
   business: {
     backgroundCheckPassed: true,

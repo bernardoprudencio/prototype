@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react'
+import { DEFAULT_FAMILY_IN_GEO, DEFAULT_SERVICE_STATES } from '../data/sitterServices'
 
 const AppContext = createContext(null)
 
@@ -6,6 +7,23 @@ const SCHEDULE_MODE_KEY = 'scheduleMode'
 const readInitialMode = () => {
   if (typeof window === 'undefined') return 'modification'
   return window.localStorage.getItem(SCHEDULE_MODE_KEY) ?? 'modification'
+}
+
+const SERVICE_STATES_KEY = 'serviceStates'
+const FAMILY_IN_GEO_KEY = 'familyInGeo'
+
+const readInitialServiceStates = () => {
+  if (typeof window === 'undefined') return DEFAULT_SERVICE_STATES
+  const raw = window.localStorage.getItem(SERVICE_STATES_KEY)
+  if (!raw) return DEFAULT_SERVICE_STATES
+  try { return JSON.parse(raw) } catch { return DEFAULT_SERVICE_STATES }
+}
+
+const readInitialFamilyInGeo = () => {
+  if (typeof window === 'undefined') return DEFAULT_FAMILY_IN_GEO
+  const raw = window.localStorage.getItem(FAMILY_IN_GEO_KEY)
+  if (!raw) return DEFAULT_FAMILY_IN_GEO
+  try { return JSON.parse(raw) } catch { return DEFAULT_FAMILY_IN_GEO }
 }
 
 export function AppProvider({ children }) {
@@ -56,6 +74,24 @@ export function AppProvider({ children }) {
     }
   }
 
+  // ── Service variant config (dev-only, persisted) ──────────────────────────
+  const [serviceStates, setServiceStatesRaw] = useState(readInitialServiceStates)
+  const [familyInGeo, setFamilyInGeoRaw]     = useState(readInitialFamilyInGeo)
+
+  const setServiceStates = (next) => {
+    setServiceStatesRaw(next)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SERVICE_STATES_KEY, JSON.stringify(next))
+    }
+  }
+
+  const setFamilyInGeo = (next) => {
+    setFamilyInGeoRaw(next)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(FAMILY_IN_GEO_KEY, JSON.stringify(next))
+    }
+  }
+
   return (
     <AppContext.Provider value={{
       // shared
@@ -73,6 +109,9 @@ export function AppProvider({ children }) {
       ownerUnits, setOwnerUnits,
       // mode switch
       scheduleMode, setScheduleMode,
+      // service variant config
+      serviceStates, setServiceStates,
+      familyInGeo, setFamilyInGeo,
     }}>
       {children}
     </AppContext.Provider>
