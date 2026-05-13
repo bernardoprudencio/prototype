@@ -39,6 +39,7 @@ import ChooseProfileSheet from '../components/ChooseProfileSheet'
 import ServiceVariantConfigSheet from '../components/ServiceVariantConfigSheet'
 import Button from '../components/Button'
 import { useApp } from '../context/AppContext'
+import { useMediaQuery } from '../lib/useMediaQuery'
 
 // Service id → icon component. Each service icon hardcodes its own color so
 // the rendered visual state cannot drift from the data layer.
@@ -277,11 +278,11 @@ const resolveCompletion = (path, profile) => {
 // Used for: each active family group, Business, and About you. "Other
 // services" and "Destructive area" render without this wrapper because
 // Figma drops the rule under those sections.
-const SectionGroup = ({ children }) => (
+const SectionGroup = ({ children, borderless = false }) => (
   <div
     style={{
       paddingBottom: 40,
-      borderBottom: `1px solid ${colors.border}`,
+      borderBottom: borderless ? 'none' : `1px solid ${colors.border}`,
     }}
   >
     {children}
@@ -300,6 +301,7 @@ export default function ServiceSettingsScreen() {
   // Missing key === collapsed (sub-sections default to collapsed when multiple
   // families render). Transient UI state — does not persist.
   const [expandedSubsections, setExpandedSubsections] = useState({})
+  const isTwoCol = useMediaQuery('(min-width: 880px)')
   const onBack = () => navigate('/more')
   const openProfileSheet = () => setProfileSheetOpen(true)
   const closeProfileSheet = () => setProfileSheetOpen(false)
@@ -340,7 +342,7 @@ export default function ServiceSettingsScreen() {
   // Carets on Services/Profile sub-headings only render when more than one
   // primary family is active. Single-family variants stay caret-free to match
   // their standalone Figma frames.
-  const subsectionsCollapsible = primaryFamilies.length > 1
+  const subsectionsCollapsible = primaryFamilies.length > 1 && !isTwoCol
 
   const toggleFamilyExpansion = (family) =>
     setExpandedFamilies((prev) => ({ ...prev, [family]: !prev[family] }))
@@ -409,217 +411,235 @@ export default function ServiceSettingsScreen() {
           paddingRight: 16,
         }}
       >
-        {primaryFamilies.map((family, idx) => {
-          const activeServices = getActiveServices(family, serviceStates)
-          const inactiveServices = getInactiveServices(family, serviceStates)
-          const isExpanded = !!expandedFamilies[family]
+        <div
+          style={{
+            display: isTwoCol ? 'grid' : 'block',
+            gridTemplateColumns: isTwoCol ? '1fr 1fr' : undefined,
+            columnGap: isTwoCol ? 80 : undefined,
+            alignItems: isTwoCol ? 'start' : undefined,
+            maxWidth: 1140,
+            width: '100%',
+            margin: '0 auto',
+          }}
+        >
+          {/* Column A: primary families + Other services */}
+          <div>
+            {primaryFamilies.map((family, idx) => {
+              const activeServices = getActiveServices(family, serviceStates)
+              const inactiveServices = getInactiveServices(family, serviceStates)
+              const isExpanded = !!expandedFamilies[family]
 
-          return (
-            <SectionGroup key={family}>
-              <div>
-                <SectionHeader
-                  title={FAMILY_LABEL[family]}
-                  rightLinkLabel="View profile"
-                  onRightLink={handleViewProfile(family)}
-                  topPadding={idx === 0 ? 24 : 40}
-                />
+              return (
+                <SectionGroup key={family} borderless={isTwoCol}>
+                  <div>
+                    <SectionHeader
+                      title={FAMILY_LABEL[family]}
+                      rightLinkLabel="View profile"
+                      onRightLink={handleViewProfile(family)}
+                      topPadding={idx === 0 ? 24 : 40}
+                    />
 
-                {/* Services sub-heading + active rows */}
-                <SubHeading
-                  Icon={ListIcon}
-                  title="Services"
-                  topPadding={32}
-                  collapsible={subsectionsCollapsible}
-                  collapsed={!expandedSubsections[family]?.services}
-                  onToggle={() => toggleSubsection(family, 'services')}
-                />
-                {(!subsectionsCollapsible || expandedSubsections[family]?.services) && (
-                  <>
-                    {activeServices.map((svc) => {
-                      const ServiceIcon = SERVICE_ICON_BY_ID[svc.id]
-                      const onRowPress =
-                        svc.id === 'boarding'
-                          ? () => navigate('/service-settings/boarding')
-                          : noop
-                      return (
-                        <SettingsRow
-                          key={svc.id}
-                          leftIcon={ServiceIcon ? <ServiceIcon /> : null}
-                          label={svc.label}
-                          statusLines={getActiveServiceStatusLines(svc)}
-                          rightItem={<Chevron />}
-                          onPress={onRowPress}
-                        />
-                      )
-                    })}
-
-                    {/* Add a new service — expandable, reveals inactive services inline */}
-                    {inactiveServices.length > 0 && (
+                    {/* Services sub-heading + active rows */}
+                    <SubHeading
+                      Icon={ListIcon}
+                      title="Services"
+                      topPadding={32}
+                      collapsible={subsectionsCollapsible}
+                      collapsed={!expandedSubsections[family]?.services}
+                      onToggle={() => toggleSubsection(family, 'services')}
+                    />
+                    {(!subsectionsCollapsible || expandedSubsections[family]?.services) && (
                       <>
-                        <SettingsRow
-                          leftIcon={<ListIcon size={24} color={colors.secondary} />}
-                          label="Add a new service"
-                          sublabel={joinServiceLabels(inactiveServices)}
-                          rightItem={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                          onPress={() => toggleFamilyExpansion(family)}
-                        />
-                        {isExpanded && inactiveServices.map((svc) => {
+                        {activeServices.map((svc) => {
                           const ServiceIcon = SERVICE_ICON_BY_ID[svc.id]
+                          const onRowPress =
+                            svc.id === 'boarding'
+                              ? () => navigate('/service-settings/boarding')
+                              : noop
                           return (
                             <SettingsRow
                               key={svc.id}
-                              leftIcon={ServiceIcon ? <ServiceIcon color={colors.tertiary} /> : null}
+                              leftIcon={ServiceIcon ? <ServiceIcon /> : null}
                               label={svc.label}
-                              statusLines={[{ text: 'Inactive', color: 'tertiary' }]}
+                              statusLines={getActiveServiceStatusLines(svc)}
                               rightItem={<Chevron />}
-                              onPress={noop}
+                              onPress={onRowPress}
                             />
                           )
                         })}
+
+                        {/* Add a new service — expandable, reveals inactive services inline */}
+                        {inactiveServices.length > 0 && (
+                          <>
+                            <SettingsRow
+                              leftIcon={<ListIcon size={24} color={colors.secondary} />}
+                              label="Add a new service"
+                              sublabel={joinServiceLabels(inactiveServices)}
+                              rightItem={isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                              onPress={() => toggleFamilyExpansion(family)}
+                            />
+                            {isExpanded && inactiveServices.map((svc) => {
+                              const ServiceIcon = SERVICE_ICON_BY_ID[svc.id]
+                              return (
+                                <SettingsRow
+                                  key={svc.id}
+                                  leftIcon={ServiceIcon ? <ServiceIcon color={colors.tertiary} /> : null}
+                                  label={svc.label}
+                                  statusLines={[{ text: 'Inactive', color: 'tertiary' }]}
+                                  rightItem={<Chevron />}
+                                  onPress={noop}
+                                />
+                              )
+                            })}
+                          </>
+                        )}
                       </>
                     )}
-                  </>
-                )}
 
-                {/* Profile sub-heading + family-specific rows (Phase 3). Rows come
-                    from `getFamilyProfileRows(family)` so each family renders
-                    its own row set. Skip the SubHeading entirely if a family
-                    has no profile rows defined. */}
-                {(() => {
-                  const profileRows = getFamilyProfileRows(family)
-                  if (profileRows.length === 0) return null
-                  return (
-                    <>
-                      <SubHeading
-                        Icon={PersonIcon}
-                        title="Profile"
-                        topPadding={32}
-                        collapsible={subsectionsCollapsible}
-                        collapsed={!expandedSubsections[family]?.profile}
-                        onToggle={() => toggleSubsection(family, 'profile')}
-                      />
-                      {(!subsectionsCollapsible || expandedSubsections[family]?.profile) && profileRows.map((row) => {
-                        const isComplete = resolveCompletion(row.completionKey, profile)
-                        return (
-                          <SettingsRow
-                            key={row.id}
-                            label={row.label}
-                            sublabel={row.sublabel}
-                            rightItem={isComplete ? <CheckCircleIcon /> : <Chevron />}
-                            onPress={noop}
+                    {/* Profile sub-heading + family-specific rows (Phase 3). Rows come
+                        from `getFamilyProfileRows(family)` so each family renders
+                        its own row set. Skip the SubHeading entirely if a family
+                        has no profile rows defined. */}
+                    {(() => {
+                      const profileRows = getFamilyProfileRows(family)
+                      if (profileRows.length === 0) return null
+                      return (
+                        <>
+                          <SubHeading
+                            Icon={PersonIcon}
+                            title="Profile"
+                            topPadding={32}
+                            collapsible={subsectionsCollapsible}
+                            collapsed={!expandedSubsections[family]?.profile}
+                            onToggle={() => toggleSubsection(family, 'profile')}
                           />
-                        )
-                      })}
-                    </>
-                  )
-                })()}
-              </div>
-            </SectionGroup>
-          )
-        })}
-
-        {/* ── Other services ── (no trailing border in Figma) */}
-        {otherFamilies.length > 0 && (
-          <div>
-            <SectionHeader title="Other services" topPadding={40} />
-            {otherFamilies.map((family) => {
-              const Icon = FAMILY_SIGNUP_ICON[family]
-              const signup = FAMILY_SIGNUP[family]
-              return (
-                <SettingsRow
-                  key={family}
-                  leftIcon={Icon ? <Icon color={colors.tertiary} /> : null}
-                  label={signup.label}
-                  sublabel={signup.sublabel}
-                  rightItem={<Chevron />}
-                  onPress={noop}
-                />
+                          {(!subsectionsCollapsible || expandedSubsections[family]?.profile) && profileRows.map((row) => {
+                            const isComplete = resolveCompletion(row.completionKey, profile)
+                            return (
+                              <SettingsRow
+                                key={row.id}
+                                label={row.label}
+                                sublabel={row.sublabel}
+                                rightItem={isComplete ? <CheckCircleIcon /> : <Chevron />}
+                                onPress={noop}
+                              />
+                            )
+                          })}
+                        </>
+                      )
+                    })()}
+                  </div>
+                </SectionGroup>
               )
             })}
+
+            {/* ── Other services ── (no trailing border in Figma) */}
+            {otherFamilies.length > 0 && (
+              <div>
+                <SectionHeader title="Other services" topPadding={40} />
+                {otherFamilies.map((family) => {
+                  const Icon = FAMILY_SIGNUP_ICON[family]
+                  const signup = FAMILY_SIGNUP[family]
+                  return (
+                    <SettingsRow
+                      key={family}
+                      leftIcon={Icon ? <Icon color={colors.tertiary} /> : null}
+                      label={signup.label}
+                      sublabel={signup.sublabel}
+                      rightItem={<Chevron />}
+                      onPress={noop}
+                    />
+                  )
+                })}
+              </div>
+            )}
           </div>
-        )}
 
-        {/* ── Business ── */}
-        <SectionGroup>
-          <SectionHeader title="Business" topPadding={40} />
+          {/* Column B: Business + About you + Destructive area */}
+          <div>
+            {/* ── Business ── */}
+            <SectionGroup borderless={isTwoCol}>
+              <SectionHeader title="Business" topPadding={isTwoCol ? 24 : 40} />
 
-          <SettingsRow
-            label="Availability"
-            sublabel="Manage the availability for your pet sitting services"
-            rightItem={<Chevron />}
-            onPress={noop}
-          />
-          <SettingsRow
-            label="Insights"
-            sublabel="Check your profile and business performance"
-            rightItem={<Chevron />}
-            onPress={noop}
-          />
-          <SettingsRow
-            label="Promote your profile"
-            sublabel="Your profile link offers pet parents a $20 off their first booking with Rover."
-            rightItem={<Chevron />}
-            onPress={noop}
-          />
-          <SettingsRow
-            label="Receive payments"
-            sublabel="Update payment details on Stripe"
-            rightItem={<Chevron />}
-            onPress={noop}
-          />
-          <SettingsRow
-            label="Background check"
-            sublabel="You passed the background check"
-            rightItem={business.backgroundCheckPassed ? <CheckCircleIcon /> : <Chevron />}
-            onPress={noop}
-          />
-        </SectionGroup>
+              <SettingsRow
+                label="Availability"
+                sublabel="Manage the availability for your pet sitting services"
+                rightItem={<Chevron />}
+                onPress={noop}
+              />
+              <SettingsRow
+                label="Insights"
+                sublabel="Check your profile and business performance"
+                rightItem={<Chevron />}
+                onPress={noop}
+              />
+              <SettingsRow
+                label="Promote your profile"
+                sublabel="Your profile link offers pet parents a $20 off their first booking with Rover."
+                rightItem={<Chevron />}
+                onPress={noop}
+              />
+              <SettingsRow
+                label="Receive payments"
+                sublabel="Update payment details on Stripe"
+                rightItem={<Chevron />}
+                onPress={noop}
+              />
+              <SettingsRow
+                label="Background check"
+                sublabel="You passed the background check"
+                rightItem={business.backgroundCheckPassed ? <CheckCircleIcon /> : <Chevron />}
+                onPress={noop}
+              />
+            </SectionGroup>
 
-        {/* ── About you ── */}
-        <SectionGroup>
-          <SectionHeader
-            title="About you"
-            rightLinkLabel="View profile"
-            onRightLink={noop}
-            topPadding={40}
-          />
+            {/* ── About you ── */}
+            <SectionGroup borderless={isTwoCol}>
+              <SectionHeader
+                title="About you"
+                rightLinkLabel="View profile"
+                onRightLink={noop}
+                topPadding={40}
+              />
 
-          <SettingsRow
-            label="Details"
-            sublabel="Address, photo, email and age"
-            rightItem={<Chevron />}
-            onPress={noop}
-          />
-          <SettingsRow
-            label="Pets"
-            sublabel="Add your pets"
-            rightItem={<Chevron />}
-            onPress={noop}
-          />
-          <SettingsRow
-            label="Phone numbers"
-            sublabel="Edit your number and emergency contact"
-            rightItem={<Chevron />}
-            onPress={noop}
-          />
-          <SettingsRow
-            label="Payment methods"
-            sublabel="Default method for payments on Rover"
-            rightItem={<Chevron />}
-            onPress={noop}
-          />
-        </SectionGroup>
+              <SettingsRow
+                label="Details"
+                sublabel="Address, photo, email and age"
+                rightItem={<Chevron />}
+                onPress={noop}
+              />
+              <SettingsRow
+                label="Pets"
+                sublabel="Add your pets"
+                rightItem={<Chevron />}
+                onPress={noop}
+              />
+              <SettingsRow
+                label="Phone numbers"
+                sublabel="Edit your number and emergency contact"
+                rightItem={<Chevron />}
+                onPress={noop}
+              />
+              <SettingsRow
+                label="Payment methods"
+                sublabel="Default method for payments on Rover"
+                rightItem={<Chevron />}
+                onPress={noop}
+              />
+            </SectionGroup>
 
-        {/* ── Destructive area (last) — no trailing border ── */}
-        <div>
-          <SectionHeader title="Destructive area" topPadding={40} />
-          <SettingsRow
-            label="Stop providing services"
-            labelColor={colors.destructive}
-            sublabel="Confirm you no longer want to provide services on Rover"
-            rightItem={<BlockedIcon />}
-            onPress={noop}
-          />
+            {/* ── Destructive area (last) — no trailing border ── */}
+            <div>
+              <SectionHeader title="Destructive area" topPadding={40} />
+              <SettingsRow
+                label="Stop providing services"
+                labelColor={colors.destructive}
+                sublabel="Confirm you no longer want to provide services on Rover"
+                rightItem={<BlockedIcon />}
+                onPress={noop}
+              />
+            </div>
+          </div>
         </div>
 
         <div style={{ paddingTop: 40, paddingBottom: 40 }}>

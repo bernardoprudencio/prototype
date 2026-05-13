@@ -635,3 +635,236 @@ Reference frames: [`386:15719`](https://www.figma.com/design/x1xUx02kgeKrRgSeVXF
 4. **Variant 5 (`All services`) via Configure variants:** each of Pet sitting, Training, and Grooming family groups has its own trailing rule. Business and About you also have trailing rules. Destructive area has no rule under it.
 5. The `SectionHeader` title font visibly differs from before (Averta is the narrower body face; Bogart is the rounder display face). All other text (sub-section labels, row labels, sublabels) is unchanged.
 6. Existing Boarding drill-down (`/service-settings/boarding`) is unaffected.
+
+---
+
+## Phase 5 — Two-column layout at wide widths
+
+**Status:** implementation complete, awaiting user verification in browser. `npm run build` passes.
+
+**What landed:**
+- [src/lib/useMediaQuery.js](src/lib/useMediaQuery.js) — new file. Exports `useMediaQuery(query)`; SSR-safe `typeof window` init, listens to `change` events, cleans up on unmount. Matches Decision #3.
+- [src/screens/ServiceSettingsScreen.jsx](src/screens/ServiceSettingsScreen.jsx):
+  - L42 — imports `useMediaQuery` from `../lib/useMediaQuery`.
+  - L280-290 — `SectionGroup` now accepts an optional `borderless` prop (default `false`); trailing border resolves to `'none'` when set, preserving the Phase 4 1px `colors.border` rule below the breakpoint.
+  - L296 — `const isTwoCol = useMediaQuery('(min-width: 880px)')` added alongside the other `useState` hooks.
+  - L344 — `subsectionsCollapsible = primaryFamilies.length > 1 && !isTwoCol` (Phase 3.5 carets suppressed above the breakpoint per Decision #6).
+  - L404-636 — body restructured. The scroll-container now holds a grid wrapper that switches to `display: grid; gridTemplateColumns: '1fr 1fr'; columnGap: 80; alignItems: start` when `isTwoCol`. The wrapper unconditionally caps at `maxWidth: 1140, width: '100%', margin: '0 auto'` — matches the existing codebase pattern used in [ScheduleScreen.jsx:1051](src/screens/ScheduleScreen.jsx#L1051), [CurrentWeekScreen.jsx:528](src/screens/CurrentWeekScreen.jsx#L528), and [EditTemplateScreen.jsx:697](src/screens/EditTemplateScreen.jsx#L697), so wide desktop viewports don't let columns grow indefinitely. Column A renders the primary-families loop + "Other services"; column B renders Business, About you, Destructive area. Every `SectionGroup` call site passes `borderless={isTwoCol}`. The `Business` `SectionHeader` uses `topPadding={isTwoCol ? 24 : 40}` so it top-aligns with column A's first family. The `Configure variants` Flat button remains the final child of the scroll-container, outside the grid (full width below both columns).
+- No data-layer, context, chip, sheet, `global.css`, icon, or token changes.
+
+**Goal:** at viewports wide enough to fit two 375px columns side-by-side, the Service settings body reflows into a two-column grid (left = service families + profiles, right = Business / About you / Destructive area) and the Phase 3.5 collapse affordance on `Services` / `Profile` sub-headings is suppressed entirely, regardless of how many primary families are active.
+
+### Figma reference
+
+- **Desktop / all (two-column):** [`386:15839`](https://www.figma.com/design/x1xUx02kgeKrRgSeVXF7bV/-UX2-2136--Provider-settings?node-id=386-15839) — the canonical Phase 5 frame.
+- **Single-column references (Phase 4 baseline, unchanged below the breakpoint):** [`386:16335`](https://www.figma.com/design/x1xUx02kgeKrRgSeVXF7bV/-UX2-2136--Provider-settings?node-id=386-16335) pet sitting partial, [`386:16393`](https://www.figma.com/design/x1xUx02kgeKrRgSeVXF7bV/-UX2-2136--Provider-settings?node-id=386-16393) training only, [`386:15719`](https://www.figma.com/design/x1xUx02kgeKrRgSeVXF7bV/-UX2-2136--Provider-settings?node-id=386-15719) all active.
+
+### Figma findings (from `386:15839`)
+
+- **Outer page width:** 1445px frame; the body content is constrained to `max-w-[1140px]`.
+- **Scroll-container layout:** `flex gap-[var(--20x,80px)] items-start max-w-[1140px] px-0 py-[var(--6x,24px)]` — an **80px column gap**, no horizontal padding on the container itself (the page's 16px gutter still sits on the outer screen-body wrapper), 24px top/bottom padding.
+- **Two equal columns** — both are `flex-[1_0_0]` with `min-w-px`. Equal share of the 1140px content area; ~530px each at the canonical width after subtracting the 80px gap. They are sized by `flex: 1`, not fixed widths, so they shrink/grow with viewport width above the breakpoint.
+- **Column A** (Figma node `386:15842`, `name="services"`) renders, top-to-bottom:
+  1. `Pet sitting` family group (`SectionHeader` with `View profile` Flat button + `Services` sub-section + `Profile` sub-section).
+  2. `Training` family group (same structure).
+  3. `Grooming` family group — in the `all` frame this header is rendered with a single inline `Sign-up to grooming` row (no Services / Profile sub-headings). The frame is treating Grooming-with-no-active-services as a primary section that contains the sign-up row, rather than batching it under a separate "Other services" header.
+- **Column B** (Figma node `386:15876`, `name="columns"`) renders, top-to-bottom:
+  1. `Business` `SectionHeader` + the 5 Business rows (Availability / Insights / Promote your profile / Receive payments / Background check).
+  2. `About you` `SectionHeader` (with `View profile` Flat button) + the 4 About-you rows.
+  3. `Destructive area` `SectionHeader` + `Stop providing services` row.
+- **Borders:** every section-header `📘 Row` in the two-column frame carries `border-0 border-[#d7dce0] border-solid` (i.e. **border-width 0** on all sides — Tailwind notation; the colour is declared but no edge is drawn). The Phase 4 inter-section trailing rule is **not** rendered in the two-column layout — the column gap and section-title `pt-24` spacing handle visual separation on their own.
+- **No collapse carets:** in the `all` frame at two-column width, the `Services` and `Profile` sub-headings render as plain headings with no chevron and no tap behavior — *even though* this is the multi-family case where Phase 3.5 would have shown carets in the single-column layout.
+- **Sub-section spacing inside a family group:** unchanged from the single-column frames. `pt-32` between `SectionHeader` and `Services`, `pt-32` between Services list and `Profile` heading, `pb-40` at the bottom of each family group. The "Other services" / sign-up inline row inside a family with no active services keeps its `py-16` row padding.
+- **First-section top padding:** the first row in each column uses `pt-24` (matches the scroll container's `py-24`). Subsequent `SectionHeader`s inside the same column use `pt-24` as well (the `📘 Row` wrapper handles its own `pt-24` per section).
+- **Breakpoint cue from Figma:** the two-column frame's content is 1140px wide. Halving that minus the 80px gap gives ~530px per column — well over the 375px minimum the user called out. With **375px minimum per column + 80px gap**, the theoretical content-width floor is `375 + 80 + 375 = 830px`. Adding the existing screen-body `paddingLeft/Right: 16` from [src/screens/ServiceSettingsScreen.jsx:408](src/screens/ServiceSettingsScreen.jsx#L408) puts the viewport floor at **862px**. Round up to **880px** for a clean breakpoint with a small headroom margin.
+
+### Decisions
+
+1. **Breakpoint: `min-width: 880px`.** Derivation: 375px × 2 + 80px gap + 16px × 2 side gutters = 862px; round up to 880px for cleaner mental math and a sliver of headroom. Anything < 880px stays single-column. **(Resolved.)**
+
+2. **Where the layout lifts** — the current phone-shell (`.phone-shell` in [src/global.css:101-110](src/global.css#L101)) is already `100vw × 100dvh` (full viewport — the "fixed 375×812 frame" wording in `CLAUDE.md` is outdated; the shell fills the viewport on desktop). **No `global.css` change is required.** The two-column reflow happens entirely inside `ServiceSettingsScreen` — its scroll-container becomes a CSS grid (`grid-template-columns: 1fr 1fr`, `gap: 80px`) above the breakpoint, and stays a single flow below it. **(Resolved — no global shell change.)**
+
+3. **Detecting the breakpoint — `useMediaQuery` hook** — no `matchMedia` / `useMediaQuery` exists in the codebase today (`grep -r "matchMedia\|useMediaQuery" src` returns nothing). Add a small new hook `src/lib/useMediaQuery.js`:
+   ```js
+   import { useEffect, useState } from 'react'
+
+   export function useMediaQuery(query) {
+     const [matches, setMatches] = useState(() =>
+       typeof window !== 'undefined' && window.matchMedia(query).matches
+     )
+     useEffect(() => {
+       const mql = window.matchMedia(query)
+       const onChange = (e) => setMatches(e.matches)
+       mql.addEventListener('change', onChange)
+       setMatches(mql.matches)
+       return () => mql.removeEventListener('change', onChange)
+     }, [query])
+     return matches
+   }
+   ```
+   Consumed in `ServiceSettingsScreen` as `const isTwoCol = useMediaQuery('(min-width: 880px)')`. This is the simplest fit for the codebase — inline styles, no CSS modules, no `:has()` polyfill concerns, no ResizeObserver wiring. **(Resolved.)**
+
+4. **Column-content split** — column A renders the primary family loop (`primaryFamilies.map(...)`) **and** the "Other services" section. Column B renders Business + About you + Destructive area. This matches the Figma node split (`386:15842` "services" column vs `386:15876` "columns" column) and reads naturally: "everything about the services I offer" on the left, "everything about my business / me / destructive controls" on the right. **(Resolved.)**
+
+   Caveat — in the Figma `all` frame, the Grooming family with no active services renders the `Sign-up to grooming` row *inside* the Grooming `SectionHeader` block (no separate "Other services" parent header). The current prototype renders these as a top-level `Other services` section. **The plan: keep the prototype's current "Other services" parent section** as a child of column A and place it *after* the primary family loop. Visually equivalent given the column gap, and avoids restructuring the data flow. **(Resolved with a divergence noted from Figma.)**
+
+5. **Section-group borders (Phase 4) are suppressed in two-column mode.** Figma drops the `border-b` rule in the two-column frame; the column gap and 40px section spacing carry the visual separation. Implementation: `SectionGroup` becomes parameterized — `<SectionGroup borderless>` skips the trailing border, or `SectionGroup` reads an ambient `isTwoCol` and drops the border itself. Recommended: pass `borderless={isTwoCol}` from each call site to keep the component dumb. **(Resolved.)**
+
+6. **Suppressing collapse carets in two-column mode.** Change [src/screens/ServiceSettingsScreen.jsx:343](src/screens/ServiceSettingsScreen.jsx#L343) from:
+   ```js
+   const subsectionsCollapsible = primaryFamilies.length > 1
+   ```
+   to:
+   ```js
+   const subsectionsCollapsible = primaryFamilies.length > 1 && !isTwoCol
+   ```
+   When `isTwoCol` is true, no caret renders, no tap handler attaches, and all sub-sections are always-expanded — matches the Figma two-column `all` frame which shows no carets despite three active families. The existing `expandedSubsections` state is *not* read in two-col mode (because the gating condition flips). It does not need to be reset — re-entering single-column at narrower widths simply resumes whatever transient state was stored, which is acceptable. **(Resolved.)**
+
+7. **`Configure variants` dev footer placement** — the button is dev-only scaffolding (not in any Figma frame). In two-column mode, place it **below both columns**, full-width inside the same 16px gutter as today. Implementation-wise: the grid wrapper only contains the two column groups; the `Configure variants` button stays as the final child of the scroll-container, after the grid, in its own `paddingTop: 40; paddingBottom: 40` wrapper. Spans the full content width naturally because it's outside the grid. **(Resolved.)**
+
+8. **`Add a new service` inline expansion** — works the same in two-col mode. It lives inside a family's Services sub-section (column A), already gated by `expandedFamilies[family]`. No layout change needed — the inline-expanded inactive-services list flows in the same place inside column A's narrower width. **(Resolved.)**
+
+9. **Mobile (≤ 420px) is unaffected.** The breakpoint is `min-width: 880px`; below it (i.e. all of mobile and tablet-portrait widths) the screen renders the existing single-column layout with Phase 3.5 collapse rules intact. **(Resolved — explicit non-goal.)**
+
+10. **Sticky header stays full-width** above the columns. The two-column grid is contained inside the body `<div>` (the existing `overflow-y: auto` container at [src/screens/ServiceSettingsScreen.jsx:403-411](src/screens/ServiceSettingsScreen.jsx#L403)); the sticky header at L357-400 spans the full screen and is unchanged. **(Resolved.)**
+
+11. **Open — vertical alignment of the two columns at the top of the scroll area.** The Figma frame uses `items-start` on the scroll container so columns top-align at `pt-24`. Both columns' first section uses `pt-24` on its `SectionHeader`. The current screen code passes `topPadding={idx === 0 ? 24 : 40}` to the first primary family but `topPadding={40}` to Business / About you / Destructive area. In two-col mode, the **first** `SectionHeader` of column B (`Business`) needs `topPadding={24}` to align with column A's `Pet sitting` header. **Decision flagged for the implementing session:** either (a) thread an `isTwoCol` prop through each `SectionHeader` call to swap 40→24 for the first item of column B, or (b) restructure column B as its own `primaryColumnTopPadding`-aware wrapper. Recommend (a) — it's one prop swap and matches Figma exactly.
+
+12. **Open — `Other services` parent-section title within column A.** In the prototype, "Other services" is its own top-level `SectionHeader` with `topPadding={40}`. In the Figma two-col frame, there is no such header — the sign-up rows live *inside* the relevant family `SectionGroup`. For Phase 5 the recommended path is to keep the prototype's existing "Other services" wrapper (per Decision #4 caveat) but **drop its `SectionGroup` border** in two-col mode (already covered by Decision #5). If the user wants strict Figma fidelity later, restructure so empty-of-active-services families render their sign-up row inline under their own header (a follow-up — out of scope for Phase 5).
+
+### Deliverables
+
+1. **`src/lib/useMediaQuery.js`** *(new file)* — the hook from Decision #3. Single named export `useMediaQuery(query: string): boolean`. SSR-safe `typeof window` guard on init. Listens to `change` events, cleans up on unmount.
+
+2. **[src/screens/ServiceSettingsScreen.jsx](src/screens/ServiceSettingsScreen.jsx)** — the bulk of the work lives here:
+
+   1. **Import the hook** alongside the existing imports:
+      ```js
+      import { useMediaQuery } from '../lib/useMediaQuery'
+      ```
+
+   2. **Add the breakpoint detection** inside the component, near the existing `useState` calls (~L293):
+      ```js
+      const isTwoCol = useMediaQuery('(min-width: 880px)')
+      ```
+
+   3. **Suppress collapse carets in two-column mode** — update [L343](src/screens/ServiceSettingsScreen.jsx#L343):
+      ```js
+      const subsectionsCollapsible = primaryFamilies.length > 1 && !isTwoCol
+      ```
+
+   4. **Parameterize `SectionGroup`** ([L280-289](src/screens/ServiceSettingsScreen.jsx#L280)) to accept a `borderless` prop:
+      ```jsx
+      const SectionGroup = ({ children, borderless = false }) => (
+        <div
+          style={{
+            paddingBottom: 40,
+            borderBottom: borderless ? 'none' : `1px solid ${colors.border}`,
+          }}
+        >
+          {children}
+        </div>
+      )
+      ```
+
+   5. **Wrap the body in a column grid above the breakpoint.** Replace the current single-flow body ([L403-635](src/screens/ServiceSettingsScreen.jsx#L403)) with a structure roughly:
+      ```jsx
+      <div
+        className="hide-scrollbar"
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          paddingLeft: 16,
+          paddingRight: 16,
+        }}
+      >
+        <div
+          style={{
+            display: isTwoCol ? 'grid' : 'block',
+            gridTemplateColumns: isTwoCol ? '1fr 1fr' : undefined,
+            columnGap: isTwoCol ? 80 : undefined,
+            alignItems: isTwoCol ? 'start' : undefined,
+            maxWidth: isTwoCol ? 1140 : undefined,
+            marginLeft: isTwoCol ? 'auto' : undefined,
+            marginRight: isTwoCol ? 'auto' : undefined,
+          }}
+        >
+          {/* Column A: primary families + Other services */}
+          <div>
+            {primaryFamilies.map((family, idx) => (
+              <SectionGroup key={family} borderless={isTwoCol}>
+                {/* existing family-group JSX */}
+              </SectionGroup>
+            ))}
+            {otherFamilies.length > 0 && (
+              <div>{/* Other services section as-is */}</div>
+            )}
+          </div>
+
+          {/* Column B: Business + About you + Destructive area */}
+          <div>
+            <SectionGroup borderless={isTwoCol}>
+              <SectionHeader title="Business" topPadding={isTwoCol ? 24 : 40} />
+              {/* Business rows */}
+            </SectionGroup>
+            <SectionGroup borderless={isTwoCol}>
+              <SectionHeader title="About you" rightLinkLabel="View profile" onRightLink={noop} topPadding={40} />
+              {/* About you rows */}
+            </SectionGroup>
+            <div>
+              <SectionHeader title="Destructive area" topPadding={40} />
+              {/* Destructive row */}
+            </div>
+          </div>
+        </div>
+
+        {/* Configure variants stays as the last child of the scroll-container — outside the grid */}
+        <div style={{ paddingTop: 40, paddingBottom: 40 }}>
+          <Button variant="flat" size="small" fullWidth onClick={() => setConfigSheetOpen(true)}>
+            Configure variants
+          </Button>
+        </div>
+      </div>
+      ```
+      Notes:
+      - The grid's `maxWidth: 1140` + `margin: auto` matches Figma's `max-w-[1140px]` content cap; below the breakpoint the wrapper is `display: block` and the cap doesn't apply (the existing 16px gutter and full-width flow are unchanged).
+      - `alignItems: 'start'` matches Figma's `items-start` so columns top-align rather than stretch.
+      - All `SectionGroup` call sites pass `borderless={isTwoCol}` so the Phase 4 trailing rule is suppressed in two-column mode and preserved below the breakpoint.
+      - The first primary family's `topPadding={idx === 0 ? 24 : 40}` rule stays the same — `pt-24` matches Figma at the top of column A. Column B's `Business` header switches to `topPadding={isTwoCol ? 24 : 40}` per Decision #11.
+
+3. **No data-layer changes.** [src/data/sitterServices.js](src/data/sitterServices.js), [src/data/sitterProfile.js](src/data/sitterProfile.js), [src/context/AppContext.jsx](src/context/AppContext.jsx), and all chip / sheet components are untouched.
+
+4. **No `global.css` change.** Phone-shell stays as `width: 100vw; height: 100dvh` (already full-viewport). The mobile media query at L112-121 (`max-width: 420px`) is unaffected.
+
+5. **No icon / token changes.** `colors.border` and the existing icon set are reused.
+
+### Out of scope
+
+- Tablet-specific typography polish — Heading 300 stays 20px across both modes.
+- Persisting the column split as a user preference — purely viewport-driven.
+- Animating the column reflow on resize (Figma shows no transitional state).
+- Restructuring "Other services" to render its sign-up rows inline under empty-family headers à la the Figma `all` frame (Decision #12 follow-up — punt unless user-test surfaces it).
+- Three-column layouts at ultra-wide viewports — Figma only specifies two-column.
+- Adapting any other screen (`HomeScreen`, `InboxScreen`, `RelationshipScreen`, etc.) to two-column. Phase 5 is `ServiceSettingsScreen` only.
+
+### Critical files
+
+- **New:** [src/lib/useMediaQuery.js](src/lib/useMediaQuery.js)
+- [src/screens/ServiceSettingsScreen.jsx](src/screens/ServiceSettingsScreen.jsx)
+
+### Parallelization
+
+Single agent, sequential. Step 1 (the hook) and step 2 (screen wiring) are tightly coupled and the whole change is ~80 lines in one file plus a small new file. Run `npm run build` before reporting done.
+
+### Verification (by user)
+
+1. `npm run dev` → More → Service settings.
+2. **Below the breakpoint (resize browser to ~700px or use mobile DevTools):** screen renders exactly as Phase 4 — single column, section borders visible under each `SectionGroup`, collapse carets present iff multiple primary families are active.
+3. **Resize past 880px wide:** body reflows into two columns with an 80px gap and an 1140px content cap. Column A: Pet sitting / Training / Grooming families (and "Other services" if any sign-up rows exist). Column B: Business / About you / Destructive area.
+4. **In two-column mode with `All services` preset:** all three families render stacked in column A; the `Services` and `Profile` sub-headings render **without** carets (despite multiple families being active — Phase 3.5's caret rule is suppressed above the breakpoint).
+5. **In two-column mode:** the Phase 4 inter-section trailing rule (`1px #D7DCE0`) is **not** drawn — sections are visually separated by the column gap and the 24/40px section padding only.
+6. **In two-column mode:** the first `SectionHeader` in column B (`Business`) top-aligns with the first `SectionHeader` in column A (the first primary family). Both sit at `pt-24` from the top of the scroll-container.
+7. **`Configure variants` button** is positioned below both columns, full-width inside the 16px gutter. Tapping opens the sheet as before; preset switching updates both columns live.
+8. **Below 880px, mobile (≤ 420px) layout is unchanged** — single column, collapse rules from Phase 3.5 still apply when multiple primary families are active, Phase 4 borders still render.
+9. **Crossing the breakpoint by resizing:** the layout reflows without a page reload (the `useMediaQuery` hook fires on `change`). No console errors. The sticky header at the top remains full-width across both modes.
+10. Existing Boarding drill-down (`/service-settings/boarding`) is unaffected.
