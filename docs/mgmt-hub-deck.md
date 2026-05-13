@@ -29,7 +29,7 @@ Current state → Migration Milestones → Focus on Mgmt hub design → GTM.
 ### Current state
 2. **What `/provider-profile` is today** — Django web page serving SSU + Management hub; embedded in apps; legacy stack. Side-by-side screenshots of the desktop web and the in-app embedded experience. Some structure exists today but sitters can't find simple things (e.g. editing your address is buried under Basic info) and the order zigzags (pet sitting → training → pet sitting again).
 3. **Module ownership map** — three columns mirroring the new IA. Confirmed ownerships:
-   - **Service settings & profile** — Service settings, Profile · Details, Profile · Photos, Profile · Your pets, Profile · Testimonials → all **Sitter Experience**.
+   - **Service settings & profile** — Service settings, Profile · Details, Profile · Photos, Profile · Testimonials → **Sitter Experience**; Profile · Your pets → **TSO**.
    - **User & Account info** — Basic info (**TSO**), Phone numbers (**TSO**), Background check (**TSO**), Survey / quiz (**TSO**).
    - **Business** — Sitter insights (**Sitter Experience**), Calendar (**Sitter Experience**), Payments (**Payments**), Payouts (**Payments**), Promote (**Growth**), Stop providing services (**Sitter Experience**).
 4. **By the numbers** — 125k weekly unique visits; Service settings is #1, Account info and Profile details follow; 60% of unmigrated eyeballs under Sitter Experience surfaces.

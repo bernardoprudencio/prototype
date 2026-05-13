@@ -188,7 +188,7 @@ function SlideOwnership() {
         { name: 'Service settings', owner: 'Sitter Experience' },
         { name: 'Profile · Details', owner: 'Sitter Experience' },
         { name: 'Profile · Photos', owner: 'Sitter Experience' },
-        { name: 'Profile · Your pets', owner: 'Sitter Experience' },
+        { name: 'Profile · Your pets', owner: 'TSO' },
         { name: 'Profile · Testimonials', owner: 'Sitter Experience' },
       ],
     },
