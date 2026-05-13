@@ -13,7 +13,7 @@ import { ChevronRightIcon } from '../assets/icons'
 const PROFILE_OPTIONS = [
   { id: 'pet-parent',  primary: 'Pet parent',  secondary: 'on Rover' },
   { id: 'cat-parent',  primary: 'Cat parent',  secondary: 'on Rover' },
-  { id: 'cat-parents', primary: 'Cat parents', secondary: 'on Cat in a Flat' },
+  { id: 'cat-parents', primary: 'Cat parent',  secondary: 'on Cat in a Flat' },
 ]
 
 const ProfileRow = ({ option, onPress }) => (

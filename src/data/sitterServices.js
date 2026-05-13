@@ -54,16 +54,16 @@ export const FAMILY_LABEL = {
 // Content shown when a family appears as a single row in "Other services".
 export const FAMILY_SIGNUP = {
   [SERVICE_FAMILY.PET_SITTING]: {
-    label:    'Sign-up to pet sitting',
-    sublabel: 'Boarding, House Sitting, Doggy Day Care, Drop-In Visits and Dog Walking',
+    label:    'Get started with pet sitting',
+    sublabel: 'Boarding, House Sitting, Doggy Day Care, Drop-In Visits, and Dog Walking',
   },
   [SERVICE_FAMILY.TRAINING]: {
-    label:    'Sign-up to dog training',
-    sublabel: 'Credentials are required',
+    label:    'Get started with dog training',
+    sublabel: 'Credentials required. Share your training certifications to get started.',
   },
   [SERVICE_FAMILY.GROOMING]: {
-    label:    'Sign-up to grooming',
-    sublabel: "In your place or the client's place",
+    label:    'Get started with grooming',
+    sublabel: "In your place or the pet parent's home",
   },
 }
 
@@ -196,18 +196,18 @@ export const PRESET_LABEL = {
  */
 export const FAMILY_PROFILE_ROWS = {
   [SERVICE_FAMILY.PET_SITTING]: [
-    { id: 'information',  label: 'Information',  sublabel: 'Edit your pet profile information' },
-    { id: 'photos',       label: 'Photos',       sublabel: 'Manage your profile gallery' },
+    { id: 'about',        label: 'About',        sublabel: 'Share your pet care experience and approach.' },
+    { id: 'photos',       label: 'Photos',       sublabel: 'Manage your profile gallery.' },
     { id: 'testimonials', label: 'Testimonials', sublabel: 'Ask people to write about your pet care experience.', completionKey: 'petSitting.testimonialsComplete' },
   ],
   [SERVICE_FAMILY.TRAINING]: [
-    { id: 'trainer_experience', label: 'Trainer experience', sublabel: 'Fill out your training bio to highlight your training qualifications for pet parents.' },
-    { id: 'photos',             label: 'Photos',             sublabel: 'Manage your profile gallery' },
-    { id: 'credentials',        label: 'Credentials',        sublabel: 'This will show on your profile and the search page.' },
-    { id: 'testimonials',       label: 'Testimonials',       sublabel: 'Ask people to write about your trainer experience.', completionKey: 'training.testimonialsComplete' },
+    { id: 'about',        label: 'About',        sublabel: 'Highlight your training experience and qualifications.' },
+    { id: 'photos',       label: 'Photos',       sublabel: 'Manage your profile gallery.' },
+    { id: 'credentials',  label: 'Credentials',  sublabel: 'This will show on your profile and the search page.' },
+    { id: 'testimonials', label: 'Testimonials', sublabel: 'Ask people to write about your trainer experience.', completionKey: 'training.testimonialsComplete' },
   ],
   [SERVICE_FAMILY.GROOMING]: [
-    { id: 'edit_profile', label: 'Edit profile', sublabel: 'Build your Grooming profile' },
+    { id: 'edit_profile', label: 'Edit profile', sublabel: 'Bio, photos, credentials, testimonials, and more — all in one place.' },
   ],
 }
 
@@ -250,19 +250,19 @@ export function getActiveServiceStatusLines(svc) {
   if (!svc) return []
   const lines = [{ text: 'Active', color: 'tertiary' }]
   if (svc.acceptingNew === false) {
-    lines.push({ text: 'Not accepting new customers', color: 'tertiary' })
+    lines.push({ text: 'Not accepting new pet parents', color: 'tertiary' })
   }
   return lines
 }
 
 /**
  * Joins inactive service labels into the "Add a new service" sublabel.
- * Two items → "A or B". 3+ items → "A, B or C".
+ * Two items → "A or B". 3+ items → "A, B, or C" (Rover style uses the Oxford comma).
  */
 export function joinServiceLabels(services) {
   const labels = services.map((s) => s.label)
   if (labels.length === 0) return ''
   if (labels.length === 1) return labels[0]
   if (labels.length === 2) return `${labels[0]} or ${labels[1]}`
-  return `${labels.slice(0, -1).join(', ')} or ${labels[labels.length - 1]}`
+  return `${labels.slice(0, -1).join(', ')}, or ${labels[labels.length - 1]}`
 }

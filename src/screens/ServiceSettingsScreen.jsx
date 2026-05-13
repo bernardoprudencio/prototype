@@ -575,7 +575,7 @@ export default function ServiceSettingsScreen() {
               />
               <SettingsRow
                 label="Promote your profile"
-                sublabel="Your profile link offers pet parents a $20 off their first booking with Rover."
+                sublabel="Share your profile link to give pet parents $20 off their first booking."
                 rightItem={<Chevron />}
                 onPress={noop}
               />
@@ -587,7 +587,11 @@ export default function ServiceSettingsScreen() {
               />
               <SettingsRow
                 label="Background check"
-                sublabel="You passed the background check"
+                sublabel={
+                  business.backgroundCheckPassed && business.backgroundCheckPassedAt
+                    ? `Passed on ${business.backgroundCheckPassedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                    : 'Required to receive bookings.'
+                }
                 rightItem={business.backgroundCheckPassed ? <CheckCircleIcon /> : <Chevron />}
                 onPress={noop}
               />
@@ -604,7 +608,7 @@ export default function ServiceSettingsScreen() {
 
               <SettingsRow
                 label="Details"
-                sublabel="Address, photo, email and age"
+                sublabel="Address, photo, email, and birthday"
                 rightItem={<Chevron />}
                 onPress={noop}
               />
@@ -630,11 +634,11 @@ export default function ServiceSettingsScreen() {
 
             {/* ── Destructive area (last) — no trailing border ── */}
             <div>
-              <SectionHeader title="Destructive area" topPadding={40} />
+              <SectionHeader title="Account actions" topPadding={40} />
               <SettingsRow
                 label="Stop providing services"
                 labelColor={colors.destructive}
-                sublabel="Confirm you no longer want to provide services on Rover"
+                sublabel="Take your services down. You can sign back up later."
                 rightItem={<BlockedIcon />}
                 onPress={noop}
               />
