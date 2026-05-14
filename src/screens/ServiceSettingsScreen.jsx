@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { colors, typography } from '../tokens'
+import { colors, radius, spacing, typography } from '../tokens'
 import {
   BackIcon,
   BlockedIcon,
@@ -20,6 +20,7 @@ import {
 } from '../assets/icons'
 import { SITTER_PROFILE } from '../data/sitterProfile'
 import {
+  ACCEPTANCE_RESTRICTION,
   DEFAULT_FAMILY_IN_GEO,
   DEFAULT_SERVICE_STATES,
   FAMILY_LABEL,
@@ -27,17 +28,26 @@ import {
   FAMILY_SIGNUP,
   PRESETS,
   SERVICE_FAMILY,
+  SERVICE_STATE,
   getActiveServiceStatusLines,
   getActiveServices,
   getFamilyProfileRows,
   getInactiveServices,
   hasActiveServices,
   isFamilyInGeo,
+  isMissingInfoRow,
   joinServiceLabels,
 } from '../data/sitterServices'
+import { HUB_COPY } from '../data/hubCopy'
 import ChooseProfileSheet from '../components/ChooseProfileSheet'
 import ServiceVariantConfigSheet from '../components/ServiceVariantConfigSheet'
 import Button from '../components/Button'
+import HubBanner from '../components/HubBanner'
+import ResubmitButton from '../components/ResubmitButton'
+import ConfirmDeactivationModal from '../components/ConfirmDeactivationModal'
+import AvailabilityModal from '../components/AvailabilityModal'
+import AdditionalPreferencesModal from '../components/AdditionalPreferencesModal'
+import HelpLinkTip from '../components/HelpLinkTip'
 import { useApp } from '../context/AppContext'
 import { useMediaQuery } from '../lib/useMediaQuery'
 
@@ -64,7 +74,13 @@ const COLOR_BY_TOKEN = {
   primary: colors.primary,
   secondary: colors.secondary,
   tertiary: colors.tertiary,
+  // "Away" service status uses the yellow/price color per production hub treatment.
+  price: colors.cautionText,
 }
+
+// sessionStorage keys gating the once-per-session post-submission modals.
+const SS_KEY_SEEN_AVAILABILITY = 'hub_seen_availability'
+const SS_KEY_SEEN_PREFERENCES  = 'hub_seen_preferences'
 
 // ─── Section header (h1) ─────────────────────────────────────────────────────
 const SectionHeader = ({ title, rightLinkLabel, onRightLink, topPadding = 24 }) => (
@@ -75,6 +91,8 @@ const SectionHeader = ({ title, rightLinkLabel, onRightLink, topPadding = 24 }) 
       justifyContent: 'space-between',
       paddingTop: topPadding,
       paddingBottom: 8,
+      paddingLeft: 16,
+      paddingRight: 16,
     }}
   >
     <h1
@@ -132,6 +150,8 @@ const SubHeading = ({
       gap: 12,
       paddingTop: topPadding,
       paddingBottom: 8,
+      paddingLeft: 16,
+      paddingRight: 16,
       cursor: collapsible ? 'pointer' : 'default',
     }}
   >
@@ -187,7 +207,11 @@ const SettingsRow = ({
   statusLines,
   rightItem,
   onPress,
-}) => (
+}) => {
+  const hasCaution = statusLines?.some(
+    (line) => typeof line === 'object' && line?.tone === 'caution',
+  )
+  return (
   <div
     onClick={onPress}
     style={{
@@ -196,7 +220,10 @@ const SettingsRow = ({
       gap: 12,
       paddingTop: 16,
       paddingBottom: 16,
+      paddingLeft: 16,
+      paddingRight: 16,
       cursor: onPress ? 'pointer' : 'default',
+      backgroundColor: hasCaution ? colors.yellow100 : undefined,
     }}
   >
     {leftIcon && (
@@ -238,20 +265,27 @@ const SettingsRow = ({
           {sublabel}
         </span>
       )}
-      {statusLines && statusLines.map((line, i) => (
-        <span
-          key={i}
-          style={{
-            fontFamily: typography.fontFamily,
-            fontWeight: 400,
-            fontSize: 14,
-            lineHeight: 1.25,
-            color: COLOR_BY_TOKEN[line.color] ?? colors.tertiary,
-          }}
-        >
-          {line.text}
-        </span>
-      ))}
+      {statusLines && statusLines.map((line, i) => {
+        const isCaution = typeof line === 'object' && line.tone === 'caution'
+        const text = typeof line === 'string' ? line : line.text
+        const colorToken = typeof line === 'object' ? line.color : undefined
+        return (
+          <span
+            key={i}
+            style={{
+              fontFamily: typography.fontFamily,
+              fontWeight: isCaution ? 600 : 400,
+              fontSize: 14,
+              lineHeight: 1.25,
+              color: isCaution
+                ? colors.cautionText
+                : COLOR_BY_TOKEN[colorToken] ?? colors.tertiary,
+            }}
+          >
+            {text}
+          </span>
+        )
+      })}
     </div>
     {rightItem && (
       <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
@@ -259,7 +293,8 @@ const SettingsRow = ({
       </div>
     )}
   </div>
-)
+  )
+}
 
 const Chevron = () => <ChevronRightIcon />
 
@@ -318,7 +353,107 @@ export default function ServiceSettingsScreen() {
     setServiceStates,
     familyInGeo,
     setFamilyInGeo,
+    // ── Hub state variants (Phase C) ─────────────────────────────────────
+    profileReviewStatus,
+    backgroundCheckStatus,
+    searchStatus,
+    acceptanceRestrictions,
+    showAvailabilityModal,
+    showAdditionalPreferencesModal,
+    showConfirmServiceDeactivation,
+    showShortNoticeRateCallout,
+    showServiceSettingsHelpTip,
+    showRegionalAlertCalifornia,
+    setShowRegionalAlertCalifornia,
+    showShortNoticeRateBanner,
+    showHubFetchError,
+    setShowHubFetchError,
+    showMissingInfo,
   } = useApp()
+
+  // Local state for the service-deactivation confirmation modal. Tracks which
+  // service id is pending so we can flip it to INACTIVE on confirm.
+  const [pendingDeactivationId, setPendingDeactivationId] = useState(null)
+
+  // Local state for the post-submission modal sequence. Mutually exclusive —
+  // Availability runs first, then Preferences.
+  const [activePostSubmissionModal, setActivePostSubmissionModal] = useState(null) // null | 'availability' | 'preferences'
+
+  // Post-submission modal sequence. On mount, surface Availability (if on and
+  // not yet shown this session), then Preferences (likewise).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (
+      showAvailabilityModal &&
+      window.sessionStorage.getItem(SS_KEY_SEEN_AVAILABILITY) !== '1'
+    ) {
+      setActivePostSubmissionModal('availability')
+      return
+    }
+    if (
+      showAdditionalPreferencesModal &&
+      window.sessionStorage.getItem(SS_KEY_SEEN_PREFERENCES) !== '1'
+    ) {
+      setActivePostSubmissionModal('preferences')
+    }
+    // Only fires on mount; we intentionally don't re-evaluate when the user
+    // toggles these flags during the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const closeAvailabilityModal = () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(SS_KEY_SEEN_AVAILABILITY, '1')
+    }
+    // After Availability dismisses, advance to Preferences if it's enabled
+    // and unseen.
+    if (
+      showAdditionalPreferencesModal &&
+      typeof window !== 'undefined' &&
+      window.sessionStorage.getItem(SS_KEY_SEEN_PREFERENCES) !== '1'
+    ) {
+      setActivePostSubmissionModal('preferences')
+    } else {
+      setActivePostSubmissionModal(null)
+    }
+  }
+
+  const closeAdditionalPreferencesModal = () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(SS_KEY_SEEN_PREFERENCES, '1')
+    }
+    setActivePostSubmissionModal(null)
+  }
+
+  // Deactivate a service: flip its state to INACTIVE in the serviceStates map.
+  // The sentinel id `__all__` deactivates every service at once — used by the
+  // global "Stop providing services" account-level action.
+  const runDeactivation = (serviceId) => {
+    if (serviceId === '__all__') {
+      const next = { ...serviceStates }
+      for (const id of Object.keys(next)) next[id] = SERVICE_STATE.INACTIVE
+      setServiceStates(next)
+      return
+    }
+    setServiceStates({ ...serviceStates, [serviceId]: SERVICE_STATE.INACTIVE })
+  }
+
+  // Wraps any service-deactivation action: shows the confirmation modal first
+  // when the variant is on, runs immediately otherwise.
+  const requestDeactivation = (serviceId) => {
+    if (showConfirmServiceDeactivation) {
+      setPendingDeactivationId(serviceId)
+    } else {
+      runDeactivation(serviceId)
+    }
+  }
+
+  const confirmPendingDeactivation = () => {
+    if (pendingDeactivationId) runDeactivation(pendingDeactivationId)
+    setPendingDeactivationId(null)
+  }
+
+  const cancelPendingDeactivation = () => setPendingDeactivationId(null)
 
   const applyPreset = (key) => {
     const preset = PRESETS[key]
@@ -407,10 +542,102 @@ export default function ServiceSettingsScreen() {
         style={{
           flex: 1,
           overflowY: 'auto',
-          paddingLeft: 16,
-          paddingRight: 16,
+          paddingLeft: 0,
+          paddingRight: 0,
         }}
       >
+        {/* Hub fetch error empty state — short-circuits the rest of the hub.
+            Renders only the error banner; the Configure variants control is
+            kept at the bottom so the testing-mode entry point stays reachable
+            even when this state is on. */}
+        {showHubFetchError ? (
+          <div
+            style={{
+              maxWidth: 1140,
+              width: '100%',
+              margin: '0 auto',
+              paddingTop: 40,
+              paddingBottom: 40,
+              paddingLeft: 16,
+              paddingRight: 16,
+            }}
+          >
+            <HubBanner
+              severity="error"
+              title={HUB_COPY.hubFetchError.title}
+              body={HUB_COPY.hubFetchError.body}
+              cta={{
+                label: HUB_COPY.hubFetchError.ctaLabel,
+                onClick: () => setShowHubFetchError(false),
+              }}
+            />
+          </div>
+        ) : (
+        <>
+        {/* ── Top-of-hub banners + Resubmit ── */}
+        <div
+          style={{
+            maxWidth: 1140,
+            width: '100%',
+            margin: '0 auto',
+            paddingTop: 16,
+            paddingLeft: 16,
+            paddingRight: 16,
+          }}
+        >
+          {profileReviewStatus === 'borderline' && (
+            <div style={{ marginBottom: 12 }}>
+              <ResubmitButton onClick={noop} />
+            </div>
+          )}
+
+          {backgroundCheckStatus === 'error' && (
+            <HubBanner
+              severity="error"
+              title={HUB_COPY.backgroundCheckError.title}
+              body={HUB_COPY.backgroundCheckError.body}
+              cta={{ label: HUB_COPY.backgroundCheckError.ctaLabel, onClick: noop }}
+            />
+          )}
+
+          {searchStatus === 'away_manual' && (
+            <HubBanner
+              severity="info"
+              title={HUB_COPY.awayManual.title}
+              body={HUB_COPY.awayManual.body}
+              cta={{ label: HUB_COPY.awayManual.ctaLabel, onClick: noop }}
+            />
+          )}
+
+          {searchStatus === 'away_auto' && (
+            <HubBanner
+              severity="info"
+              title={HUB_COPY.awayAuto.title}
+              body={HUB_COPY.awayAuto.body}
+              cta={{ label: HUB_COPY.awayAuto.ctaLabel, onClick: noop }}
+            />
+          )}
+
+          {showRegionalAlertCalifornia && (
+            <HubBanner
+              severity="info"
+              title={HUB_COPY.californiaProviderGroup.title}
+              body={HUB_COPY.californiaProviderGroup.body}
+              cta={{ label: HUB_COPY.californiaProviderGroup.ctaLabel, onClick: noop }}
+              onDismiss={() => setShowRegionalAlertCalifornia(false)}
+            />
+          )}
+
+          {showShortNoticeRateBanner && (
+            <HubBanner
+              severity="info"
+              title={HUB_COPY.shortNoticeRateBanner.title}
+              body={HUB_COPY.shortNoticeRateBanner.body}
+              cta={{ label: HUB_COPY.shortNoticeRateBanner.ctaLabel, onClick: noop }}
+            />
+          )}
+        </div>
+
         <div
           style={{
             display: isTwoCol ? 'grid' : 'block',
@@ -456,17 +683,66 @@ export default function ServiceSettingsScreen() {
                             svc.id === 'boarding'
                               ? () => navigate('/service-settings/boarding')
                               : noop
+                          const baseStatusLines = getActiveServiceStatusLines(svc, {
+                            state: serviceStates[svc.id],
+                            restriction:
+                              acceptanceRestrictions?.[svc.id] ?? ACCEPTANCE_RESTRICTION.NONE,
+                          })
+                          const statusLines =
+                            showMissingInfo && isMissingInfoRow(svc.id)
+                              ? [...baseStatusLines, { text: 'Missing information', tone: 'caution' }]
+                              : baseStatusLines
                           return (
                             <SettingsRow
                               key={svc.id}
                               leftIcon={ServiceIcon ? <ServiceIcon /> : null}
                               label={svc.label}
-                              statusLines={getActiveServiceStatusLines(svc)}
+                              statusLines={statusLines}
                               rightItem={<Chevron />}
                               onPress={onRowPress}
                             />
                           )
                         })}
+
+                        {/* Short-notice rate callout — appears inside the services
+                            sub-section (distinct from the top-of-hub banner). */}
+                        {idx === 0 && showShortNoticeRateCallout && (
+                          <div style={{ paddingTop: spacing.sm, paddingBottom: spacing.sm, paddingLeft: 16, paddingRight: 16 }}>
+                            <div
+                              style={{
+                                border: `1px solid ${colors.border}`,
+                                borderRadius: radius.primary,
+                                padding: 16,
+                                background: colors.bgInfo,
+                              }}
+                            >
+                              <p
+                                style={{
+                                  fontFamily: typography.fontFamily,
+                                  fontWeight: 600,
+                                  fontSize: 14,
+                                  lineHeight: 1.25,
+                                  color: colors.primary,
+                                  margin: 0,
+                                }}
+                              >
+                                {HUB_COPY.shortNoticeRateCallout.title}
+                              </p>
+                              <p
+                                style={{
+                                  fontFamily: typography.fontFamily,
+                                  fontWeight: 400,
+                                  fontSize: 14,
+                                  lineHeight: 1.5,
+                                  color: colors.primary,
+                                  margin: '4px 0 0',
+                                }}
+                              >
+                                {HUB_COPY.shortNoticeRateCallout.body}
+                              </p>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Add a new service — expandable, reveals inactive services inline */}
                         {inactiveServices.length > 0 && (
@@ -515,11 +791,16 @@ export default function ServiceSettingsScreen() {
                           />
                           {(!subsectionsCollapsible || expandedSubsections[family]?.profile) && profileRows.map((row) => {
                             const isComplete = resolveCompletion(row.completionKey, profile)
+                            const statusLines =
+                              showMissingInfo && isMissingInfoRow(row.id)
+                                ? [{ text: 'Missing information', tone: 'caution' }]
+                                : undefined
                             return (
                               <SettingsRow
                                 key={row.id}
                                 label={row.label}
                                 sublabel={row.sublabel}
+                                statusLines={statusLines}
                                 rightItem={isComplete ? <CheckCircleIcon /> : <Chevron />}
                                 onPress={noop}
                               />
@@ -640,13 +921,38 @@ export default function ServiceSettingsScreen() {
                 labelColor={colors.destructive}
                 sublabel="Take your services down. You can sign back up later."
                 rightItem={<BlockedIcon />}
-                onPress={noop}
+                onPress={() => requestDeactivation('__all__')}
               />
             </div>
           </div>
         </div>
 
-        <div style={{ paddingTop: 40, paddingBottom: 40 }}>
+        {/* ── Help-link tip ──
+            Only renders for approved sitters and when the variant is on
+            (matches production's HUB_SERVICE_TIP_NOTIFICATION gate). */}
+        {showServiceSettingsHelpTip && profileReviewStatus === 'approved' && (
+          <div
+            style={{
+              maxWidth: 1140,
+              width: '100%',
+              margin: '0 auto',
+              paddingTop: 24,
+              paddingBottom: 8,
+              paddingLeft: 16,
+              paddingRight: 16,
+            }}
+          >
+            <HelpLinkTip
+              linkLabel={HUB_COPY.serviceSettingsHelpTip.linkLabel}
+              tipTitle={HUB_COPY.serviceSettingsHelpTip.tipTitle}
+              tipBody={HUB_COPY.serviceSettingsHelpTip.tipBody}
+            />
+          </div>
+        )}
+        </>
+        )}
+
+        <div style={{ paddingTop: 40, paddingBottom: 40, paddingLeft: 16, paddingRight: 16 }}>
           <Button
             variant="flat"
             size="small"
@@ -670,6 +976,23 @@ export default function ServiceSettingsScreen() {
           onDismiss={() => setConfigSheetOpen(false)}
         />
       )}
+
+      {/* Service-deactivation confirmation. Open whenever a pending id is set. */}
+      <ConfirmDeactivationModal
+        open={pendingDeactivationId != null}
+        onConfirm={confirmPendingDeactivation}
+        onCancel={cancelPendingDeactivation}
+      />
+
+      {/* Post-submission modal sequence (once per session). */}
+      <AvailabilityModal
+        open={activePostSubmissionModal === 'availability'}
+        onClose={closeAvailabilityModal}
+      />
+      <AdditionalPreferencesModal
+        open={activePostSubmissionModal === 'preferences'}
+        onClose={closeAdditionalPreferencesModal}
+      />
     </div>
   )
 }

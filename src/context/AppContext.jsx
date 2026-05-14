@@ -26,6 +26,56 @@ const readInitialFamilyInGeo = () => {
   try { return JSON.parse(raw) } catch { return DEFAULT_FAMILY_IN_GEO }
 }
 
+// ── Hub state variants ──────────────────────────────────────────────────
+// Storage keys + default-reading helpers for the provider-profile
+// management hub variants exposed via the Testing Mode sheet.
+const PROFILE_REVIEW_STATUS_KEY            = 'profileReviewStatus'
+const BACKGROUND_CHECK_STATUS_KEY          = 'backgroundCheckStatus'
+const SEARCH_STATUS_KEY                    = 'searchStatus'
+const ACCEPTANCE_RESTRICTIONS_KEY          = 'acceptanceRestrictions'
+const SHOW_AVAILABILITY_MODAL_KEY          = 'showAvailabilityModal'
+const SHOW_ADDITIONAL_PREFERENCES_MODAL_KEY = 'showAdditionalPreferencesModal'
+const SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY = 'showConfirmServiceDeactivation'
+const SHOW_SHORT_NOTICE_RATE_CALLOUT_KEY   = 'showShortNoticeRateCallout'
+const SHOW_SERVICE_SETTINGS_HELP_TIP_KEY   = 'showServiceSettingsHelpTip'
+const SHOW_REGIONAL_ALERT_CALIFORNIA_KEY   = 'showRegionalAlertCalifornia'
+const SHOW_SHORT_NOTICE_RATE_BANNER_KEY    = 'showShortNoticeRateBanner'
+const SHOW_HUB_FETCH_ERROR_KEY             = 'showHubFetchError'
+const SHOW_MISSING_INFO_KEY                = 'showMissingInfo'
+
+const readInitialEnum = (key, fallback) => {
+  if (typeof window === 'undefined') return fallback
+  return window.localStorage.getItem(key) ?? fallback
+}
+
+const readInitialBool = (key, fallback) => {
+  if (typeof window === 'undefined') return fallback
+  const raw = window.localStorage.getItem(key)
+  if (raw == null) return fallback
+  try { return JSON.parse(raw) } catch { return fallback }
+}
+
+const readInitialAcceptanceRestrictions = () => {
+  if (typeof window === 'undefined') return {}
+  const raw = window.localStorage.getItem(ACCEPTANCE_RESTRICTIONS_KEY)
+  if (!raw) return {}
+  try { return JSON.parse(raw) } catch { return {} }
+}
+
+const readInitialProfileReviewStatus      = () => readInitialEnum(PROFILE_REVIEW_STATUS_KEY,   'approved')
+const readInitialBackgroundCheckStatus    = () => readInitialEnum(BACKGROUND_CHECK_STATUS_KEY, 'verified')
+const readInitialSearchStatus             = () => readInitialEnum(SEARCH_STATUS_KEY,           'active')
+
+const readInitialShowAvailabilityModal           = () => readInitialBool(SHOW_AVAILABILITY_MODAL_KEY,           false)
+const readInitialShowAdditionalPreferencesModal  = () => readInitialBool(SHOW_ADDITIONAL_PREFERENCES_MODAL_KEY, false)
+const readInitialShowConfirmServiceDeactivation  = () => readInitialBool(SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY, true)
+const readInitialShowShortNoticeRateCallout      = () => readInitialBool(SHOW_SHORT_NOTICE_RATE_CALLOUT_KEY,    false)
+const readInitialShowServiceSettingsHelpTip      = () => readInitialBool(SHOW_SERVICE_SETTINGS_HELP_TIP_KEY,    false)
+const readInitialShowRegionalAlertCalifornia     = () => readInitialBool(SHOW_REGIONAL_ALERT_CALIFORNIA_KEY,    false)
+const readInitialShowShortNoticeRateBanner       = () => readInitialBool(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     false)
+const readInitialShowHubFetchError               = () => readInitialBool(SHOW_HUB_FETCH_ERROR_KEY,              false)
+const readInitialShowMissingInfo                 = () => readInitialBool(SHOW_MISSING_INFO_KEY,                 false)
+
 export function AppProvider({ children }) {
   // ── Shared ────────────────────────────────────────────────────────────────
   const [resolvedCards, setResolvedCards]         = useState({})  // { [cardId]: { resolution, timestamp } }
@@ -92,6 +142,55 @@ export function AppProvider({ children }) {
     }
   }
 
+  // ── Hub state variants ──────────────────────────────────────────────────
+  // Mirrors the localStorage read-on-mount + setter-writes-through pattern
+  // used by `serviceStates` / `familyInGeo` above.
+  const [profileReviewStatus,   setProfileReviewStatusRaw]   = useState(readInitialProfileReviewStatus)
+  const [backgroundCheckStatus, setBackgroundCheckStatusRaw] = useState(readInitialBackgroundCheckStatus)
+  const [searchStatus,          setSearchStatusRaw]          = useState(readInitialSearchStatus)
+
+  const [acceptanceRestrictions, setAcceptanceRestrictionsRaw] = useState(readInitialAcceptanceRestrictions)
+
+  const [showAvailabilityModal,           setShowAvailabilityModalRaw]           = useState(readInitialShowAvailabilityModal)
+  const [showAdditionalPreferencesModal,  setShowAdditionalPreferencesModalRaw]  = useState(readInitialShowAdditionalPreferencesModal)
+  const [showConfirmServiceDeactivation,  setShowConfirmServiceDeactivationRaw]  = useState(readInitialShowConfirmServiceDeactivation)
+  const [showShortNoticeRateCallout,      setShowShortNoticeRateCalloutRaw]      = useState(readInitialShowShortNoticeRateCallout)
+  const [showServiceSettingsHelpTip,      setShowServiceSettingsHelpTipRaw]      = useState(readInitialShowServiceSettingsHelpTip)
+  const [showRegionalAlertCalifornia,     setShowRegionalAlertCaliforniaRaw]     = useState(readInitialShowRegionalAlertCalifornia)
+  const [showShortNoticeRateBanner,       setShowShortNoticeRateBannerRaw]       = useState(readInitialShowShortNoticeRateBanner)
+  const [showHubFetchError,               setShowHubFetchErrorRaw]               = useState(readInitialShowHubFetchError)
+  const [showMissingInfo,                 setShowMissingInfoRaw]                 = useState(readInitialShowMissingInfo)
+
+  const persistEnum = (key, next, raw) => {
+    raw(next)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(key, next)
+    }
+  }
+
+  const persistJson = (key, next, raw) => {
+    raw(next)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(key, JSON.stringify(next))
+    }
+  }
+
+  const setProfileReviewStatus   = (next) => persistEnum(PROFILE_REVIEW_STATUS_KEY,   next, setProfileReviewStatusRaw)
+  const setBackgroundCheckStatus = (next) => persistEnum(BACKGROUND_CHECK_STATUS_KEY, next, setBackgroundCheckStatusRaw)
+  const setSearchStatus          = (next) => persistEnum(SEARCH_STATUS_KEY,           next, setSearchStatusRaw)
+
+  const setAcceptanceRestrictions = (next) => persistJson(ACCEPTANCE_RESTRICTIONS_KEY, next, setAcceptanceRestrictionsRaw)
+
+  const setShowAvailabilityModal          = (next) => persistJson(SHOW_AVAILABILITY_MODAL_KEY,           next, setShowAvailabilityModalRaw)
+  const setShowAdditionalPreferencesModal = (next) => persistJson(SHOW_ADDITIONAL_PREFERENCES_MODAL_KEY, next, setShowAdditionalPreferencesModalRaw)
+  const setShowConfirmServiceDeactivation = (next) => persistJson(SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY, next, setShowConfirmServiceDeactivationRaw)
+  const setShowShortNoticeRateCallout     = (next) => persistJson(SHOW_SHORT_NOTICE_RATE_CALLOUT_KEY,    next, setShowShortNoticeRateCalloutRaw)
+  const setShowServiceSettingsHelpTip     = (next) => persistJson(SHOW_SERVICE_SETTINGS_HELP_TIP_KEY,    next, setShowServiceSettingsHelpTipRaw)
+  const setShowRegionalAlertCalifornia    = (next) => persistJson(SHOW_REGIONAL_ALERT_CALIFORNIA_KEY,    next, setShowRegionalAlertCaliforniaRaw)
+  const setShowShortNoticeRateBanner      = (next) => persistJson(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     next, setShowShortNoticeRateBannerRaw)
+  const setShowHubFetchError              = (next) => persistJson(SHOW_HUB_FETCH_ERROR_KEY,              next, setShowHubFetchErrorRaw)
+  const setShowMissingInfo                = (next) => persistJson(SHOW_MISSING_INFO_KEY,                 next, setShowMissingInfoRaw)
+
   return (
     <AppContext.Provider value={{
       // shared
@@ -112,6 +211,20 @@ export function AppProvider({ children }) {
       // service variant config
       serviceStates, setServiceStates,
       familyInGeo, setFamilyInGeo,
+      // hub state variants
+      profileReviewStatus,           setProfileReviewStatus,
+      backgroundCheckStatus,         setBackgroundCheckStatus,
+      searchStatus,                  setSearchStatus,
+      acceptanceRestrictions,        setAcceptanceRestrictions,
+      showAvailabilityModal,          setShowAvailabilityModal,
+      showAdditionalPreferencesModal, setShowAdditionalPreferencesModal,
+      showConfirmServiceDeactivation, setShowConfirmServiceDeactivation,
+      showShortNoticeRateCallout,     setShowShortNoticeRateCallout,
+      showServiceSettingsHelpTip,     setShowServiceSettingsHelpTip,
+      showRegionalAlertCalifornia,    setShowRegionalAlertCalifornia,
+      showShortNoticeRateBanner,      setShowShortNoticeRateBanner,
+      showHubFetchError,              setShowHubFetchError,
+      showMissingInfo,                setShowMissingInfo,
     }}>
       {children}
     </AppContext.Provider>

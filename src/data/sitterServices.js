@@ -29,7 +29,18 @@
 // ─── Per-service state ───────────────────────────────────────────────────────
 export const SERVICE_STATE = {
   ACTIVE:   'active',   // configured; appears in the family's services list
+  AWAY:     'away',     // active but not searchable
   INACTIVE: 'inactive', // not configured; appears under "Add a new service"
+}
+
+// ─── Per-service customer-acceptance restriction ─────────────────────────────
+// Independent of SERVICE_STATE. Drives the "Not accepting new customers…" copy
+// rendered after the inline status text on an ACTIVE/AWAY service row.
+export const ACCEPTANCE_RESTRICTION = {
+  NONE:           'none',
+  REPEAT_ONLY:    'repeat_only',
+  RECURRING_ONLY: 'recurring_only',  // not accepting new for weekly care
+  ONE_TIME_ONLY:  'one_time_only',   // not accepting new for one-time care
 }
 
 // ─── Families ────────────────────────────────────────────────────────────────
@@ -96,6 +107,26 @@ export const DEFAULT_SERVICE_STATES = {
 export const DEFAULT_FAMILY_IN_GEO = {
   [SERVICE_FAMILY.TRAINING]: true,
   [SERVICE_FAMILY.GROOMING]: true,
+}
+
+// Per-service acceptance restriction defaults — every service starts at NONE.
+export const DEFAULT_ACCEPTANCE_RESTRICTIONS = {
+  boarding:      ACCEPTANCE_RESTRICTION.NONE,
+  house_sitting: ACCEPTANCE_RESTRICTION.NONE,
+  doggy_daycare: ACCEPTANCE_RESTRICTION.NONE,
+  drop_in:       ACCEPTANCE_RESTRICTION.NONE,
+  dog_walking:   ACCEPTANCE_RESTRICTION.NONE,
+  dog_training:  ACCEPTANCE_RESTRICTION.NONE,
+  grooming:      ACCEPTANCE_RESTRICTION.NONE,
+}
+
+// Row ids that render the "Missing information" status line when the
+// `showMissingInfo` testing-mode toggle is on. Covers one overnight service
+// (boarding), one short service (dog_walking), and the About profile row.
+export const MISSING_INFO_DEMO_ROWS = ['boarding', 'dog_walking', 'about']
+
+export function isMissingInfoRow(rowId) {
+  return MISSING_INFO_DEMO_ROWS.includes(rowId)
 }
 
 // ─── Variant presets ─────────────────────────────────────────────────────────
@@ -242,16 +273,49 @@ export function isFamilyInGeo(family, familyInGeo) {
 }
 
 /**
- * Returns the status lines under an ACTIVE service row.
- * - active + acceptingNew=true  → ['Active' tertiary]
- * - active + acceptingNew=false → ['Active' tertiary, 'Not accepting…' tertiary]
+ * Returns the status lines under a service row.
+ *
+ * Back-compat: the original signature took only `svc` and used the per-service
+ * `acceptingNew` boolean. Callers can now pass an optional `opts` object with
+ * `{ state, restriction }` sourced from `SERVICE_STATE` / `ACCEPTANCE_RESTRICTION`.
+ * When `restriction` is provided it wins over the legacy `acceptingNew` field.
+ *
+ * Lines:
+ * - state=ACTIVE        → ['Active' tertiary, ...optional restriction line]
+ * - state=AWAY          → ['Away' price, ...optional restriction line]
+ * - state=INACTIVE      → []  (no inline status rendered for inactive rows)
+ *
+ * Restriction copy (only appended when state is ACTIVE or AWAY):
+ * - REPEAT_ONLY    → 'Not accepting new customers'
+ * - RECURRING_ONLY → 'Not accepting new customers for weekly care'
+ * - ONE_TIME_ONLY  → 'Not accepting new customers for one-time care'
  */
-export function getActiveServiceStatusLines(svc) {
+export function getActiveServiceStatusLines(svc, opts) {
   if (!svc) return []
-  const lines = [{ text: 'Active', color: 'tertiary' }]
-  if (svc.acceptingNew === false) {
-    lines.push({ text: 'Not accepting new pet parents', color: 'tertiary' })
+  const state = opts?.state ?? SERVICE_STATE.ACTIVE
+  // Prefer explicit restriction; fall back to legacy `acceptingNew === false`
+  // for back-compat with call sites that haven't been updated yet.
+  const restriction =
+    opts?.restriction ??
+    (svc.acceptingNew === false ? ACCEPTANCE_RESTRICTION.REPEAT_ONLY : ACCEPTANCE_RESTRICTION.NONE)
+
+  if (state === SERVICE_STATE.INACTIVE) return []
+
+  const lines = []
+  if (state === SERVICE_STATE.AWAY) {
+    lines.push({ text: 'Away', color: 'price' })
+  } else {
+    lines.push({ text: 'Active', color: 'tertiary' })
   }
+
+  if (restriction && restriction !== ACCEPTANCE_RESTRICTION.NONE) {
+    let text = null
+    if (restriction === ACCEPTANCE_RESTRICTION.REPEAT_ONLY)    text = 'Not accepting new customers'
+    if (restriction === ACCEPTANCE_RESTRICTION.RECURRING_ONLY) text = 'Not accepting new customers for weekly care'
+    if (restriction === ACCEPTANCE_RESTRICTION.ONE_TIME_ONLY)  text = 'Not accepting new customers for one-time care'
+    if (text) lines.push({ text, color: 'tertiary' })
+  }
+
   return lines
 }
 
