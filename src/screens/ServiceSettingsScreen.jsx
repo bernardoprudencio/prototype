@@ -91,6 +91,8 @@ const SectionHeader = ({ title, rightLinkLabel, onRightLink, topPadding = 24 }) 
       justifyContent: 'space-between',
       paddingTop: topPadding,
       paddingBottom: 8,
+      paddingLeft: 16,
+      paddingRight: 16,
     }}
   >
     <h1
@@ -148,6 +150,8 @@ const SubHeading = ({
       gap: 12,
       paddingTop: topPadding,
       paddingBottom: 8,
+      paddingLeft: 16,
+      paddingRight: 16,
       cursor: collapsible ? 'pointer' : 'default',
     }}
   >
@@ -216,6 +220,8 @@ const SettingsRow = ({
       gap: 12,
       paddingTop: 16,
       paddingBottom: 16,
+      paddingLeft: 16,
+      paddingRight: 16,
       cursor: onPress ? 'pointer' : 'default',
       backgroundColor: hasCaution ? colors.yellow100 : undefined,
     }}
@@ -536,8 +542,8 @@ export default function ServiceSettingsScreen() {
         style={{
           flex: 1,
           overflowY: 'auto',
-          paddingLeft: 16,
-          paddingRight: 16,
+          paddingLeft: 0,
+          paddingRight: 0,
         }}
       >
         {/* Hub fetch error empty state — short-circuits the rest of the hub.
@@ -552,6 +558,8 @@ export default function ServiceSettingsScreen() {
               margin: '0 auto',
               paddingTop: 40,
               paddingBottom: 40,
+              paddingLeft: 16,
+              paddingRight: 16,
             }}
           >
             <HubBanner
@@ -573,6 +581,8 @@ export default function ServiceSettingsScreen() {
             width: '100%',
             margin: '0 auto',
             paddingTop: 16,
+            paddingLeft: 16,
+            paddingRight: 16,
           }}
         >
           {profileReviewStatus === 'borderline' && (
@@ -697,7 +707,7 @@ export default function ServiceSettingsScreen() {
                         {/* Short-notice rate callout — appears inside the services
                             sub-section (distinct from the top-of-hub banner). */}
                         {idx === 0 && showShortNoticeRateCallout && (
-                          <div style={{ paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
+                          <div style={{ paddingTop: spacing.sm, paddingBottom: spacing.sm, paddingLeft: 16, paddingRight: 16 }}>
                             <div
                               style={{
                                 border: `1px solid ${colors.border}`,
@@ -928,6 +938,8 @@ export default function ServiceSettingsScreen() {
               margin: '0 auto',
               paddingTop: 24,
               paddingBottom: 8,
+              paddingLeft: 16,
+              paddingRight: 16,
             }}
           >
             <HelpLinkTip
@@ -940,7 +952,7 @@ export default function ServiceSettingsScreen() {
         </>
         )}
 
-        <div style={{ paddingTop: 40, paddingBottom: 40 }}>
+        <div style={{ paddingTop: 40, paddingBottom: 40, paddingLeft: 16, paddingRight: 16 }}>
           <Button
             variant="flat"
             size="small"
