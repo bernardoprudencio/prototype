@@ -227,14 +227,14 @@ function SlideOwnership() {
             background: stage.card, border: `1px solid ${stage.rule}`,
             display: 'flex', flexDirection: 'column', gap: 12,
           }}>
-            <p style={{ ...eyebrow, fontSize: 14, color: stage.accent }}>{header}</p>
+            <p style={{ ...eyebrow, fontSize: 16, color: stage.accent }}>{header}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {modules.map(({ name, owner }) => (
                 <div key={name} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12,
                 }}>
                   <span style={{ ...body, fontSize: 18, fontWeight: 600 }}>{name}</span>
-                  <span style={{ ...muted, fontSize: 14 }}>{owner}</span>
+                  <span style={{ ...muted, fontSize: 16 }}>{owner}</span>
                 </div>
               ))}
             </div>
@@ -291,7 +291,7 @@ function SlideMilestones() {
             display: 'flex', flexDirection: 'column', gap: 6,
           }}>
             <p style={{
-              ...muted, fontSize: 14, fontWeight: 700, letterSpacing: '0.06em',
+              ...muted, fontSize: 16, fontWeight: 700, letterSpacing: '0.06em',
               textTransform: 'uppercase', color: accent ? stage.accent : stage.muted, margin: 0,
             }}>{tag}</p>
             <p style={{ ...body, fontWeight: 700, fontSize: 24 }}>{title}</p>
@@ -300,19 +300,19 @@ function SlideMilestones() {
         ))}
       </div>
       <div style={{ paddingTop: 18, borderTop: `1px solid ${stage.rule}` }}>
-        <p style={{ ...eyebrow, fontSize: 14, color: stage.accent, marginBottom: 10 }}>Why SSR + RxN matters</p>
+        <p style={{ ...eyebrow, fontSize: 16, color: stage.accent, marginBottom: 10 }}>Why SSR + RxN matters</p>
         <div style={{ display: 'flex', gap: 18 }}>
           <div style={{ flex: 1 }}>
-            <p style={{ ...body, fontWeight: 700, fontSize: 18 }}>Better IA</p>
-            <p style={{ ...muted, fontSize: 16 }}>Unlocks the grouping we need to fix the "long list" problem.</p>
+            <p style={{ ...body, fontWeight: 700, fontSize: 20 }}>Better IA</p>
+            <p style={{ ...muted, fontSize: 18 }}>Unlocks the grouping we need to fix the "long list" problem.</p>
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ ...body, fontWeight: 700, fontSize: 18 }}>Newer UI</p>
-            <p style={{ ...muted, fontSize: 16 }}>Modern visual system, consistent with the rest of the migrated surfaces.</p>
+            <p style={{ ...body, fontWeight: 700, fontSize: 20 }}>Newer UI</p>
+            <p style={{ ...muted, fontSize: 18 }}>Modern visual system, consistent with the rest of the migrated surfaces.</p>
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ ...body, fontWeight: 700, fontSize: 18 }}>Native in-app nav</p>
-            <p style={{ ...muted, fontSize: 16 }}>Drilling into a screen and pressing back no longer closes the web view.</p>
+            <p style={{ ...body, fontWeight: 700, fontSize: 20 }}>Native in-app nav</p>
+            <p style={{ ...muted, fontSize: 18 }}>Drilling into a screen and pressing back no longer closes the web view.</p>
           </div>
         </div>
       </div>
@@ -358,11 +358,11 @@ function SlideIA() {
               fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 20,
             }}>{idx + 1}</div>
             <p style={{ ...body, fontWeight: 700, fontSize: 22 }}>{label}</p>
-            <p style={{ ...muted, fontSize: 17 }}>{desc}</p>
+            <p style={{ ...muted, fontSize: 18 }}>{desc}</p>
             <div style={{ height: 1, background: stage.rule, margin: '4px 0' }} />
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {modules.map((m) => (
-                <li key={m} style={{ ...muted, fontSize: 16, color: stage.ink }}>· {m}</li>
+                <li key={m} style={{ ...muted, fontSize: 18, color: stage.ink }}>· {m}</li>
               ))}
             </ul>
           </div>
@@ -403,7 +403,7 @@ function SlideDesignChanges() {
             display: 'flex', flexDirection: 'column', gap: 8,
           }}>
             <p style={{ ...body, fontWeight: 700, fontSize: 22 }}>{t}</p>
-            <p style={{ ...muted, fontSize: 18 }}>{d}</p>
+            <p style={{ ...muted, fontSize: 20 }}>{d}</p>
           </div>
         ))}
       </div>
@@ -412,7 +412,7 @@ function SlideDesignChanges() {
         background: stage.card, border: `1px solid ${stage.rule}`,
         borderLeft: `6px solid ${stage.accent}`,
       }}>
-        <p style={{ ...eyebrow, fontSize: 14, color: stage.accent, marginBottom: 12 }}>What's moving</p>
+        <p style={{ ...eyebrow, fontSize: 16, color: stage.accent, marginBottom: 12 }}>What's moving</p>
         <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {moves.map((m) => (
             <li key={m} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -541,7 +541,7 @@ function SlideGTMAsk() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center', gap: 32 }}>
       <p style={eyebrow}>Go-to-market — rollout</p>
       <h1 style={{ ...titleFont, fontSize: 72, lineHeight: 1.1, margin: 0, maxWidth: 1200 }}>
-        Roll it out progressively.<br/>
+        User testing, then a progressive rollout.<br/>
         <span style={{ color: stage.accent }}>No A/B test.</span>
       </h1>
       <div style={{ display: 'flex', gap: 20, maxWidth: 1200 }}>
@@ -577,20 +577,43 @@ function SlideDeRisk() {
       borderLeft: `6px solid ${accent ? stage.accent : stage.rule}`,
       display: 'flex', flexDirection: 'column', gap: 10,
     }}>
-      <p style={{ ...eyebrow, fontSize: 14, color: stage.accent }}>{eyebrowText}</p>
+      <p style={{ ...eyebrow, fontSize: 16, color: stage.accent }}>{eyebrowText}</p>
       <p style={{ ...body, fontWeight: 700, fontSize: 22 }}>{title}</p>
+      {children}
+    </div>
+  )
+  const RejectedCard = ({ title, children }) => (
+    <div style={{
+      padding: '20px 24px', borderRadius: 12,
+      background: '#F7F8FA',
+      border: `1px solid ${stage.rule}`,
+      borderLeft: `6px solid ${stage.muted}`,
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <p style={{
+        ...body, fontWeight: 700, fontSize: 20, color: stage.muted,
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <span aria-hidden="true" style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 22, height: 22, borderRadius: 99,
+          border: `1.5px solid ${stage.muted}`, color: stage.muted,
+          fontSize: 14, fontWeight: 700, lineHeight: 1,
+        }}>✕</span>
+        {title}
+      </p>
       {children}
     </div>
   )
   return (
     <div>
       <SlideHeader eyebrowText="Plan & alternatives" title="What supports the no-A/B call" />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 22 }}>
         <Card eyebrowText="Pre-launch" title="Unmoderated UserTesting">
           <p style={{ ...muted, fontSize: 18 }}>
             Existing sitters complete top tasks (edit service settings, find payouts, update profile). We watch for findability and confusion before we ship.
           </p>
-          <p style={{ ...muted, fontSize: 16, color: stage.accent, fontWeight: 600 }}>
+          <p style={{ ...muted, fontSize: 18, color: stage.accent, fontWeight: 600 }}>
             Decision criteria: any task with &gt;1 fail blocks rollout until fixed.
           </p>
         </Card>
@@ -609,22 +632,36 @@ function SlideDeRisk() {
           <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span style={{ ...titleFont, fontSize: 36, lineHeight: 1, color: stage.accent }}>20%</span>
-              <span style={{ ...muted, fontSize: 14 }}>of /provider-profile traffic is web</span>
+              <span style={{ ...muted, fontSize: 16 }}>of /provider-profile traffic is web</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span style={{ ...titleFont, fontSize: 36, lineHeight: 1 }}>80%</span>
-              <span style={{ ...muted, fontSize: 14 }}>is in-app — the bigger blast radius</span>
+              <span style={{ ...muted, fontSize: 16 }}>is in-app — the bigger blast radius</span>
             </div>
           </div>
         </Card>
-        <Card eyebrowText="Considered & discarded" title="Split tech migration from UI improvement">
-          <p style={{ ...muted, fontSize: 18 }}>
-            We considered shipping the SSR + RxN migration first with no IA changes, then a second rollout for the redesign.
-          </p>
-          <p style={{ ...muted, fontSize: 16, color: stage.accent, fontWeight: 600 }}>
-            Rejected: ~2× the work for the same end result, since both pass through the same surface.
-          </p>
-        </Card>
+      </div>
+      <div style={{
+        paddingTop: 18, marginTop: 4,
+        borderTop: `1px solid ${stage.rule}`,
+        display: 'flex', flexDirection: 'column', gap: 12,
+      }}>
+        <p style={{ ...eyebrow, fontSize: 16, color: stage.muted }}>Considered & discarded</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <RejectedCard title="A/B test the redesign">
+            <p style={{ ...muted, fontSize: 18 }}>
+              An A/B test would tell us whether the new IA moves a metric, but not <em>why</em> sitters miss a module. Unmoderated UserTesting surfaces findability and confusion before traffic is at risk.
+            </p>
+          </RejectedCard>
+          <RejectedCard title="Split tech migration from UI improvement">
+            <p style={{ ...muted, fontSize: 18 }}>
+              Ship the SSR + RxN migration first with no IA changes, then a second rollout for the redesign.
+            </p>
+            <p style={{ ...muted, fontSize: 18, fontWeight: 600 }}>
+              ~2× the work for the same end result, since both pass through the same surface.
+            </p>
+          </RejectedCard>
+        </div>
       </div>
     </div>
   )
