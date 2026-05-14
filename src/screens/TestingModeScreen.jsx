@@ -5,42 +5,48 @@ import { BackIcon } from '../assets/icons'
 import { useApp } from '../context/AppContext'
 
 // Two-pill toggle used by each testing variant.
-const ModeToggle = ({ value, onChange, options }) => (
-  <div style={{
-    display: 'flex',
-    gap: 4,
-    padding: 4,
-    background: colors.bgSecondary,
-    borderRadius: 999,
-  }}>
-    {options.map(opt => {
-      const active = value === opt.id
-      return (
-        <div
-          key={opt.id}
-          onClick={() => onChange(opt.id)}
-          style={{
-            flex: 1,
-            textAlign: 'center',
-            padding: '8px 12px',
-            cursor: 'pointer',
-            fontFamily: typography.fontFamily,
-            fontWeight: 600,
-            fontSize: 14,
-            lineHeight: '20px',
-            color: active ? colors.white : colors.primary,
-            background: active ? colors.primary : 'transparent',
-            borderRadius: 999,
-            transition: 'background 120ms ease, color 120ms ease',
-            userSelect: 'none',
-          }}
-        >
-          {opt.label}
-        </div>
-      )
-    })}
-  </div>
-)
+const ModeToggle = ({ value, onChange, options }) => {
+  // Shrink padding/font when there are 4+ options so labels don't truncate
+  // inside the 375px phone frame.
+  const compact = options.length >= 4
+  return (
+    <div style={{
+      display: 'flex',
+      gap: 4,
+      padding: 4,
+      background: colors.bgSecondary,
+      borderRadius: 999,
+    }}>
+      {options.map(opt => {
+        const active = value === opt.id
+        return (
+          <div
+            key={opt.id}
+            onClick={() => onChange(opt.id)}
+            style={{
+              flex: 1,
+              textAlign: 'center',
+              padding: compact ? '8px 6px' : '8px 12px',
+              cursor: 'pointer',
+              fontFamily: typography.fontFamily,
+              fontWeight: 600,
+              fontSize: compact ? 12 : 14,
+              lineHeight: compact ? '16px' : '20px',
+              color: active ? colors.white : colors.primary,
+              background: active ? colors.primary : 'transparent',
+              borderRadius: 999,
+              transition: 'background 120ms ease, color 120ms ease',
+              userSelect: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {opt.label}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 const VariantRow = ({ title, description, value, onChange, options }) => (
   <div style={{
@@ -54,10 +60,12 @@ const VariantRow = ({ title, description, value, onChange, options }) => (
       fontFamily: typography.fontFamily, fontWeight: 600, fontSize: 16,
       lineHeight: '24px', color: colors.primary,
     }}>{title}</span>
-    <span style={{
-      fontFamily: typography.fontFamily, fontWeight: 400, fontSize: 13,
-      lineHeight: '18px', color: colors.tertiary, marginBottom: 12,
-    }}>{description}</span>
+    {description && (
+      <span style={{
+        fontFamily: typography.fontFamily, fontWeight: 400, fontSize: 13,
+        lineHeight: '18px', color: colors.tertiary, marginBottom: 12,
+      }}>{description}</span>
+    )}
     <ModeToggle value={value} onChange={onChange} options={options} />
   </div>
 )
