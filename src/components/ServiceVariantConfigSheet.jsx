@@ -223,6 +223,9 @@ export default function ServiceVariantConfigSheet({
     showShortNoticeRateBanner,      setShowShortNoticeRateBanner,
     showHubFetchError,              setShowHubFetchError,
     showMissingInfo,                setShowMissingInfo,
+    showCiafMigrationOnboarding,        setShowCiafMigrationOnboarding,
+    showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBanner,
+    showGroomingProfileReviewBanner,    setShowGroomingProfileReviewBanner,
   } = useApp()
 
   useEffect(
@@ -377,6 +380,39 @@ export default function ServiceVariantConfigSheet({
         <OptionToggle
           value={boolToId(showShortNoticeRateBanner)}
           onChange={(id) => setShowShortNoticeRateBanner(idToBool(id))}
+          options={BOOL_OPTIONS}
+        />
+      </ConfigRow>
+
+      <ConfigRow
+        label="CIAF migration onboarding"
+        note="Cat-themed onboarding card for sitters who just migrated from Cat in a Flat."
+      >
+        <OptionToggle
+          value={boolToId(showCiafMigrationOnboarding)}
+          onChange={(id) => setShowCiafMigrationOnboarding(idToBool(id))}
+          options={BOOL_OPTIONS}
+        />
+      </ConfigRow>
+
+      <ConfigRow
+        label="Training credentials banner"
+        note="Warning shown to sitters who need to upload dog-training credentials."
+      >
+        <OptionToggle
+          value={boolToId(showTrainingCredentialsUploadBanner)}
+          onChange={(id) => setShowTrainingCredentialsUploadBanner(idToBool(id))}
+          options={BOOL_OPTIONS}
+        />
+      </ConfigRow>
+
+      <ConfigRow
+        label="Grooming profile review banner"
+        note="Notice that a groomer profile is under review (up to 20 days)."
+      >
+        <OptionToggle
+          value={boolToId(showGroomingProfileReviewBanner)}
+          onChange={(id) => setShowGroomingProfileReviewBanner(idToBool(id))}
           options={BOOL_OPTIONS}
         />
       </ConfigRow>

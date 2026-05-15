@@ -42,6 +42,9 @@ const SHOW_REGIONAL_ALERT_CALIFORNIA_KEY   = 'showRegionalAlertCalifornia'
 const SHOW_SHORT_NOTICE_RATE_BANNER_KEY    = 'showShortNoticeRateBanner'
 const SHOW_HUB_FETCH_ERROR_KEY             = 'showHubFetchError'
 const SHOW_MISSING_INFO_KEY                = 'showMissingInfo'
+const SHOW_CIAF_MIGRATION_ONBOARDING_KEY        = 'showCiafMigrationOnboarding'
+const SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY      = 'showTrainingCredentialsUploadBanner'
+const SHOW_GROOMING_PROFILE_REVIEW_KEY          = 'showGroomingProfileReviewBanner'
 
 const readInitialEnum = (key, fallback) => {
   if (typeof window === 'undefined') return fallback
@@ -75,6 +78,9 @@ const readInitialShowRegionalAlertCalifornia     = () => readInitialBool(SHOW_RE
 const readInitialShowShortNoticeRateBanner       = () => readInitialBool(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     false)
 const readInitialShowHubFetchError               = () => readInitialBool(SHOW_HUB_FETCH_ERROR_KEY,              false)
 const readInitialShowMissingInfo                 = () => readInitialBool(SHOW_MISSING_INFO_KEY,                 false)
+const readInitialShowCiafMigrationOnboarding     = () => readInitialBool(SHOW_CIAF_MIGRATION_ONBOARDING_KEY,    false)
+const readInitialShowTrainingCredentialsUpload   = () => readInitialBool(SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY,  false)
+const readInitialShowGroomingProfileReview       = () => readInitialBool(SHOW_GROOMING_PROFILE_REVIEW_KEY,      false)
 
 export function AppProvider({ children }) {
   // ── Shared ────────────────────────────────────────────────────────────────
@@ -160,6 +166,9 @@ export function AppProvider({ children }) {
   const [showShortNoticeRateBanner,       setShowShortNoticeRateBannerRaw]       = useState(readInitialShowShortNoticeRateBanner)
   const [showHubFetchError,               setShowHubFetchErrorRaw]               = useState(readInitialShowHubFetchError)
   const [showMissingInfo,                 setShowMissingInfoRaw]                 = useState(readInitialShowMissingInfo)
+  const [showCiafMigrationOnboarding,        setShowCiafMigrationOnboardingRaw]        = useState(readInitialShowCiafMigrationOnboarding)
+  const [showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBannerRaw] = useState(readInitialShowTrainingCredentialsUpload)
+  const [showGroomingProfileReviewBanner,     setShowGroomingProfileReviewBannerRaw]     = useState(readInitialShowGroomingProfileReview)
 
   const persistEnum = (key, next, raw) => {
     raw(next)
@@ -190,6 +199,9 @@ export function AppProvider({ children }) {
   const setShowShortNoticeRateBanner      = (next) => persistJson(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     next, setShowShortNoticeRateBannerRaw)
   const setShowHubFetchError              = (next) => persistJson(SHOW_HUB_FETCH_ERROR_KEY,              next, setShowHubFetchErrorRaw)
   const setShowMissingInfo                = (next) => persistJson(SHOW_MISSING_INFO_KEY,                 next, setShowMissingInfoRaw)
+  const setShowCiafMigrationOnboarding        = (next) => persistJson(SHOW_CIAF_MIGRATION_ONBOARDING_KEY,        next, setShowCiafMigrationOnboardingRaw)
+  const setShowTrainingCredentialsUploadBanner = (next) => persistJson(SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY,     next, setShowTrainingCredentialsUploadBannerRaw)
+  const setShowGroomingProfileReviewBanner    = (next) => persistJson(SHOW_GROOMING_PROFILE_REVIEW_KEY,         next, setShowGroomingProfileReviewBannerRaw)
 
   return (
     <AppContext.Provider value={{
@@ -225,6 +237,9 @@ export function AppProvider({ children }) {
       showShortNoticeRateBanner,      setShowShortNoticeRateBanner,
       showHubFetchError,              setShowHubFetchError,
       showMissingInfo,                setShowMissingInfo,
+      showCiafMigrationOnboarding,        setShowCiafMigrationOnboarding,
+      showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBanner,
+      showGroomingProfileReviewBanner,    setShowGroomingProfileReviewBanner,
     }}>
       {children}
     </AppContext.Provider>
