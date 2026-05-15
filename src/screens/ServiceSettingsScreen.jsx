@@ -21,14 +21,10 @@ import {
 import { SITTER_PROFILE } from '../data/sitterProfile'
 import {
   ACCEPTANCE_RESTRICTION,
-  DEFAULT_FAMILY_IN_GEO,
-  DEFAULT_SERVICE_STATES,
   FAMILY_LABEL,
   FAMILY_ORDER,
   FAMILY_SIGNUP,
-  PRESETS,
   SERVICE_FAMILY,
-  SERVICE_STATE,
   getActiveServiceStatusLines,
   getActiveServices,
   getFamilyProfileRows,
@@ -39,15 +35,12 @@ import {
   joinServiceLabels,
 } from '../data/sitterServices'
 import { HUB_COPY } from '../data/hubCopy'
-import ChooseProfileSheet from '../components/ChooseProfileSheet'
-import ServiceVariantConfigSheet from '../components/ServiceVariantConfigSheet'
-import Button from '../components/Button'
 import HubBanner from '../components/HubBanner'
 import ResubmitButton from '../components/ResubmitButton'
-import ConfirmDeactivationModal from '../components/ConfirmDeactivationModal'
 import AvailabilityModal from '../components/AvailabilityModal'
 import AdditionalPreferencesModal from '../components/AdditionalPreferencesModal'
 import HelpLinkTip from '../components/HelpLinkTip'
+import ChooseProfileSheet from '../components/ChooseProfileSheet'
 import { useApp } from '../context/AppContext'
 import { useMediaQuery } from '../lib/useMediaQuery'
 
@@ -132,9 +125,15 @@ const SectionHeader = ({ title, rightLinkLabel, onRightLink, topPadding = 24 }) 
 // right-aligned caret renders (chevron-down when `collapsed`, chevron-up when
 // expanded). When `collapsible` is false, defaults preserve the original
 // non-interactive render exactly.
+//
+// `sublabel` (optional) renders as a plain second line under the title — same
+// indent, `colors.tertiary`, no warning treatment. Used to surface a
+// "Missing information" hint on collapsed sub-sections so participants know to
+// expand them. Deliberately understated: not an inset, not a caution color.
 const SubHeading = ({
   Icon,
   title,
+  sublabel,
   topPadding = 32,
   collapsible = false,
   collapsed = false,
@@ -163,17 +162,32 @@ const SubHeading = ({
     >
       <Icon size={24} color={colors.secondary} />
     </span>
-    <span
-      style={{
-        fontFamily: typography.fontFamily,
-        fontWeight: 600,
-        fontSize: 16,
-        lineHeight: 1.5,
-        color: colors.primary,
-      }}
-    >
-      {title}
-    </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
+      <span
+        style={{
+          fontFamily: typography.fontFamily,
+          fontWeight: 600,
+          fontSize: 16,
+          lineHeight: 1.5,
+          color: colors.primary,
+        }}
+      >
+        {title}
+      </span>
+      {sublabel && (
+        <span
+          style={{
+            fontFamily: typography.fontFamily,
+            fontWeight: 400,
+            fontSize: 14,
+            lineHeight: 1.25,
+            color: colors.tertiary,
+          }}
+        >
+          {sublabel}
+        </span>
+      )}
+    </div>
     {collapsible && (
       <span
         style={{
@@ -323,8 +337,6 @@ const SectionGroup = ({ children, borderless = false }) => (
 
 export default function ServiceSettingsScreen() {
   const navigate = useNavigate()
-  const [profileSheetOpen, setProfileSheetOpen] = useState(false)
-  const [configSheetOpen, setConfigSheetOpen] = useState(false)
   // Tracks which primary-section families have the "Add a new service" row
   // expanded inline. Keyed by family id.
   const [expandedFamilies, setExpandedFamilies] = useState({})
@@ -335,19 +347,28 @@ export default function ServiceSettingsScreen() {
   const [expandedSubsections, setExpandedSubsections] = useState({})
   const isTwoCol = useMediaQuery('(min-width: 880px)')
   const onBack = () => navigate('/more')
-  const openProfileSheet = () => setProfileSheetOpen(true)
-  const closeProfileSheet = () => setProfileSheetOpen(false)
   const noop = () => {}
 
-  // Only pet sitting opens ChooseProfileSheet — training/grooming each have a
-  // single profile, so their "View profile" buttons are empty clicks in the
-  // prototype (would navigate to that single profile in production).
+  // Routes any clickable row that doesn't have a real destination to the
+  // generic PlaceholderScreen. Keeps user-testing participants from hitting
+  // dead taps — every row lands somewhere they can read + back out of.
+  const goTo = (slug) => () => navigate(`/placeholder/${slug}`)
+
+  // Local state for the multi-profile chooser sheet. Pet sitting is the only
+  // family with multiple "view as" profiles (pet parent on Rover, cat parent
+  // on Rover, cat parent on Cat in a Flat), so its per-family "View profile"
+  // link opens the sheet. Training/grooming each have a single conceptual
+  // profile and route to the placeholder instead. The top-level
+  // "About you → View profile" link likewise routes to the placeholder.
+  const [profileSheetOpen, setProfileSheetOpen] = useState(false)
+  const openProfileSheet = () => setProfileSheetOpen(true)
+  const closeProfileSheet = () => setProfileSheetOpen(false)
+
   const handleViewProfile = (family) =>
-    family === SERVICE_FAMILY.PET_SITTING ? openProfileSheet : noop
+    family === SERVICE_FAMILY.PET_SITTING ? openProfileSheet : goTo('view-profile')
 
   const {
     serviceStates,
-    setServiceStates,
     familyInGeo,
     setFamilyInGeo,
     // ── Hub state variants (Phase C) ─────────────────────────────────────
@@ -357,7 +378,6 @@ export default function ServiceSettingsScreen() {
     acceptanceRestrictions,
     showAvailabilityModal,
     showAdditionalPreferencesModal,
-    showConfirmServiceDeactivation,
     showShortNoticeRateCallout,
     showServiceSettingsHelpTip,
     showRegionalAlertCalifornia,
@@ -367,10 +387,6 @@ export default function ServiceSettingsScreen() {
     setShowHubFetchError,
     showMissingInfo,
   } = useApp()
-
-  // Local state for the service-deactivation confirmation modal. Tracks which
-  // service id is pending so we can flip it to INACTIVE on confirm.
-  const [pendingDeactivationId, setPendingDeactivationId] = useState(null)
 
   // Local state for the post-submission modal sequence. Mutually exclusive —
   // Availability runs first, then Preferences.
@@ -422,48 +438,6 @@ export default function ServiceSettingsScreen() {
     setActivePostSubmissionModal(null)
   }
 
-  // Deactivate a service: flip its state to INACTIVE in the serviceStates map.
-  // The sentinel id `__all__` deactivates every service at once — used by the
-  // global "Stop providing services" account-level action.
-  const runDeactivation = (serviceId) => {
-    if (serviceId === '__all__') {
-      const next = { ...serviceStates }
-      for (const id of Object.keys(next)) next[id] = SERVICE_STATE.INACTIVE
-      setServiceStates(next)
-      return
-    }
-    setServiceStates({ ...serviceStates, [serviceId]: SERVICE_STATE.INACTIVE })
-  }
-
-  // Wraps any service-deactivation action: shows the confirmation modal first
-  // when the variant is on, runs immediately otherwise.
-  const requestDeactivation = (serviceId) => {
-    if (showConfirmServiceDeactivation) {
-      setPendingDeactivationId(serviceId)
-    } else {
-      runDeactivation(serviceId)
-    }
-  }
-
-  const confirmPendingDeactivation = () => {
-    if (pendingDeactivationId) runDeactivation(pendingDeactivationId)
-    setPendingDeactivationId(null)
-  }
-
-  const cancelPendingDeactivation = () => setPendingDeactivationId(null)
-
-  const applyPreset = (key) => {
-    const preset = PRESETS[key]
-    if (!preset) return
-    setServiceStates(preset.serviceStates)
-    setFamilyInGeo(preset.familyInGeo)
-  }
-
-  const resetVariants = () => {
-    setServiceStates(DEFAULT_SERVICE_STATES)
-    setFamilyInGeo(DEFAULT_FAMILY_IN_GEO)
-  }
-
   const { profile, business } = SITTER_PROFILE
 
   const primaryFamilies = FAMILY_ORDER.filter((fam) => hasActiveServices(fam, serviceStates))
@@ -475,6 +449,15 @@ export default function ServiceSettingsScreen() {
   // primary family is active. Single-family variants stay caret-free to match
   // their standalone Figma frames.
   const subsectionsCollapsible = primaryFamilies.length > 1 && !isTwoCol
+
+  // Sub-section missing-info detectors. Used to surface a "Missing information"
+  // sublabel on the collapsible Services/Profile sub-headings so participants
+  // know which collapsed section hides an incomplete row. Per-family scoped via
+  // the new `MISSING_INFO_DEMO_ROWS` map — see `isMissingInfoRow(rowId, family)`.
+  const hasMissingService = (family) =>
+    getActiveServices(family, serviceStates).some((s) => isMissingInfoRow(s.id, family))
+  const hasMissingProfile = (family, profileRows) =>
+    profileRows.some((r) => isMissingInfoRow(r.id, family))
 
   const toggleFamilyExpansion = (family) =>
     setExpandedFamilies((prev) => ({ ...prev, [family]: !prev[family] }))
@@ -544,9 +527,7 @@ export default function ServiceSettingsScreen() {
         }}
       >
         {/* Hub fetch error empty state — short-circuits the rest of the hub.
-            Renders only the error banner; the Configure variants control is
-            kept at the bottom so the testing-mode entry point stays reachable
-            even when this state is on. */}
+            Renders only the error banner. */}
         {showHubFetchError ? (
           <div
             style={{
@@ -663,6 +644,11 @@ export default function ServiceSettingsScreen() {
                     <SubHeading
                       Icon={ListIcon}
                       title="Services"
+                      sublabel={
+                        subsectionsCollapsible && showMissingInfo && hasMissingService(family)
+                          ? 'Missing information'
+                          : undefined
+                      }
                       topPadding={32}
                       collapsible={subsectionsCollapsible}
                       collapsed={!expandedSubsections[family]?.services}
@@ -675,14 +661,14 @@ export default function ServiceSettingsScreen() {
                           const onRowPress =
                             svc.id === 'boarding'
                               ? () => navigate('/service-settings/boarding')
-                              : noop
+                              : goTo(svc.id.replace(/_/g, '-'))
                           const baseStatusLines = getActiveServiceStatusLines(svc, {
                             state: serviceStates[svc.id],
                             restriction:
                               acceptanceRestrictions?.[svc.id] ?? ACCEPTANCE_RESTRICTION.NONE,
                           })
                           const statusLines =
-                            showMissingInfo && isMissingInfoRow(svc.id)
+                            showMissingInfo && isMissingInfoRow(svc.id, svc.family)
                               ? [...baseStatusLines, { text: 'Missing information', tone: 'caution' }]
                               : baseStatusLines
                           return (
@@ -756,7 +742,7 @@ export default function ServiceSettingsScreen() {
                                   label={svc.label}
                                   statusLines={[{ text: 'Inactive', color: 'tertiary' }]}
                                   rightItem={<Chevron />}
-                                  onPress={noop}
+                                  onPress={goTo(svc.id.replace(/_/g, '-'))}
                                 />
                               )
                             })}
@@ -777,6 +763,11 @@ export default function ServiceSettingsScreen() {
                           <SubHeading
                             Icon={PersonIcon}
                             title="Profile"
+                            sublabel={
+                              subsectionsCollapsible && showMissingInfo && hasMissingProfile(family, profileRows)
+                                ? 'Missing information'
+                                : undefined
+                            }
                             topPadding={32}
                             collapsible={subsectionsCollapsible}
                             collapsed={!expandedSubsections[family]?.profile}
@@ -785,9 +776,11 @@ export default function ServiceSettingsScreen() {
                           {(!subsectionsCollapsible || expandedSubsections[family]?.profile) && profileRows.map((row) => {
                             const isComplete = resolveCompletion(row.completionKey, profile)
                             const statusLines =
-                              showMissingInfo && isMissingInfoRow(row.id)
+                              showMissingInfo && isMissingInfoRow(row.id, family)
                                 ? [{ text: 'Missing information', tone: 'caution' }]
                                 : undefined
+                            const familySlug = family.replace(/_/g, '-')
+                            const rowSlug = row.id.replace(/_/g, '-')
                             return (
                               <SettingsRow
                                 key={row.id}
@@ -795,7 +788,7 @@ export default function ServiceSettingsScreen() {
                                 sublabel={row.sublabel}
                                 statusLines={statusLines}
                                 rightItem={isComplete ? <CheckCircleIcon /> : <Chevron />}
-                                onPress={noop}
+                                onPress={goTo(`${familySlug}.${rowSlug}`)}
                               />
                             )
                           })}
@@ -807,13 +800,25 @@ export default function ServiceSettingsScreen() {
               )
             })}
 
-            {/* ── Other services ── (no trailing border in Figma) */}
+            {/* ── Other services ──
+                User-testing build: wrap in SectionGroup so it carries a
+                trailing border on the single-column phone layout, separating
+                it from the Business section that follows. In the two-column
+                desktop layout Business sits in Column B, so the border is
+                suppressed (`borderless={isTwoCol}`) to match Figma. */}
             {otherFamilies.length > 0 && (
-              <div>
+              <SectionGroup borderless={isTwoCol}>
                 <SectionHeader title="Other services" topPadding={40} />
                 {otherFamilies.map((family) => {
                   const Icon = FAMILY_SIGNUP_ICON[family]
                   const signup = FAMILY_SIGNUP[family]
+                  // Training/grooming families each route to their own sign-up
+                  // placeholder; pet sitting (rare here, but covered) reuses
+                  // the family slug as a fallback.
+                  const signupSlug =
+                    family === SERVICE_FAMILY.TRAINING ? 'training-signup'
+                    : family === SERVICE_FAMILY.GROOMING ? 'grooming-signup'
+                    : family.replace(/_/g, '-')
                   return (
                     <SettingsRow
                       key={family}
@@ -821,11 +826,11 @@ export default function ServiceSettingsScreen() {
                       label={signup.label}
                       sublabel={signup.sublabel}
                       rightItem={<Chevron />}
-                      onPress={noop}
+                      onPress={goTo(signupSlug)}
                     />
                   )
                 })}
-              </div>
+              </SectionGroup>
             )}
           </div>
 
@@ -839,25 +844,25 @@ export default function ServiceSettingsScreen() {
                 label="Availability"
                 sublabel="Manage the availability for your pet sitting services"
                 rightItem={<Chevron />}
-                onPress={noop}
+                onPress={goTo('availability')}
               />
               <SettingsRow
                 label="Insights"
                 sublabel="Check your profile and business performance"
                 rightItem={<Chevron />}
-                onPress={noop}
+                onPress={goTo('insights')}
               />
               <SettingsRow
                 label="Promote your profile"
                 sublabel="Share your profile link to give pet parents $20 off their first booking."
                 rightItem={<Chevron />}
-                onPress={noop}
+                onPress={goTo('promote')}
               />
               <SettingsRow
                 label="Receive payments"
                 sublabel="Update payment details on Stripe"
                 rightItem={<Chevron />}
-                onPress={noop}
+                onPress={goTo('payments')}
               />
               <SettingsRow
                 label="Background check"
@@ -867,7 +872,7 @@ export default function ServiceSettingsScreen() {
                     : 'Required to receive bookings.'
                 }
                 rightItem={business.backgroundCheckPassed ? <CheckCircleIcon /> : <Chevron />}
-                onPress={noop}
+                onPress={goTo('background-check')}
               />
             </SectionGroup>
 
@@ -876,7 +881,7 @@ export default function ServiceSettingsScreen() {
               <SectionHeader
                 title="About you"
                 rightLinkLabel="View profile"
-                onRightLink={noop}
+                onRightLink={goTo('view-profile')}
                 topPadding={40}
               />
 
@@ -884,25 +889,25 @@ export default function ServiceSettingsScreen() {
                 label="Details"
                 sublabel="Address, photo, email, and birthday"
                 rightItem={<Chevron />}
-                onPress={noop}
+                onPress={goTo('details')}
               />
               <SettingsRow
                 label="Pets"
                 sublabel="Add your pets"
                 rightItem={<Chevron />}
-                onPress={noop}
+                onPress={goTo('pets')}
               />
               <SettingsRow
                 label="Phone numbers"
                 sublabel="Edit your number and emergency contact"
                 rightItem={<Chevron />}
-                onPress={noop}
+                onPress={goTo('phone-numbers')}
               />
               <SettingsRow
                 label="Payment methods"
                 sublabel="Default method for payments on Rover"
                 rightItem={<Chevron />}
-                onPress={noop}
+                onPress={goTo('payment-methods')}
               />
             </SectionGroup>
 
@@ -914,7 +919,7 @@ export default function ServiceSettingsScreen() {
                 labelColor={colors.destructive}
                 sublabel="Take your services down. You can sign back up later."
                 rightItem={<BlockedIcon />}
-                onPress={() => requestDeactivation('__all__')}
+                onPress={goTo('stop-providing-services')}
               />
             </div>
           </div>
@@ -942,38 +947,7 @@ export default function ServiceSettingsScreen() {
         )}
         </>
         )}
-
-        <div style={{ paddingTop: 40, paddingBottom: 40 }}>
-          <Button
-            variant="flat"
-            size="small"
-            fullWidth
-            onClick={() => setConfigSheetOpen(true)}
-          >
-            Configure variants
-          </Button>
-        </div>
       </div>
-
-      {profileSheetOpen && <ChooseProfileSheet onDismiss={closeProfileSheet} />}
-      {configSheetOpen && (
-        <ServiceVariantConfigSheet
-          serviceStates={serviceStates}
-          familyInGeo={familyInGeo}
-          onChangeServiceStates={setServiceStates}
-          onChangeFamilyInGeo={setFamilyInGeo}
-          onApplyPreset={applyPreset}
-          onReset={resetVariants}
-          onDismiss={() => setConfigSheetOpen(false)}
-        />
-      )}
-
-      {/* Service-deactivation confirmation. Open whenever a pending id is set. */}
-      <ConfirmDeactivationModal
-        open={pendingDeactivationId != null}
-        onConfirm={confirmPendingDeactivation}
-        onCancel={cancelPendingDeactivation}
-      />
 
       {/* Post-submission modal sequence (once per session). */}
       <AvailabilityModal
@@ -984,6 +958,9 @@ export default function ServiceSettingsScreen() {
         open={activePostSubmissionModal === 'preferences'}
         onClose={closeAdditionalPreferencesModal}
       />
+
+      {/* Multi-profile chooser — opened from Pet sitting → "View profile". */}
+      {profileSheetOpen && <ChooseProfileSheet onDismiss={closeProfileSheet} />}
     </div>
   )
 }

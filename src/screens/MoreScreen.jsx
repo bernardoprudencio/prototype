@@ -1,7 +1,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { colors, typography, radius, shadows } from '../tokens'
-import { ChevronRightIcon, SettingsIcon, ChartIcon } from '../assets/icons'
+import { ChevronRightIcon, SettingsIcon } from '../assets/icons'
 import { TabBar } from '../components'
 import { SITTER_MORE_MENU, SITTER_MORE_MENU_BANNER } from '../data/moreMenu'
 
@@ -131,20 +131,6 @@ export default function MoreScreen() {
           </div>
         ))}
 
-        {/* ── Prototype-only entry point for testing variants ── */}
-        <div style={{ height: 24 }} />
-        <MenuRow
-          Icon={SettingsIcon}
-          title="Testing mode"
-          subtitle="Configure prototype variants"
-          onPress={() => navigate('/testing-mode')}
-        />
-        <MenuRow
-          Icon={ChartIcon}
-          title="Presentations"
-          subtitle="Leadership review decks"
-          onPress={() => navigate('/presentations')}
-        />
       </div>
 
       <TabBar activeTab="more" onTabSelect={onTabSelect} />

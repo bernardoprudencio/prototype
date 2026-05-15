@@ -91,16 +91,19 @@ export const SERVICES = [
   { id: 'grooming',      family: SERVICE_FAMILY.GROOMING,    label: 'Grooming',       acceptingNew: true  },
 ]
 
-// ─── Variant 2 default — matches Figma node 386:16335 ────────────────────────
-// Boarding, Doggy Day Care, Drop-In active; House Sitting, Dog Walking inactive
-// (revealed via "Add a new service"); training + grooming available for sign-up.
+// ─── User-testing default ────────────────────────────────────────────────────
+// Boarding, Doggy Day Care, Dog Walking, and Dog Training active so participants
+// see two primary family sections (Pet sitting + Training) and the
+// Services/Profile collapse pattern is exercised; House Sitting and Drop-In
+// remain inactive under Pet sitting's `Add a new service`; Grooming is the only
+// family left in `Other services`.
 export const DEFAULT_SERVICE_STATES = {
   boarding:      SERVICE_STATE.ACTIVE,
   house_sitting: SERVICE_STATE.INACTIVE,
   doggy_daycare: SERVICE_STATE.ACTIVE,
-  drop_in:       SERVICE_STATE.ACTIVE,
-  dog_walking:   SERVICE_STATE.INACTIVE,
-  dog_training:  SERVICE_STATE.INACTIVE,
+  drop_in:       SERVICE_STATE.INACTIVE,
+  dog_walking:   SERVICE_STATE.ACTIVE,
+  dog_training:  SERVICE_STATE.ACTIVE,
   grooming:      SERVICE_STATE.INACTIVE,
 }
 
@@ -121,12 +124,22 @@ export const DEFAULT_ACCEPTANCE_RESTRICTIONS = {
 }
 
 // Row ids that render the "Missing information" status line when the
-// `showMissingInfo` testing-mode toggle is on. Covers one overnight service
-// (boarding), one short service (dog_walking), and the About profile row.
-export const MISSING_INFO_DEMO_ROWS = ['boarding', 'dog_walking', 'about']
+// `showMissingInfo` testing-mode toggle is on, scoped per family. The
+// user-testing scenario isolates the missing-information treatment to Pet
+// sitting → Profile → About — a single, unambiguous surface. Other families'
+// `about` rows (e.g. Training → Profile → About) intentionally do NOT light up.
+//
+// Shape: `{ [family]: [rowId, ...] }`. Families absent from the map have no
+// missing-info rows. Row ids can refer to either a service id (e.g.
+// `'boarding'`) or a profile row id (e.g. `'about'`); the calling site decides
+// which is which via the `family` it passes to `isMissingInfoRow`.
+export const MISSING_INFO_DEMO_ROWS = {
+  [SERVICE_FAMILY.PET_SITTING]: ['about'],
+}
 
-export function isMissingInfoRow(rowId) {
-  return MISSING_INFO_DEMO_ROWS.includes(rowId)
+export function isMissingInfoRow(rowId, family) {
+  const rows = MISSING_INFO_DEMO_ROWS[family]
+  return !!rows && rows.includes(rowId)
 }
 
 // ─── Variant presets ─────────────────────────────────────────────────────────

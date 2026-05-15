@@ -6,6 +6,7 @@ on:
       - main
       - new-modification
       - incomplete-cards-user-tested
+      - user-testing-provider-profile
 
 permissions:
   contents: write
@@ -35,6 +36,10 @@ jobs:
         if: github.ref == 'refs/heads/incomplete-cards-user-tested'
         run: VITE_BASE=/prototype/incomplete-cards-user-tested/ npm run build
 
+      - name: Build (user-testing-provider-profile)
+        if: github.ref == 'refs/heads/user-testing-provider-profile'
+        run: VITE_BASE=/prototype/user-testing-provider-profile/ npm run build
+
       - name: Deploy main → root
         if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4
@@ -60,4 +65,13 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           destination_dir: incomplete-cards-user-tested
+          keep_files: true
+
+      - name: Deploy user-testing-provider-profile → subdirectory
+        if: github.ref == 'refs/heads/user-testing-provider-profile'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: user-testing-provider-profile
           keep_files: true

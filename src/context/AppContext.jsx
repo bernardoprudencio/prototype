@@ -74,7 +74,7 @@ const readInitialShowServiceSettingsHelpTip      = () => readInitialBool(SHOW_SE
 const readInitialShowRegionalAlertCalifornia     = () => readInitialBool(SHOW_REGIONAL_ALERT_CALIFORNIA_KEY,    false)
 const readInitialShowShortNoticeRateBanner       = () => readInitialBool(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     false)
 const readInitialShowHubFetchError               = () => readInitialBool(SHOW_HUB_FETCH_ERROR_KEY,              false)
-const readInitialShowMissingInfo                 = () => readInitialBool(SHOW_MISSING_INFO_KEY,                 false)
+const readInitialShowMissingInfo                 = () => readInitialBool(SHOW_MISSING_INFO_KEY,                 true)
 
 export function AppProvider({ children }) {
   // ── Shared ────────────────────────────────────────────────────────────────

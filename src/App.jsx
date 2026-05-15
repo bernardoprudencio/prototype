@@ -4,7 +4,7 @@ import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, BoardingSettingsScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen } from './screens'
+import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, BoardingSettingsScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen, PlaceholderScreen } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
 
@@ -96,34 +96,6 @@ export default function App() {
         <Route path="*" element={null} />
       </Routes>
 
-      {/* ── Testing mode overlay (z-15) ── */}
-      <Routes>
-        <Route path="/testing-mode" element={
-          <SlideOverlay zIndex={15}>
-            <TestingModeScreen />
-          </SlideOverlay>
-        } />
-      </Routes>
-
-      {/* ── Presentations list overlay (z-15) ── */}
-      <Routes>
-        <Route path="/presentations" element={
-          <SlideOverlay zIndex={15}>
-            <PresentationsScreen />
-          </SlideOverlay>
-        } />
-      </Routes>
-
-      {/* ── Deck (full-viewport, breaks out of phone shell via its own fixed positioning) ── */}
-      <Routes>
-        <Route path="/presentations/leadership-review" element={
-          <DeckScreen onClose={() => navigate('/presentations')} />
-        } />
-        <Route path="/presentations/mgmt-hub-migration" element={
-          <MgmtHubDeckScreen onClose={() => navigate('/presentations')} />
-        } />
-      </Routes>
-
       {/* ── Schedule + CurrentWeek (z-20 siblings).
            In Modification mode, /schedule renders ScheduleScreen (5-week calendar).
            In Agenda mode, /schedule renders ScheduleOverlay (RelationshipManagement + sheets). ── */}
@@ -145,6 +117,15 @@ export default function App() {
         <Route path="/conversation/:ownerId/schedule/edit-template" element={
           <SlideOverlay zIndex={30}>
             <EditTemplateScreen />
+          </SlideOverlay>
+        } />
+      </Routes>
+
+      {/* ── Placeholder overlay (z-15) — generic "you'd find X here" screens for user testing ── */}
+      <Routes>
+        <Route path="/placeholder/:slug" element={
+          <SlideOverlay zIndex={15}>
+            <PlaceholderScreen />
           </SlideOverlay>
         } />
       </Routes>
