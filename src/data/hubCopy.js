@@ -89,6 +89,52 @@ export const HUB_COPY = {
     ctaLabel: 'Retry',
   },
 
+  // CIAF migration onboarding card. Shown to sitters who just migrated from
+  // Cat in a Flat (UK cat-sitting service acquired by Rover, Oct 2024).
+  // Production: src/frontend/react-lib/.../HubPage/components/MigrationOnboarding/MigrationOnboarding.tsx
+  ciafMigrationOnboarding: {
+    heading: 'Hello cat lovers!',
+    subheading: 'Get to know your new Rover profile',
+    bullets: [
+      {
+        title: 'Ensure you get paid',
+        body: 'Required: Add a Stripe bank account for your payouts, even if you previously set up Stripe on Cat in a Flat.',
+        href: '/account/profile/receive-payments',
+      },
+      {
+        title: 'Review your settings and calendar',
+        body: 'Explore improved control over your service preferences and rates. The calendar adds flexibility over your previous schedule. View it online or the improved version in the Rover app.',
+        href: '/provider-profile/calendar',
+      },
+      {
+        title: 'Download the app',
+        body: 'The Rover app lets you manage bookings, message clients, and access other powerful app-only tools, all on the go.',
+        href: 'https://rover.app.link/download',
+      },
+    ],
+    dismissLabel: 'Dismiss',
+  },
+
+  // Training credentials upload prompt. Kibble Alert severity=WARNING.
+  // Production: src/frontend/react-lib/.../HubPage/components/TrainingCredentialsUploadBanner.tsx
+  trainingCredentialsUpload: {
+    severity: 'warning',
+    title: 'Add your dog training credentials',
+    body: 'These documents help us review and approve your profile.',
+    ctaLabel: 'Upload credentials',
+  },
+
+  // Grooming profile review notice. Kibble Alert severity=WARNING, no icon,
+  // single paragraph with bolded lead.
+  // Production: src/frontend/react-lib/.../HubPage/components/GroomingProfileReviewBanner.tsx
+  groomingProfileReview: {
+    severity: 'warning',
+    boldLead: 'Your groomer profile is under review.',
+    body: "This can take up to 20 days. We'll let you know when it's done.",
+    ctaLabel: 'Learn more',
+    ctaHref: 'https://support.rover.com/hc/en-us/articles/45572014256788-How-do-I-become-a-groomer-on-Rover',
+  },
+
   // Service-row status copy — used by getActiveServiceStatusLines in sitterServices.js,
   // duplicated here for reference. Edit sitterServices.js, not this file, if changing.
   serviceStatus: {

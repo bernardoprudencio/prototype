@@ -43,6 +43,7 @@ import ChooseProfileSheet from '../components/ChooseProfileSheet'
 import ServiceVariantConfigSheet from '../components/ServiceVariantConfigSheet'
 import Button from '../components/Button'
 import HubBanner from '../components/HubBanner'
+import MigrationOnboardingBanner from '../components/MigrationOnboardingBanner'
 import ResubmitButton from '../components/ResubmitButton'
 import ConfirmDeactivationModal from '../components/ConfirmDeactivationModal'
 import AvailabilityModal from '../components/AvailabilityModal'
@@ -366,6 +367,10 @@ export default function ServiceSettingsScreen() {
     showHubFetchError,
     setShowHubFetchError,
     showMissingInfo,
+    showCiafMigrationOnboarding,
+    setShowCiafMigrationOnboarding,
+    showTrainingCredentialsUploadBanner,
+    showGroomingProfileReviewBanner,
   } = useApp()
 
   // Local state for the service-deactivation confirmation modal. Tracks which
@@ -593,6 +598,33 @@ export default function ServiceSettingsScreen() {
             />
           )}
 
+          {showTrainingCredentialsUploadBanner && (
+            <HubBanner
+              severity={HUB_COPY.trainingCredentialsUpload.severity}
+              title={HUB_COPY.trainingCredentialsUpload.title}
+              body={HUB_COPY.trainingCredentialsUpload.body}
+              cta={{
+                label: HUB_COPY.trainingCredentialsUpload.ctaLabel,
+                onClick: noop,
+              }}
+            />
+          )}
+
+          {showGroomingProfileReviewBanner && (
+            <HubBanner
+              severity={HUB_COPY.groomingProfileReview.severity}
+              layout="paragraph"
+              hideIcon
+              title={HUB_COPY.groomingProfileReview.boldLead}
+              body={HUB_COPY.groomingProfileReview.body}
+              cta={{
+                label: HUB_COPY.groomingProfileReview.ctaLabel,
+                href: HUB_COPY.groomingProfileReview.ctaHref,
+                target: '_blank',
+              }}
+            />
+          )}
+
           {searchStatus === 'away_manual' && (
             <HubBanner
               severity="info"
@@ -618,6 +650,13 @@ export default function ServiceSettingsScreen() {
               body={HUB_COPY.californiaProviderGroup.body}
               cta={{ label: HUB_COPY.californiaProviderGroup.ctaLabel, onClick: noop }}
               onDismiss={() => setShowRegionalAlertCalifornia(false)}
+            />
+          )}
+
+          {showCiafMigrationOnboarding && (
+            <MigrationOnboardingBanner
+              copy={HUB_COPY.ciafMigrationOnboarding}
+              onDismiss={() => setShowCiafMigrationOnboarding(false)}
             />
           )}
 

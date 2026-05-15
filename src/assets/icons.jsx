@@ -326,6 +326,39 @@ export const TrainingIcon = ({ color = c.success }) => (
   </svg>
 )
 
+// Cat-peek mascot — used in the CIAF MigrationOnboarding banner, mirroring the
+// peeking-cat illustration in production's MigrationOnboarding.tsx. Stylized
+// silhouette: two ears, round face, simple eyes + smile.
+export const CatPeekIcon = ({ size = 72, color = c.primary }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 72 72" fill="none" aria-hidden="true">
+    <path
+      d="M12 30 L20 10 L28 26 Z"
+      fill={color}
+    />
+    <path
+      d="M44 26 L52 10 L60 30 Z"
+      fill={color}
+    />
+    <circle cx="36" cy="40" r="24" fill={color} />
+    <circle cx="27" cy="38" r="3" fill="#FFFFFF" />
+    <circle cx="45" cy="38" r="3" fill="#FFFFFF" />
+    <path
+      d="M30 48 Q36 54 42 48"
+      stroke="#FFFFFF"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      fill="none"
+    />
+    <path
+      d="M34 46 L36 49 L38 46"
+      stroke="#FFFFFF"
+      strokeWidth="2"
+      strokeLinecap="round"
+      fill="none"
+    />
+  </svg>
+)
+
 // Grooming — used in the "Other services" sign-up row when grooming is
 // available but not yet configured. Sourced from Figma; brand green to match
 // the other sign-up icons.
