@@ -45,6 +45,7 @@ const client = ({
   cancelledBookings = null,
   hasUpcoming = true,
   recurringSchedule = null,
+  lockedRates = null,
 }) => {
   // No-tier clients pass an explicit cancelledBookings list. Per the
   // CumulativeGrossBookingValueCalculator in roverdotcom/web, cancelled
@@ -64,6 +65,7 @@ const client = ({
     cancelledBookings,
     hasUpcoming,
     recurringSchedule,
+    lockedRates,
     subtitleText: formatPetNames(petNames),
     bookingInfoText: formatBookingLine(count, gbv),
   }
@@ -178,6 +180,32 @@ export const CLIENTS = [
     pets: [pet(1, 'Mochi', petImages.mochi), pet(2, 'Yuzu', petImages.yuzu)],
     bookingCount: 24,
     gbv: 5640,
+    // Locked rates only exist on non-recurring relationships: production builds
+    // recurring sentinel requests `.without_locked_rates()`, so the recurring
+    // clients above can never carry this block. Lena is a long-running boarding
+    // client, which is exactly the case the feature was built for.
+    //
+    // In production the state lives in `services.LockedServiceAddOn`, keyed
+    // unique_together on (service, requester, add_on_type) — one row per rate
+    // type, and the row's existence IS the locked state. The mock collapses that
+    // to `locked` + a rate list because the API write is full-set replacement
+    // (unlock POSTs an empty list), so per-row toggling never happens.
+    //
+    // `lockedPrice` is below `defaultPrice` on every row because production
+    // snapshots the rate the owner actually agreed to on the booking, not the
+    // sitter's current profile rate. defaultPrice values track
+    // BOARDING_SETTINGS in src/data/sitterProfile.js.
+    lockedRates: {
+      serviceKey: 'dog_boarding',
+      serviceName: 'dog boarding',
+      locked: true,
+      rates: [
+        { slug: 'standard-rate',  label: 'Standard rate',       lockedPrice: 38, defaultPrice: 45, unit: 'night' },
+        { slug: 'additional-dog', label: 'Additional dog rate', lockedPrice: 28, defaultPrice: 35, unit: 'night' },
+        { slug: 'puppy',          label: 'Puppy rate',          lockedPrice: 8,  defaultPrice: 10, unit: 'night' },
+        { slug: 'holiday',        label: 'Holiday rate',        lockedPrice: 12, defaultPrice: 15, unit: 'night' },
+      ],
+    },
   }),
   // gbv is intentionally just below Tier 3 ($999) so the upcoming booking
   // crosses the milestone — exercises the willCross callout copy.

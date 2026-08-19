@@ -33,11 +33,17 @@ No linting or test setup exists in this project.
 
 ## Architecture
 
-**Routing:** React Router v6 with `HashRouter` (in `src/main.jsx`). Tab-level routes (`/` and `/inbox`) render via `<Routes>` inside the phone shell. Conversation and Schedule screens are **state-based overlays** (`position: absolute, inset: 0`) that slide in/out over the active tab — they are not routes. This lets back navigation return to the correct tab without losing scroll state.
+**Routing:** React Router v6 with `HashRouter` (in `src/main.jsx`). Every screen is a
+real route declared in `src/App.jsx`. Tab-level routes (`/`, `/inbox`, `/contacts`,
+`/more`, `/service-settings`) render in the base layer; conversation, relationship,
+schedule, testing-mode, and presentation screens are **overlay routes** rendered in
+sibling `<Routes>` blocks wrapped in `SlideOverlay` (`position: absolute, inset: 0`)
+at ascending `zIndex`. `SlideOverlay` owns the slide-in/out animation, so overlays
+stack over the active tab without unmounting it.
 
 **Design Tokens:** All colors, spacing, radius, shadows, and typography are centralized in `src/tokens/tokens.js`. Use these values instead of hardcoding CSS — spacing is an 8-based scale (4, 8, 12, 16, 24, 32px), and the palette uses semantic names (primary, secondary, success, link, etc.).
 
-**Component Variants:** `Button.jsx` supports `default`, `primary`, `flat`, and `disabled` variants via a `variant` prop. SVG icons live in `src/assets/icons.jsx` as named React components (17 total).
+**Component Variants:** `Button.jsx` supports `default`, `primary`, `flat`, and `disabled` variants via a `variant` prop. Icons live in `src/assets/icons.jsx` as named React components (50 exports), most wrapping the Rover icon font (`src/assets/rover-icons.css`) via a private `Icon` component.
 
 **Responsive Behavior:** On desktop, the app renders inside a 375×812px phone frame with a CSS shadow shell (`global.css`). On mobile (≤420px viewport), it goes full-screen for native-feeling user tests.
 
@@ -47,29 +53,26 @@ No linting or test setup exists in this project.
 
 ## App State & Navigation Flow
 
-`App.jsx` is the single source of truth. Key state:
+`src/context/AppContext.jsx` is the single source of truth — consume it with
+`useApp()`. `App.jsx` holds only the two transient sheets (`sheetItem`,
+`reviewSheetCard`) and `loadTime`. Selected context state:
 
 | State | Type | Purpose |
 |-------|------|---------|
-| `conversation` | `{ type, card?, clientKey? }` \| null | Active conversation passed to ConversationScreen overlay |
-| `convVisible` / `convTransition` | bool | Controls slide-in/out animation for conversation overlay |
-| `scheduleContext` | object \| null | Context for the Schedule overlay (owner, units, pets) |
-| `schedVisible` / `schedTransition` | bool | Controls slide-in/out animation for schedule overlay |
-| `sheetItem` | object \| null | Controls ActionSheet content |
-| `reviewSheetCard` | card \| null | Controls ReviewSheet (completion confirm) |
 | `resolvedCards` | `{ [cardId]: { resolution, timestamp } }` | Completed/cancelled cards; hidden from HomeScreen |
 | `liveEvents` | `{ [ownerId]: event[] }` | Per-owner events (messages, schedule changes) shown in ConversationScreen and InboxScreen |
-| `ownerUnits` | `{ [ownerId]: units[] }` | Schedule edits committed during session |
-| `loadTime` | string | Cached on mount via `useLoadTime()` |
+| `ownerUnits` | `{ [ownerId]: unit[] }` | Schedule edits committed during session |
+| `ownerTemplates` / `ownerWeeks` / `ownerCurrentWeeks` | `{ [ownerId]: ... }` | Per-owner schedule edits by surface |
+| `scheduleChanges` / `templateChanges` / `currentWeekChanges` | `{ [ownerId]: ... }` | Change logs feeding the conversation event stream |
+| `lockedRatesByOwner` | map keyed `ownerId:serviceKey` → bool | Locked-rates state, seeded from `client.lockedRates.locked` |
+| dev variant flags | bool / enum | `scheduleMode`, `serviceStates`, `showShortNoticeRateBanner`, `showLockedRates`, … — persisted to `localStorage` via `persistJson`, edited in `ServiceVariantConfigSheet` |
 
 **Navigation path:**
-1. HomeScreen or InboxScreen → tap card/thread → `openConversation(conv)` → conversation overlay slides in
-2. ConversationScreen "Schedule" button → `openSchedule(ctx)` → schedule overlay slides in on top (z-index 20)
-3. Schedule overlay back → `closeSchedule()` → slides out, conversation visible again
-4. Conversation overlay back → `closeConversation()` → slides out, active tab (Home or Inbox) visible
-5. Editing schedule → `onScheduleChange` callback → appended to `liveEvents[ownerId]`
-
-**Overlay animation pattern:** `openConversation` sets `convVisible=true` then uses a double `requestAnimationFrame` to set `convTransition=true`, triggering the CSS transform from `translateX(100%)` to `translateX(0)`. `closeConversation` reverses: sets `convTransition=false`, waits 200ms, then clears `convVisible` and `conversation`.
+1. HomeScreen or InboxScreen → tap card/thread → `navigate('/conversation/:ownerId')` → conversation overlay slides in
+2. Conversation "Modify schedule" → schedule routes / `ScheduleOverlay` layer on top
+3. Overlay back → `navigate(-1)` → overlay slides out, the tab underneath is still mounted
+4. Editing schedule → change appended to `liveEvents[ownerId]` via the context setters
+5. Contacts → tap a client → `/contacts/:ownerId` → `RelationshipPage` overlay
 
 ## Screen & Component Inventory
 
@@ -78,9 +81,16 @@ No linting or test setup exists in this project.
 |------|-------------|
 | `HomeScreen.jsx` | Dashboard: incomplete cards from last week, today's scheduled walks, promo cards |
 | `InboxScreen.jsx` | Inbox tab: filter chips, sorted thread list, live snippet updates from liveEvents |
-| `ConversationScreen.jsx` | Chat interface + Schedule tab; embeds RelationshipScreen |
-| `RelationshipScreen.jsx` | Full schedule UI: agenda view, add/manage/edit dialogs, billing confirmations |
-| `ScheduleScreen.jsx` | Unused wrapper — real schedule logic lives in RelationshipScreen |
+| `ConversationScreen.jsx` | Chat interface; hosts `BookingDetailsSheet` on the `/booking/:conversationOpk` route |
+| `CurrentWeekScreen.jsx` | Current-week modification screen; contains `PricingLedger` |
+| `EditTemplateScreen.jsx` | Recurring template editor |
+| `RebookScreen.jsx` | Contacts tab: client list |
+| `RelationshipPage/` | Relationship page: header, tier progress tracker, Rates row, booking lists |
+| `relationship/RelationshipManagement.jsx` | Full recurring schedule UI: agenda view, add/manage/edit sheets, billing confirmations |
+| `ScheduleScreen.jsx` / `ScheduleOverlay.jsx` | Schedule route wrappers over `RelationshipManagement` |
+| `ServiceSettingsScreen.jsx` / `BoardingSettingsScreen.jsx` | Service hub + boarding rates & settings |
+| `MoreScreen.jsx` / `TestingModeScreen.jsx` | More tab and dev variant entry point |
+| `PresentationsScreen.jsx` / `DeckScreen.jsx` / `MgmtHubDeckScreen.jsx` | Internal review decks |
 
 ### Relationship sub-components (`src/screens/relationship/`)
 | File | Description |
@@ -89,7 +99,7 @@ No linting or test setup exists in this project.
 | `AddSheet.jsx` | Bottom sheet to add a new recurring service |
 | `OccActionSheet.jsx` | Edit/skip/override a single occurrence (or from-date-forward) |
 | `ManageSheet.jsx` | List and cancel/modify multiple units |
-| `DeleteConfirmDialog.jsx` | Cancellation confirmation with refund/keep-paid options |
+| `SummarySheet.jsx` | Cancellation/modification summary with refund/keep-paid options |
 | `UnitEditor.jsx` | Form for service details: type, duration, pets, time, frequency, weekdays |
 | `theme.js` | Local token aliases + shared `labelSt` style object |
 
@@ -107,10 +117,15 @@ No linting or test setup exists in this project.
 | `Chip.jsx` | Toggle chip with optional checkmark/remove |
 | `RadioRow.jsx` | Radio + label row |
 | `TimeInput.jsx` / `CalInput.jsx` / `DisabledInput.jsx` | Form inputs |
+| `SlideOverlay.jsx` | Route-level slide-in overlay wrapper |
+| `HubBanner.jsx` / `MigrationOnboardingBanner.jsx` | Service-hub banners |
+| `HelpLinkTip.jsx` | Inline link that opens a tip sheet |
+| `ServiceVariantConfigSheet.jsx` | Dev sheet toggling every variant flag |
+| `OnOffSwitch.jsx` / `Snackbar.jsx` | On/off switch and transient bottom toast |
+| `LockRatesToggleRow.jsx` / `LockRatesSheet.jsx` | Locked-rates toggle + lock/unlock confirmation sheet |
+| `BookingDetailsSheet.jsx` | Booking price ledger; hosts the locked-rates toggle |
 
 ## Key Business Logic
-
-See [`docs/schedule-logic.md`](docs/schedule-logic.md) for the full reference. Summary:
 
 **Date anchor:** `PROTO_TODAY = new Date()` in `src/data/owners.js` — evaluated once on module load. All schedule math is relative to this value.
 
@@ -125,10 +140,23 @@ See [`docs/schedule-logic.md`](docs/schedule-logic.md) for the full reference. S
 - `getPaidThruSunday(units)` — the billing cutoff: Sunday of the week containing the earliest `startDate`
 - `shortRuleLabel(unit)` — human-readable recurrence label (e.g. "Mon, Wed and Fri")
 
+**Locked rates** — a sitter freezes the rates one client pays for one service.
+Mirrors production (`roverdotcom/web`): keyed per (owner × service), the lock is a
+single boolean because production's write is full-set replacement, and **recurring
+clients are excluded** (production builds recurring requests `.without_locked_rates()`),
+so only non-recurring clients with a `lockedRates` block show the UI. Wiring lives in
+`src/lib/useLockedRates.js`; all copy in `src/data/lockedRatesCopy.js`. Surfaces:
+`BookingDetailsSheet`, `CurrentWeekScreen`'s `PricingLedger`, and the relationship
+page's "Rates" row.
+
 **Data sources in `src/data/`:**
 - `owners.js` — 3 hardcoded clients (Owen, James, Sarah) with pet info, schedule templates, and `getIncompleteCards()` / `getTodayWalks()` / `getOwnerRelUnit()`
 - `services.js` — 5 service types; `DURATION_SHORT` / `DURATION_DAYCARE` option arrays; `FREQ` / `WEEKDAYS` constants
-- `conversations.js` — Per-owner inbox thread metadata (`INBOX_THREADS`): last message, service label, status, alert, unread flag
+- `threads.js` — Inbox thread metadata + `getChatHistory(conversationOpk)`: last message, service label, status, alert, unread flag
+- `contacts.js` — The full client roster (recurring and non-recurring), incl. `pricing` and `lockedRates`
+- `relationshipData.js` — Builds each client's relationship page: tier progress + upcoming/past/archived bookings
+- `sitterProfile.js` / `sitterServices.js` — The sitter's own default rates and service configuration
+- `lockedRatesCopy.js` / `hubCopy.js` — Verbatim production copy, single source of truth per feature
 
 ## Workflow Rules
 

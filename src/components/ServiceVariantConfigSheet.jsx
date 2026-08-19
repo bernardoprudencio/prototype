@@ -226,6 +226,7 @@ export default function ServiceVariantConfigSheet({
     showCiafMigrationOnboarding,        setShowCiafMigrationOnboarding,
     showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBanner,
     showGroomingProfileReviewBanner,    setShowGroomingProfileReviewBanner,
+    showLockedRates,                    setShowLockedRates,
   } = useApp()
 
   useEffect(
@@ -413,6 +414,17 @@ export default function ServiceVariantConfigSheet({
         <OptionToggle
           value={boolToId(showGroomingProfileReviewBanner)}
           onChange={(id) => setShowGroomingProfileReviewBanner(idToBool(id))}
+          options={BOOL_OPTIONS}
+        />
+      </ConfigRow>
+
+      <ConfigRow
+        label="Locked rates"
+        note="Lock/unlock rates control on booking details, the pricing ledger and the relationship page. Non-recurring clients only — production excludes recurring bookings."
+      >
+        <OptionToggle
+          value={boolToId(showLockedRates)}
+          onChange={(id) => setShowLockedRates(idToBool(id))}
           options={BOOL_OPTIONS}
         />
       </ConfigRow>

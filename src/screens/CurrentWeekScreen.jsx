@@ -2,7 +2,10 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { colors, typography, radius, shadows } from '../tokens'
 import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../assets/icons'
-import { Button, PetAvatar, Chip } from '../components'
+import { Button, PetAvatar, Chip, LockRatesToggleRow, LockRatesSheet, Snackbar } from '../components'
+import { getClient } from '../data/contacts'
+import { useLockedRates } from '../lib/useLockedRates'
+import { toggleLabelLedger, ledgerRowSitter } from '../data/lockedRatesCopy'
 import { OWNERS, PROTO_TODAY, getFullCurrentWeekSlots } from '../data/owners'
 import { useApp } from '../context/AppContext'
 
@@ -129,6 +132,14 @@ const CurrentWeekSnapshotCard = ({ days }) => {
 
 // ── Pricing ledger ─────────────────────────────────────────────────────────────
 const PricingLedger = ({ owner, days, baseDays }) => {
+  // Production puts the lock control directly in the price ledger (see the
+  // server-driven `ToggleOption` in conversations/.../price_ledger.py), below
+  // the subtotal. It stays hidden for the recurring clients this screen serves,
+  // because recurring requests are built `.without_locked_rates()` — so this is
+  // the production-faithful placement rather than a reachable path for Owen,
+  // James or Sarah. The reachable ledger is the one in BookingDetailsSheet.
+  const lr = useLockedRates(getClient(owner.id))
+
   const currentWalks = days.reduce((sum, d) => sum + d.slots.length, 0)
   const prevWalks    = baseDays.reduce((sum, d) => sum + d.slots.length, 0)
   const { pets, addOns } = owner.pricing
@@ -177,6 +188,35 @@ const PricingLedger = ({ owner, days, baseDays }) => {
           <p style={{ ...tx(14, 400, colors.secondary), margin: 0 }}>{fmt(prevTotal)}</p>
         </div>
       </div>
+
+      {lr.available && (
+        <div style={{ padding: '4px 0', ...divider }}>
+          <LockRatesToggleRow
+            label={toggleLabelLedger(lr.ownerFirstName)}
+            ownerFirstName={lr.ownerFirstName}
+            checked={lr.locked}
+            onRequestChange={lr.requestChange}
+          />
+          {lr.locked && (
+            <p style={{ ...tx(14, 400, colors.secondary), margin: 0, paddingBottom: 12 }}>
+              {ledgerRowSitter(lr.ownerFirstName)}
+            </p>
+          )}
+        </div>
+      )}
+
+      {lr.sheetMode && (
+        <LockRatesSheet
+          mode={lr.sheetMode}
+          ownerFirstName={lr.ownerFirstName}
+          serviceName={lr.config.serviceName}
+          rates={lr.config.rates}
+          onConfirm={lr.confirm}
+          onClose={lr.closeSheet}
+        />
+      )}
+
+      <Snackbar message={lr.snackbar} onDone={lr.dismissSnackbar} />
 
       <div style={{ padding: '16px 0', ...divider }}>
         {diff === 0 && <>

@@ -452,8 +452,10 @@ export const getInboxThreads = () => {
 // Locate a booking + its archived/upcoming flag from a conversationOpk.
 // Returns { client, booking, archived, upcoming } or null.
 const findBookingByOpk = (conversationOpk) => {
-  // opk shape: `${ownerId}-conv-{up|past|arc}-${i}`
-  const match = conversationOpk.match(/^(.+)-conv-(up|past|arc)-(\d+)$/)
+  // opk shape: `${ownerId}-conv-{up|past|arc}-${suffix}`, where suffix is
+  // normally an index but is a slug for the hand-placed demo bookings in
+  // relationshipData.js (`-up-active`, `-up-locked`).
+  const match = conversationOpk.match(/^(.+)-conv-(up|past|arc)-([\w-]+)$/)
   if (!match) return null
   const [, ownerId, kind] = match
 

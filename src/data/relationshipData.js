@@ -159,6 +159,32 @@ const buildUpcomingBookings = (client, count, currentTier) => {
     })
   }
 
+  // Lena gets one demo paid boarding booking, which is what makes the locked
+  // rates surfaces reachable: production gates the lock toggle on the
+  // conversation being `is_paid()`, browsable and not cancelled. Priced at her
+  // *locked* rates (see contacts.js) rather than the sitter's defaults —
+  // 3 nights x ($38 standard + $28 additional dog).
+  if (client.id === 'lena' && count > 0) {
+    const start = new Date(PROTO_TODAY); start.setHours(0,0,0,0); start.setDate(start.getDate() + 6)
+    const end   = new Date(PROTO_TODAY); end.setHours(0,0,0,0);   end.setDate(end.getDate() + 9)
+    const locked = client.lockedRates.rates
+    const nights = 3
+    const perNight = locked[0].lockedPrice + locked[1].lockedPrice
+    const price = perNight * nights
+    out.push({
+      id: `${client.id}-up-locked`,
+      price: money(price),
+      dates: fmtRange(start, end),
+      startDate: isoKey(start),
+      endDate: isoKey(end),
+      serviceName: SERVICES.boarding.name,
+      serviceIcon: SERVICES.boarding.icon,
+      earnings: money(price * currentTier.sitterShare),
+      serviceStatus: 'completed_service_deposit',
+      conversationOpk: `${client.id}-conv-up-locked`,
+    })
+  }
+
   const cursor = new Date(PROTO_TODAY)
   cursor.setHours(0, 0, 0, 0)
   cursor.setDate(cursor.getDate() + 5)

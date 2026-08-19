@@ -3,11 +3,12 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { colors, typography, shadows, textStyles } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
 import { peopleImages } from '../assets/images'
-import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
+import { Button, PetAvatar, BannerBlock, ChatBubble, BookingDetailsSheet } from '../components'
 import { useApp } from '../context/AppContext'
 import { OWNERS } from '../data/owners'
 import { getChatHistory, getInboxThreads } from '../data/threads'
 import { getClient } from '../data/contacts'
+import { getRelationshipData } from '../data/relationshipData'
 import { getOwnerRelUnit } from '../data/scheduleData'
 import { getConversationStatusDisplay } from '../lib/threadStatus'
 
@@ -84,6 +85,7 @@ export default function ConversationScreen() {
   }
 
   const messagesEndRef = useRef(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [text, setText] = useState('')
   const [sentMessages, setSentMessages] = useState([])
 
@@ -110,6 +112,17 @@ export default function ConversationScreen() {
   }, [sentMessages, liveEvents.length])
 
   const history = getChatHistory(effectiveOpk)
+
+  // The booking behind this conversation, used by the details sheet (price
+  // ledger + locked-rates toggle). Null on the recurring conversations, which
+  // have no single booking — and which production excludes from locked rates.
+  const client = getClient(ownerId)
+  const booking = (() => {
+    const rel = getRelationshipData(ownerId)
+    if (!rel) return null
+    const all = [...rel.bookings.upcoming, ...rel.bookings.past, ...rel.bookings.archived]
+    return all.find(b => b.conversationOpk === effectiveOpk) ?? null
+  })()
 
   // Resolve the thread for this conversation to derive the header status
   // ("Booking confirmed" / "Booking ongoing" / etc.). Falls back to a synthetic
@@ -150,7 +163,14 @@ export default function ConversationScreen() {
           <Button variant="default" style={{ flexShrink: 0 }} onClick={onOpenSchedule}>
             {scheduleMode === 'agenda' ? 'Manage schedule' : 'Modify schedule'}
           </Button>
-          <Button variant="default" style={{ flexShrink: 0 }}>Details</Button>
+          <Button
+            variant="default"
+            style={{ flexShrink: 0 }}
+            disabled={!booking}
+            onClick={() => setDetailsOpen(true)}
+          >
+            Details
+          </Button>
         </div>
       </div>
 
@@ -260,6 +280,14 @@ export default function ConversationScreen() {
           <Button variant="primary" icon={<SendIcon />} onClick={sendMessage} />
         )}
       </div>
+
+      {detailsOpen && booking && (
+        <BookingDetailsSheet
+          client={client}
+          booking={booking}
+          onClose={() => setDetailsOpen(false)}
+        />
+      )}
     </div>
   )
 }
