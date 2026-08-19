@@ -1,0 +1,15 @@
+# Dependencies — CI runs `npm install` itself (.github/workflows/deploy.yml)
+node_modules/
+
+# Build output — CI runs `npm run build` and publishes to gh-pages
+dist/
+
+# Vite
+.vite/
+*.local
+
+# Claude Code session state and worktrees
+.claude/
+
+# OS
+.DS_Store
