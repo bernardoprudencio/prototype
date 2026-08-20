@@ -45,6 +45,7 @@ const client = ({
   cancelledBookings = null,
   hasUpcoming = true,
   recurringSchedule = null,
+  lockedServices = [],
 }) => {
   // No-tier clients pass an explicit cancelledBookings list. Per the
   // CumulativeGrossBookingValueCalculator in roverdotcom/web, cancelled
@@ -64,6 +65,12 @@ const client = ({
     cancelledBookings,
     hasUpcoming,
     recurringSchedule,
+    // Service keys whose rates start out locked for this client. Production has
+    // no per-client capability flag: a lock is just the presence of
+    // LockedServiceAddOn rows for (requester, service), so every client can
+    // lock every browsable service and this list is only the seed state.
+    // See src/data/lockableRates.js.
+    lockedServices,
     subtitleText: formatPetNames(petNames),
     bookingInfoText: formatBookingLine(count, gbv),
   }
@@ -71,7 +78,10 @@ const client = ({
 
 // Pet helpers: pet IDs are local to each client (1..n). Image references come
 // from src/assets/images.js so designers can swap them in one place.
-const pet = (id, name, image) => ({ id, name, image })
+// `details` is optional and only populated where a surface renders the
+// production "Pets" section (mappers/base.py:236-270 — subtitle is
+// `pet.get_breeds_display()`, text is "{gender}, {birthday}, {weight}").
+const pet = (id, name, image, details = null) => ({ id, name, image, details })
 
 export const CLIENTS = [
   client({
@@ -175,9 +185,25 @@ export const CLIENTS = [
     id: 'lena',
     displayName: 'Lena K.',
     imageUrl: peopleImages.lena,
-    pets: [pet(1, 'Mochi', petImages.mochi), pet(2, 'Yuzu', petImages.yuzu)],
+    pets: [
+      pet(1, 'Mochi', petImages.mochi, { breeds: 'Shiba Inu',              gender: 'Female', birthday: '3 years old', weight: '19 lbs' }),
+      pet(2, 'Yuzu',  petImages.yuzu,  { breeds: 'Corgi, Australian Shepherd mix', gender: 'Male', birthday: '5 years old', weight: '27 lbs' }),
+    ],
     bookingCount: 24,
     gbv: 5640,
+    // Lena is the long-running boarding client the locked-rates feature was
+    // built for, so her boarding rates start locked. In production this is not a
+    // client attribute at all — it is the presence of LockedServiceAddOn rows
+    // for (requester, service), unique_together on
+    // (service, requester, add_on_type). Every client here can lock every
+    // browsable service; this list is only which ones begin locked.
+    //
+    // The mock collapses the per-row model to one boolean per service because
+    // the API write is full-set replacement (unlock POSTs an empty list), so
+    // per-row toggling never happens. Her rate numbers live in
+    // src/data/lockableRates.js — relationshipData.js prices her demo booking's
+    // ledger off them.
+    lockedServices: ['boarding'],
   }),
   // gbv is intentionally just below Tier 3 ($999) so the upcoming booking
   // crosses the milestone — exercises the willCross callout copy.
@@ -197,6 +223,9 @@ export const CLIENTS = [
     bookingCount: 8,
     gbv: 1920,
     hasUpcoming: false,
+    // A second seeded lock, on a different service, so the surfaces can be
+    // checked for per-(client x service) independence rather than one global flag.
+    lockedServices: ['dog_walking'],
   }),
   client({
     id: 'nora',

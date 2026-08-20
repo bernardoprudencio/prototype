@@ -45,6 +45,7 @@ const SHOW_MISSING_INFO_KEY                = 'showMissingInfo'
 const SHOW_CIAF_MIGRATION_ONBOARDING_KEY        = 'showCiafMigrationOnboarding'
 const SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY      = 'showTrainingCredentialsUploadBanner'
 const SHOW_GROOMING_PROFILE_REVIEW_KEY          = 'showGroomingProfileReviewBanner'
+const SHOW_LOCKED_RATES_KEY                     = 'showLockedRates'
 
 const readInitialEnum = (key, fallback) => {
   if (typeof window === 'undefined') return fallback
@@ -81,6 +82,7 @@ const readInitialShowMissingInfo                 = () => readInitialBool(SHOW_MI
 const readInitialShowCiafMigrationOnboarding     = () => readInitialBool(SHOW_CIAF_MIGRATION_ONBOARDING_KEY,    false)
 const readInitialShowTrainingCredentialsUpload   = () => readInitialBool(SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY,  false)
 const readInitialShowGroomingProfileReview       = () => readInitialBool(SHOW_GROOMING_PROFILE_REVIEW_KEY,      false)
+const readInitialShowLockedRates                 = () => readInitialBool(SHOW_LOCKED_RATES_KEY,                 true)
 
 export function AppProvider({ children }) {
   // ── Shared ────────────────────────────────────────────────────────────────
@@ -169,6 +171,15 @@ export function AppProvider({ children }) {
   const [showCiafMigrationOnboarding,        setShowCiafMigrationOnboardingRaw]        = useState(readInitialShowCiafMigrationOnboarding)
   const [showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBannerRaw] = useState(readInitialShowTrainingCredentialsUpload)
   const [showGroomingProfileReviewBanner,     setShowGroomingProfileReviewBannerRaw]     = useState(readInitialShowGroomingProfileReview)
+  const [showLockedRates,                     setShowLockedRatesRaw]                     = useState(readInitialShowLockedRates)
+
+  // Locked-rates state per (owner x service). Production keys LockedServiceAddOn
+  // rows on (service, requester, add_on_type), but the API write is full-set
+  // replacement — lock POSTs the whole rate list, unlock POSTs an empty one — so
+  // a single boolean per owner+service faithfully covers every reachable state.
+  // Undefined means "not yet touched this session": read the seed from
+  // client.lockedServices instead (see isRatesLocked below).
+  const [lockedRatesByOwner, setLockedRatesByOwner] = useState({})  // { [`${ownerId}:${serviceKey}`]: bool }
 
   const persistEnum = (key, next, raw) => {
     raw(next)
@@ -202,6 +213,21 @@ export function AppProvider({ children }) {
   const setShowCiafMigrationOnboarding        = (next) => persistJson(SHOW_CIAF_MIGRATION_ONBOARDING_KEY,        next, setShowCiafMigrationOnboardingRaw)
   const setShowTrainingCredentialsUploadBanner = (next) => persistJson(SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY,     next, setShowTrainingCredentialsUploadBannerRaw)
   const setShowGroomingProfileReviewBanner    = (next) => persistJson(SHOW_GROOMING_PROFILE_REVIEW_KEY,         next, setShowGroomingProfileReviewBannerRaw)
+  const setShowLockedRates                    = (next) => persistJson(SHOW_LOCKED_RATES_KEY,                    next, setShowLockedRatesRaw)
+
+  // Keyed on (client x service), as production keys LockedServiceAddOn rows.
+  // Falls back to the client's declared seed list until the sitter toggles it.
+  const isRatesLocked = (client, serviceKey) => {
+    if (!client || !serviceKey) return false
+    const key = `${client.id}:${serviceKey}`
+    return lockedRatesByOwner[key] ?? Boolean(client.lockedServices?.includes(serviceKey))
+  }
+
+  const setRatesLocked = (client, serviceKey, locked) => {
+    if (!client || !serviceKey) return
+    const key = `${client.id}:${serviceKey}`
+    setLockedRatesByOwner(prev => ({ ...prev, [key]: locked }))
+  }
 
   return (
     <AppContext.Provider value={{
@@ -240,6 +266,8 @@ export function AppProvider({ children }) {
       showCiafMigrationOnboarding,        setShowCiafMigrationOnboarding,
       showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBanner,
       showGroomingProfileReviewBanner,    setShowGroomingProfileReviewBanner,
+      showLockedRates,                    setShowLockedRates,
+      isRatesLocked,                      setRatesLocked,
     }}>
       {children}
     </AppContext.Provider>

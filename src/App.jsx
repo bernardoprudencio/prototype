@@ -4,7 +4,7 @@ import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
-import { HomeScreen, ConversationScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, BoardingSettingsScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen } from './screens'
+import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, BoardingSettingsScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
 
@@ -54,7 +54,7 @@ export default function App() {
   })
 
   return (
-    <div className="phone-shell" style={{ fontFamily: typography.fontFamily, position: 'relative', overflow: 'hidden' }}>
+    <div className="app-shell" style={{ fontFamily: typography.fontFamily, position: 'relative', overflow: 'hidden' }}>
       {/* ── Tab routes (base layer) ── */}
       <Routes>
         <Route path="/" element={
@@ -74,7 +74,9 @@ export default function App() {
 
       {/* ── Conversation overlay (z-10) ── */}
       <Routes>
-        <Route path="/conversation/:ownerId/booking/:conversationOpk" element={
+        {/* A thread opened for one specific booking keeps its opk in the URL, so
+            the conversation stays resolved while /details sits on top of it. */}
+        <Route path="/conversation/:ownerId/thread/:conversationOpk/*" element={
           <SlideOverlay zIndex={10}>
             <ConversationScreen />
           </SlideOverlay>
@@ -82,6 +84,16 @@ export default function App() {
         <Route path="/conversation/:ownerId/*" element={
           <SlideOverlay zIndex={10}>
             <ConversationScreen />
+          </SlideOverlay>
+        } />
+      </Routes>
+
+      {/* ── Booking details (z-20, over the conversation).
+           Production's /account/conversations/<opk>/details page. ── */}
+      <Routes>
+        <Route path="/conversation/:ownerId/thread/:conversationOpk/details" element={
+          <SlideOverlay zIndex={20}>
+            <BookingDetailsScreen />
           </SlideOverlay>
         } />
       </Routes>
@@ -124,9 +136,13 @@ export default function App() {
         } />
       </Routes>
 
-      {/* ── Schedule + CurrentWeek (z-20 siblings).
+      {/* ── Schedule + CurrentWeek + ModifyBooking (z-20 siblings).
            In Modification mode, /schedule renders ScheduleScreen (5-week calendar).
-           In Agenda mode, /schedule renders ScheduleOverlay (RelationshipManagement + sheets). ── */}
+           In Agenda mode, /schedule renders ScheduleOverlay (RelationshipManagement + sheets).
+           /modify is the one-time (non-recurring) counterpart: production picks
+           between ModifyBookingProviderButton and ModifyScheduleProviderButton on
+           `is_recurring` (booking_ctas.py:265-267), so the two never coexist for
+           one client and they belong at the same layer. ── */}
       <Routes>
         <Route path="/conversation/:ownerId/schedule" element={
           <SlideOverlay zIndex={20}>
@@ -136,6 +152,21 @@ export default function App() {
         <Route path="/conversation/:ownerId/current-week" element={
           <SlideOverlay zIndex={20}>
             <CurrentWeekScreen />
+          </SlideOverlay>
+        } />
+        {/* Two paths, one screen — mirroring the details route above. A thread
+            opened for one specific booking keeps its opk in the URL so the
+            modify page acts on *that* conversation; the bare path is the
+            fallback for conversations opened without an opk (HomeScreen's
+            incomplete cards). Production is always per-conversation. */}
+        <Route path="/conversation/:ownerId/thread/:conversationOpk/modify" element={
+          <SlideOverlay zIndex={20}>
+            <ModifyBookingScreen />
+          </SlideOverlay>
+        } />
+        <Route path="/conversation/:ownerId/modify" element={
+          <SlideOverlay zIndex={20}>
+            <ModifyBookingScreen />
           </SlideOverlay>
         } />
       </Routes>

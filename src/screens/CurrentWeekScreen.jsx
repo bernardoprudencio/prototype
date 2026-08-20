@@ -2,20 +2,14 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { colors, typography, radius, shadows } from '../tokens'
 import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../assets/icons'
-import { Button, PetAvatar, Chip } from '../components'
+import { Button, PetAvatar, Chip, LockRatesToggleRow, LockRatesSheet, Snackbar } from '../components'
+import { getClient } from '../data/contacts'
+import { useLockedRates } from '../lib/useLockedRates'
+import { toggleLabelLedger, ledgerRowSitter } from '../data/lockedRatesCopy'
 import { OWNERS, PROTO_TODAY, getFullCurrentWeekSlots } from '../data/owners'
 import { useApp } from '../context/AppContext'
+import { useIsWide } from '../lib/useMediaQuery'
 
-// ── Responsive hook ────────────────────────────────────────────────────────────
-const useIsDesktop = () => {
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth > 768)
-  useEffect(() => {
-    const handler = () => setIsDesktop(window.innerWidth > 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
-  return isDesktop
-}
 
 const tx = (size, weight, color) => ({
   fontFamily: typography.fontFamily, fontSize: size, fontWeight: weight, color, margin: 0,
@@ -129,6 +123,18 @@ const CurrentWeekSnapshotCard = ({ days }) => {
 
 // ── Pricing ledger ─────────────────────────────────────────────────────────────
 const PricingLedger = ({ owner, days, baseDays }) => {
+  // Production puts the lock control directly in the price ledger (see the
+  // server-driven `ToggleOption` in conversations/.../price_ledger.py), below
+  // the subtotal. This screen is not a conversation, so it stands in for the
+  // recurring walking conversation behind it: paid, not cancelled, dog walking.
+  // The canonical `_get_lock_rates_toggle` has no recurring check, so the
+  // control is offered here — but production prices recurring sentinel requests
+  // `.without_locked_rates()` (recurring/models.py), so a lock set here would
+  // never *apply* to these walks. The placement is faithful; the effect is not.
+  const lr = useLockedRates(getClient(owner.id), {
+    serviceKey: 'dog_walking', isPaid: true, isCancelled: false,
+  })
+
   const currentWalks = days.reduce((sum, d) => sum + d.slots.length, 0)
   const prevWalks    = baseDays.reduce((sum, d) => sum + d.slots.length, 0)
   const { pets, addOns } = owner.pricing
@@ -177,6 +183,35 @@ const PricingLedger = ({ owner, days, baseDays }) => {
           <p style={{ ...tx(14, 400, colors.secondary), margin: 0 }}>{fmt(prevTotal)}</p>
         </div>
       </div>
+
+      {lr.available && (
+        <div style={{ padding: '4px 0', ...divider }}>
+          <LockRatesToggleRow
+            label={toggleLabelLedger(lr.ownerFirstName)}
+            ownerFirstName={lr.ownerFirstName}
+            checked={lr.locked}
+            onRequestChange={lr.requestChange}
+          />
+          {lr.locked && (
+            <p style={{ ...tx(14, 400, colors.secondary), margin: 0, paddingBottom: 12 }}>
+              {ledgerRowSitter(lr.ownerFirstName)}
+            </p>
+          )}
+        </div>
+      )}
+
+      {lr.sheetMode && (
+        <LockRatesSheet
+          mode={lr.sheetMode}
+          ownerFirstName={lr.ownerFirstName}
+          serviceName={lr.config.serviceName}
+          rates={lr.config.rates}
+          onConfirm={lr.confirm}
+          onClose={lr.closeSheet}
+        />
+      )}
+
+      <Snackbar message={lr.snackbar} onDone={lr.dismissSnackbar} />
 
       <div style={{ padding: '16px 0', ...divider }}>
         {diff === 0 && <>
@@ -414,7 +449,7 @@ export default function CurrentWeekScreen() {
     addOwnerCurrentWeekChange(ownerId, diff)
   }
 
-  const isDesktop = useIsDesktop()
+  const isDesktop = useIsWide()
   const [days, setDays]           = useState(() => cloneDays(initialDays))
   const [baseDays, setBaseDays]   = useState(() => cloneDays(initialDays))
   const [showConfirm, setShowConfirm] = useState(false)

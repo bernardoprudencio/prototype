@@ -17,9 +17,17 @@ const DRAG_HANDLE = (
  *   onDismiss  called when overlay or back-swipe closes the sheet
  *   zIndex     number              (default 300)
  *   header     ReactNode           (full variant only — rendered sticky at top)
+ *   footer     ReactNode           (full variant only — reserved region below
+ *                                   the scrolling body, mirroring Kibble's
+ *                                   ScrollableModal, which renders its buttons
+ *                                   as a sibling after the scroll area rather
+ *                                   than inside it: ScrollableModal.tsx:97-125.
+ *                                   Its region is px="4x" py="4x" (16px) and the
+ *                                   scrolling body drops to a 4px bottom pad
+ *                                   (`paddingBottom: space['1x']`, L91).)
  *   children   ReactNode           (main content / scrollable body)
  */
-export default function BottomSheet({ variant = 'simple', onDismiss, zIndex = 300, header, children }) {
+export default function BottomSheet({ variant = 'simple', onDismiss, zIndex = 300, header, footer, children }) {
   const overlay = {
     position: 'fixed', inset: 0,
     background: colors.overlayBg,
@@ -44,9 +52,14 @@ export default function BottomSheet({ variant = 'simple', onDismiss, zIndex = 30
             {DRAG_HANDLE}
             {header}
           </div>
-          <div style={{ overflowY: 'auto', padding: '0 16px 24px' }}>
+          <div style={{ overflowY: 'auto', padding: footer ? '0 16px 4px' : '0 16px 24px' }}>
             {children}
           </div>
+          {footer && (
+            <div style={{ flexShrink: 0, background: '#fff', padding: 16 }}>
+              {footer}
+            </div>
+          )}
         </div>
       </div>
     )

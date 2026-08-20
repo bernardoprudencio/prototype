@@ -98,26 +98,19 @@ img {
   display: none;
 }
 
-/* ─── Phone Shell ─── */
-.phone-shell {
+/* ─── App Shell ───
+   Deliberately NOT a phone frame. The app fills its container at every width on
+   every device, and screens that have a wide layout gate it on the shared
+   breakpoints in src/lib/useMediaQuery.js rather than on a fixed frame size.
+   This replaced a 375x812 centred frame in e265be4; the `max-width: 420px`
+   override that used to sit below here restated these same values and was dead. */
+.app-shell {
   width: 100vw;
   height: 100dvh;
   margin: 0;
-  border-radius: 0;
   overflow: hidden;
   position: relative;
   background: #fff;
-}
-
-@media (max-width: 420px) {
-  .phone-shell {
-    width: 100vw !important;
-    height: 100dvh !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-  }
-
 }
 
 /* ─── Animations ─── */

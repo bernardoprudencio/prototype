@@ -5,6 +5,7 @@ import { Button, PetAvatar } from '../components'
 import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../assets/icons'
 import Chip from '../components/Chip'
 import { useApp } from '../context/AppContext'
+import { useIsWide } from '../lib/useMediaQuery'
 import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks } from '../data/owners'
 
 const DAYS_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
@@ -16,16 +17,6 @@ const nextMonday = () => {
   return d
 }
 
-// ── Responsive hook ────────────────────────────────────────────────────────────
-const useIsDesktop = () => {
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth > 768)
-  useEffect(() => {
-    const handler = () => setIsDesktop(window.innerWidth > 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
-  return isDesktop
-}
 
 // ── Text style helper ──────────────────────────────────────────────────────────
 const tx = (size, weight, color) => ({
@@ -450,7 +441,7 @@ export default function EditTemplateScreen() {
     addOwnerTemplateChange(ownerId, templateChanges)
   }
 
-  const isDesktop = useIsDesktop()
+  const isDesktop = useIsWide()
   // Init selected days and per-day schedules from owner template
   const initSelectedDays = () => [...new Set(owner.template.map(t => t.day))]
   const initSchedules = () => {

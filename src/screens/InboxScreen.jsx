@@ -150,7 +150,7 @@ export default function InboxScreen() {
               displayMessage={displayMessage}
               onClick={() => {
                 if (thread.bookingId) {
-                  navigate(`/conversation/${thread.ownerId}/booking/${thread.conversationOpk}`, { state: { type: 'today' } })
+                  navigate(`/conversation/${thread.ownerId}/thread/${thread.conversationOpk}`, { state: { type: 'today' } })
                 } else {
                   navigate(`/conversation/${thread.ownerId}`, { state: { type: 'today' } })
                 }

@@ -8,8 +8,10 @@ import { useApp } from '../context/AppContext'
 import { OWNERS } from '../data/owners'
 import { getChatHistory, getInboxThreads } from '../data/threads'
 import { getClient } from '../data/contacts'
+import { getRelationshipData } from '../data/relationshipData'
 import { getOwnerRelUnit } from '../data/scheduleData'
 import { getConversationStatusDisplay } from '../lib/threadStatus'
+import { MODIFY_BOOKING } from '../data/bookingDetailsCopy'
 
 const fmtDayChange = (c, withDate) => {
   const label = withDate ? `${c.day}, ${c.date}` : c.day
@@ -111,6 +113,44 @@ export default function ConversationScreen() {
 
   const history = getChatHistory(effectiveOpk)
 
+  // The booking behind this conversation. In production every conversation has
+  // one, recurring included — each Conversation IS one week
+  // (recurring/models.py:238-250) — so `${ownerId}-conv-recurring` now resolves
+  // to the client's current-week booking (relationshipData.js
+  // buildRecurringWeekBooking) and the Details CTA below stops being disabled.
+  // Drives that CTA, which navigates to BookingDetailsScreen (production's
+  // /conversations/<opk>/details page).
+  const client = getClient(ownerId)
+
+  const booking = (() => {
+    const rel = getRelationshipData(ownerId)
+    if (!rel) return null
+    const all = [...rel.bookings.upcoming, ...rel.bookings.past, ...rel.bookings.archived]
+    return all.find(b => b.conversationOpk === effectiveOpk) ?? null
+  })()
+
+  // The schedule CTA forks on recurring-ness, not on a flag — production does
+  // the same in one mapper: `modify_btn = ModifyBookingProviderButton if not
+  // self.conv.is_recurring else ModifyScheduleProviderButton`
+  // (booking_ctas.py:265-267). `ModifyScheduleProviderButton` subclasses
+  // `ModifyBookingProviderButton` and only overrides the title
+  // (cta_buttons.py:582-583), so both point at the same modify page; the
+  // prototype's split is that a recurring conversation gets the schedule
+  // surfaces (which `scheduleMode` chooses between, untouched here) and a
+  // one-time conversation gets the Modify booking screen, exactly as production
+  // falls through when the conversation has no recurring relationship
+  // (useConversationActionHandler.ts:428-439).
+  //
+  // Note `self.conv.is_recurring` — the subject is the **conversation**, not the
+  // requester (`recurring_billing_relationship_id is not None` on the
+  // conversation itself, conversations/models/conversation.py:632-633). A
+  // recurring client still books one-off stays outside the relationship, and
+  // each of those is a plain non-recurring conversation that must get "Modify
+  // booking". So this reads the resolved booking's own flag rather than
+  // `isRecurringClient(client)`, which would wrongly hand owen / james / sarah
+  // the schedule surfaces on every thread they have.
+  const isRecurring = Boolean(booking?.isRecurring)
+
   // Resolve the thread for this conversation to derive the header status
   // ("Booking confirmed" / "Booking ongoing" / etc.). Falls back to a synthetic
   // "current" thread for owners with no matching inbox entry.
@@ -147,10 +187,27 @@ export default function ConversationScreen() {
         </div>
         <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, paddingTop: 12, overflowX: 'auto', paddingBottom: 14, marginBottom: -14 }}>
           <Button variant="primary" style={{ boxShadow: shadows.medium, flexShrink: 0 }}>Leave feedback</Button>
-          <Button variant="default" style={{ flexShrink: 0 }} onClick={onOpenSchedule}>
-            {scheduleMode === 'agenda' ? 'Manage schedule' : 'Modify schedule'}
+          {isRecurring ? (
+            <Button variant="default" style={{ flexShrink: 0 }} onClick={onOpenSchedule}>
+              {scheduleMode === 'agenda' ? 'Manage schedule' : 'Modify schedule'}
+            </Button>
+          ) : (
+            <Button
+              variant="default"
+              style={{ flexShrink: 0 }}
+              onClick={() => navigate(`/conversation/${ownerId}/thread/${effectiveOpk}/modify`)}
+            >
+              {MODIFY_BOOKING}
+            </Button>
+          )}
+          <Button
+            variant="default"
+            style={{ flexShrink: 0 }}
+            disabled={!booking}
+            onClick={() => navigate(`/conversation/${ownerId}/thread/${effectiveOpk}/details`)}
+          >
+            Details
           </Button>
-          <Button variant="default" style={{ flexShrink: 0 }}>Details</Button>
         </div>
       </div>
 
@@ -260,6 +317,7 @@ export default function ConversationScreen() {
           <Button variant="primary" icon={<SendIcon />} onClick={sendMessage} />
         )}
       </div>
+
     </div>
   )
 }

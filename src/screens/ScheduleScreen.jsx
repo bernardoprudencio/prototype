@@ -5,6 +5,7 @@ import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../a
 import { Button, PetAvatar, Chip } from '../components'
 import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeek } from '../data/owners'
 import { useApp } from '../context/AppContext'
+import { useIsWide } from '../lib/useMediaQuery'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const CheckIcon = () => (
@@ -124,16 +125,6 @@ const CALENDAR_DAYS_FLAT = CALENDAR_WEEKS.flat()
 const toDateKey = (date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
 const calDateLabel = (date) => `${SHORT_MONTHS_CAL[date.getMonth()]} ${date.getDate()}`
 
-// ── Responsive hook ────────────────────────────────────────────────────────────
-const useIsDesktop = () => {
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth > 768)
-  useEffect(() => {
-    const handler = () => setIsDesktop(window.innerWidth > 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
-  return isDesktop
-}
 
 
 const cloneWeeks = (weeks) =>
@@ -762,7 +753,7 @@ export default function ScheduleScreen() {
   const currentWeekDays = ownerCurrentWeeks[ownerId] ?? null
   const initialWeeksProp = ownerWeeks[ownerId]
 
-  const isDesktop = useIsDesktop()
+  const isDesktop = useIsWide()
   const [initialWeeks] = useState(() => initialWeeksProp || getOwnerUpcomingWeeks(owner))
   const [weeks, setWeeks] = useState(() => cloneWeeks(initialWeeks))
   const [baseWeeks, setBaseWeeks] = useState(() => cloneWeeks(initialWeeks))
