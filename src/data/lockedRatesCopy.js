@@ -27,7 +27,9 @@
 // ── Toggle ───────────────────────────────────────────────────────────────────
 // Production ships two phrasings of the same toggle. The possessive form is
 // used by the editor/modify-booking surfaces; the plain form by the ledger.
-// UNUSED. Kept for provenance — no prototype surface renders the possessive form.
+// The possessive form is rendered by ModifyBookingScreen's Rates section
+// (production: LockedRatesComponent.tsx:30, nested in RatesComponent.tsx:104);
+// the ledger form by the booking-details / relationship / current-week surfaces.
 export const toggleLabel       = (ownerFirstName) => `Lock your rates for future stays with ${ownerFirstName}`
 export const toggleLabelLedger = (ownerFirstName) => `Lock rates for future stays with ${ownerFirstName}`
 // NB: production's toggle text does not change when the switch is on

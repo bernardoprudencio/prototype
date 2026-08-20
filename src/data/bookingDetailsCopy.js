@@ -132,6 +132,41 @@ export const FLEXIBLE_START_TIME = 'Flexible start time'
 export const unitCount   = (n, unit, plural) => `${n} ${n === 1 ? unit : plural}`
 export const minutesEach = (minutes) => `${minutes} min each`
 
+// ── 3a. Recurring service summary — the same mapper, recurring branch ────────
+// A recurring conversation is dispatched to a
+// RecurringNonContiguousServiceSummaryBuilder subclass
+// (service_summary.py:681-701, :752-755), which replaces the contiguous
+// Starts/Ends block with a *schedule section*: a title plus one row per service
+// day. `OngoingRecurringSummaryBuilder` is the one that applies to a week
+// already under way.
+//
+// mappers/details/service_summary.py:467-468 —
+//   class OngoingRecurringSummaryBuilder(...):
+//       SCHEDULE_TITLE = gettext_lazy("This week's service happens on")
+export const RECURRING_SCHEDULE_TITLE = "This week's service happens on"
+
+// mappers/details/service_summary.py:448-451 — `get_title()` on
+// RecurringNonContiguousServiceSummaryBuilder is
+// `super().get_title() + " " + gettext_lazy("Weekly")`, so on the DETAILS page
+// "Weekly" is APPENDED to the service name ("Dog walking Weekly").
+export const WEEKLY_SUFFIX = 'Weekly'
+
+// mappers/details/booking_card.py:80-82 — the conversation BOOKING CARD builds
+// the same idea the other way round: `" ".join([_("Weekly"), service_title])`.
+// Two surfaces, two orders; both strings are production's.
+export const WEEKLY_PREFIX = 'Weekly'
+
+// mappers/details/service_summary.py:429-431 —
+//   SERVICE_INFO_SUFFIX = gettext_lazy("this week")
+// appended to the unit count in the subtitle, e.g. "3 walks this week"
+// (:452-464, `"{service_part} {suffix}"`).
+export const RECURRING_UNIT_SUFFIX = 'this week'
+
+// mappers/details/booking_card.py:118-122 — a recurring conversation shows
+// `" ".join((_("Starts"), start_date))` only while its start date is still in
+// the future; once the relationship has begun the field is deliberately "".
+export const startsOn = (date) => `${STARTS} ${date}`
+
 // ── 4. Price ledger — mappers/details/price_ledger.py ────────────────────────
 // `rate_section_title`; the sitter-interest variant is "Potential Earnings".
 export const LEDGER_SECTION_TITLE = 'Services & Charges'
@@ -146,6 +181,59 @@ export const rateMultiplier = (priceText, n, unit, plural) =>
 // `_get_provider_title` — the collapsed-ledger summary line.
 export const paidForStay = (ownerName, finalAmount, datePaid) =>
   `${ownerName} paid ${finalAmount} on ${datePaid} for this stay.`
+
+// ── 4a. Recurring price ledger — same mapper, recurring branches ─────────────
+// Every string below was read out of
+// mappers/details/price_ledger.py and mappers/base.py on master.
+//
+// mappers/base.py:306-314 — `_get_price_label()`. Earnings-transparency wins
+// first ("Subtotal"); otherwise a recurring conversation gets the week-scoped
+// pair, with "Price this week" while today falls inside the conversation's own
+// week and "Price per week" outside it.
+export const PRICE_THIS_WEEK = 'Price this week'
+export const PRICE_PER_WEEK  = 'Price per week'
+
+// mappers/details/price_ledger.py:1069-1080 — `_get_total_price_title()`.
+// Non-recurring returns "Subtotal" (already exported above). Recurring forks on
+// `is_date_in_or_after_service_start_week` and then again on
+// earnings-transparency, which this prototype models as ON (it is what puts the
+// "Your earnings" row on the ledger at all, :498-502).
+export const SUBTOTAL_THIS_WEEK   = 'Subtotal this week'
+export const FIRST_WEEK_SUBTOTAL  = 'First week subtotal'
+// The non-earnings-transparency halves of the same two branches (:1077, :1080).
+export const TOTAL_THIS_WEEK      = 'Total this week'
+export const TOTAL_FIRST_WEEK     = 'Total first week'
+
+// mappers/details/price_ledger.py:511-514 — `_get_total_earnings()`.
+export const YOUR_EARNINGS_THIS_WEEK = 'Your earnings this week'
+
+// ── The recurring-only extra ledger section ─────────────────────────────────
+// price_ledger.py:504-507 appends one more PriceSection, recurring only:
+//   if self.conv.is_recurring:
+//       price_sections.append(PriceSection(items=[self._get_total_price_per_week(request)]))
+//
+// Its title comes from `_get_total_price_per_week_title()` (:1097-1100) — again
+// forked on earnings-transparency.
+export const SUBTOTAL_PER_WEEK    = 'Subtotal per week'
+export const TOTAL_PRICE_PER_WEEK = 'Total price per week'
+
+// …and its description from `_get_total_price_per_week()` (:1119-1123), which
+// forks on ROLE, not on recurring-ness:
+//   description = _("Paid on each Tuesday. Please allow 3-5 days for bank processing.")
+//                 if self._is_provider() else _("Charged each Monday morning")
+// This prototype is the sitter (provider) surface, so PAID_EACH_TUESDAY is the
+// one that renders. CHARGED_EACH_MONDAY is kept for provenance — it is the
+// OWNER's string, and also the one `_get_requester_title()` interpolates into
+// "Price per week — {final_amount} — Charged each Monday morning" (:302-306).
+// Neither is reachable from a sitter's screen.
+export const PAID_EACH_TUESDAY    = 'Paid on each Tuesday. Please allow 3-5 days for bank processing.'
+export const CHARGED_EACH_MONDAY  = 'Charged each Monday morning'
+
+// mappers/details/price_ledger.py:346-353 — `_get_provider_title()`, recurring
+// branch. The sitter-side collapsed-ledger summary line for one week:
+//   _("{owner_name} paid {final_amount} on {date_paid} for this week.")
+export const paidForWeek = (ownerName, finalAmount, datePaid) =>
+  `${ownerName} paid ${finalAmount} on ${datePaid} for this week.`
 
 // conversations/constants.py — YOUR_EARNINGS_TITLE / YOUR_EARNINGS_HELP_TEXT.
 // The production string is HTML; the anchor around "Service fees" points at the

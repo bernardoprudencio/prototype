@@ -10,8 +10,22 @@ import { peopleImages } from '../assets/images'
 import { PROTO_TODAY } from './owners'
 import {
   LEDGER_SECTION_TITLE, SUBTOTAL, YOUR_EARNINGS, rateMultiplier,
+  RECURRING_SCHEDULE_TITLE, RECURRING_UNIT_SUFFIX, WEEKLY_PREFIX, WEEKLY_SUFFIX,
+  SUBTOTAL_THIS_WEEK, SUBTOTAL_PER_WEEK, PAID_EACH_TUESDAY,
+  YOUR_EARNINGS_THIS_WEEK,
 } from './bookingDetailsCopy'
 import { lockedRatesFor } from './lockableRates'
+
+// ── isRecurringClient ────────────────────────────────────────────────────────
+// Production derives recurring-ness from FK presence:
+// `recurring_billing_relationship_id is not None`
+// (conversations/models/conversation.py:632-633). The prototype's stand-in for
+// that FK is the client's `recurringSchedule` block, which is present on
+// exactly owen, james and sarah and absent on the other seven clients
+// (contacts.js). Exported so the conversation screen's CTA fork and this
+// module's booking builders read the same single derivation — in production
+// both come from one mapper (booking_ctas.py).
+export const isRecurringClient = (client) => Boolean(client?.recurringSchedule)
 
 export const TIERS = [
   { tierName: 'Tier 1', threshold: 499,      sitterShare: 0.70 },
@@ -83,8 +97,31 @@ const SERVICE_DETAIL = {
 // conversation thread, so the Starts/Ends columns and the subtitle chip must
 // resolve for past and archived bookings too — not just the one demo booking
 // that carries a ledger.
-const detailFields = (start, end, serviceKey, span) => {
+//
+// RECURRING VARIANT (`opts.schedules`). A recurring conversation is dispatched
+// to a RecurringNonContiguousServiceSummaryBuilder subclass rather than the
+// contiguous one (service_summary.py:752-755), and that builder replaces the
+// Starts/Ends block with a *schedule section*: `build_schedule_section()`
+// (:397-420) emits SCHEDULE_TITLE plus one ScheduleItem(day, times) per service
+// day. For a week already under way the subclass is
+// OngoingRecurringSummaryBuilder, whose title is "This week's service happens
+// on" (:467-468). The subtitle also gains the "this week" suffix (:429-431).
+//
+// The week window is still carried as startLabel/endLabel so any consumer that
+// wants a date range has one; the details screen branches on `scheduleTitle`.
+const detailFields = (start, end, serviceKey, span, opts = {}) => {
   const d = SERVICE_DETAIL[serviceKey] ?? SERVICE_DETAIL.boarding
+  if (opts.schedules) {
+    return {
+      startLabel: fmtLong(start),
+      endLabel: fmtLong(end),
+      scheduleTitle: RECURRING_SCHEDULE_TITLE,
+      schedules: opts.schedules,
+      unitCount: span,
+      unitLabel: d.unit,
+      unitSuffix: RECURRING_UNIT_SUFFIX,
+    }
+  }
   return {
     startLabel: fmtLong(start),
     endLabel: fmtLong(end),
@@ -170,6 +207,30 @@ const statusFields = (serviceStatus, start, end, serviceKey, span, opts = {}) =>
   const s = startOfDay(start)
   const e = startOfDay(end)
   if (s > today) return { ...base, isPaid: true, statusKey: 'confirmed' }
+
+  // Recurring branch — booking_status.py:400-404, the tail of
+  // `_get_ongoing_stay_status()`. It sits *after* the future-start check (which
+  // returns ConfirmedStatus for recurring too, :382-383) and after the same-day
+  // check, and *before* the plain OngoingStatus fallthrough:
+  //
+  //   if self.conv.is_recurring:
+  //       if self.conv.recurring_billing_relationship.service_skipped_this_week:
+  //           return statuses.SkippedWeekStatus()
+  //       return statuses.OngoingRecurringStatus()
+  //
+  // `skippedThisWeek` is passed in rather than invented here, mirroring the fact
+  // that production reads it off the RBR row. Note the recurring branch has no
+  // `complete` state: each Conversation IS one week, and the week containing
+  // today can never have ended.
+  if (opts.recurring) {
+    return {
+      ...base,
+      isPaid: true,
+      isOngoing: true,
+      statusKey: opts.skippedThisWeek ? 'skippedWeek' : 'ongoingRecurring',
+    }
+  }
+
   if (e < today) return { ...base, isPaid: true, isCompleted: true, statusKey: 'complete' }
   if (s.getTime() === today.getTime() && startsLaterToday(start, d.start)) {
     return { ...base, isPaid: true, statusKey: 'confirmedSameDay' }
@@ -402,6 +463,220 @@ const buildUpcomingBookings = (client, count, currentTier) => {
   return out
 }
 
+// ── The recurring week booking ───────────────────────────────────────────────
+// Production has NO separate recurring details page: one route, one mapper set,
+// one payload (ConversationDetailsMapper.map(),
+// conversations/api/mappers/conversation.py). Recurring-ness is a per-mapper
+// branch, and — critically — **each Conversation IS one week**. The recurring
+// billing relationship cycles initial_conversation / active_conversation /
+// next_conversation (recurring/models.py:238,244,250), so "the booking" behind a
+// recurring conversation is that conversation's own week.
+//
+// The prototype's recurring conversations use the synthetic opk
+// `${client.id}-conv-recurring` (see ConversationScreen / threads.js), which
+// until now matched no booking at all — which is why the Details CTA was
+// permanently disabled. This builder gives it a real one, so the existing
+// `all.find(b => b.conversationOpk === effectiveOpk)` lookup resolves with no
+// change to that lookup.
+//
+// Every `recurringSchedule` in contacts.js is a walk schedule (owen 60-min,
+// james and sarah 30-min), which is also what threads.js labels the recurring
+// thread ("Dog walking · repeats weekly").
+const RECURRING_SERVICE_KEY = 'dog_walking'
+
+const FULL_DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+// Monday of the week containing PROTO_TODAY. getDay() is 0=Sunday, so
+// (getDay() + 6) % 7 is the number of days back to Monday.
+const mondayOfWeek = (from) => {
+  const d = new Date(from)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+
+// `skippedThisWeek` mirrors `rbr.service_skipped_this_week`
+// (booking_status.py:401-402). Nothing in the prototype flips it yet; it is a
+// parameter rather than a hardcoded false so the `skippedWeek` status can be
+// exercised without touching the derivation.
+export const buildRecurringWeekBooking = (client, currentTier, skippedThisWeek = false) => {
+  const tpl = client?.recurringSchedule
+  if (!tpl) return null
+
+  const weekStart = mondayOfWeek(PROTO_TODAY)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekStart.getDate() + 6)
+
+  const svc = SERVICES[RECURRING_SERVICE_KEY]
+  const visits = tpl.template.length
+
+  // Per-visit price: every pet's rate plus every add-on, exactly as the
+  // recurringSchedule.pricing block is shaped in contacts.js.
+  const petRows = tpl.pricing.pets
+  const addOnRows = tpl.pricing.addOns ?? []
+  const perVisit =
+    petRows.reduce((s, p) => s + p.ratePerWalk, 0) +
+    addOnRows.reduce((s, a) => s + a.ratePerWalk, 0)
+  const weeklyPrice = perVisit * visits
+
+  const unit = SERVICE_DETAIL[RECURRING_SERVICE_KEY].unit
+  const plural = `${unit}s`
+
+  // One schedule row per service day, dated inside this week — production's
+  // NonContiguousServiceDatesStringBuilder emits a real date per occurrence,
+  // not a bare weekday name.
+  const schedules = tpl.template.map((t) => {
+    const idx = FULL_DAYS.indexOf(t.day)
+    const d = new Date(weekStart)
+    d.setDate(weekStart.getDate() + ((idx + 6) % 7))
+    return { day: fmtLong(d), times: [t.time] }
+  })
+
+  // Ledger rows mirror `_get_rate_price()` the same way Lena's do: one row per
+  // pet titled with the pet's name and described by the add-on type, with the
+  // "$X × N walks" multiplier as a sub-line, then the schedule's add-ons.
+  const rateRows = [
+    ...petRows.map(p => ({
+      title: p.petName,
+      description: p.rateType,
+      text: [rateMultiplier(`$${p.ratePerWalk}`, visits, unit, plural)],
+      amount: money(p.ratePerWalk * visits),
+    })),
+    ...addOnRows.map(a => ({
+      title: a.label,
+      text: [rateMultiplier(`$${a.ratePerWalk}`, visits, unit, plural)],
+      amount: money(a.ratePerWalk * visits),
+    })),
+  ]
+
+  // The owner is charged each Monday morning for the week ahead
+  // (price_ledger.py:302-306), so this week's payment date is its Monday.
+  const paidOn = fmt(weekStart)
+
+  return {
+    id: `${client.id}-recurring-week`,
+    isRecurring: true,
+    price: money(weeklyPrice),
+    dates: fmtRange(weekStart, weekEnd),
+    startDate: isoKey(weekStart),
+    endDate: isoKey(weekEnd),
+    // booking_card.py:80-82 PREFIXES "Weekly" onto the card's service title…
+    serviceName: `${WEEKLY_PREFIX} ${svc.name}`,
+    // …while service_summary.py:448-451 APPENDS it for the details page's
+    // service-summary heading. Two production surfaces, two orders.
+    serviceSummaryTitle: `${svc.name} ${WEEKLY_SUFFIX}`,
+    serviceIcon: svc.icon,
+    serviceKey: RECURRING_SERVICE_KEY,
+    earnings: money(weeklyPrice * currentTier.sitterShare),
+    serviceStatus: 'completed_service_deposit',
+    conversationOpk: `${client.id}-conv-recurring`,
+    paidOn,
+    ...statusFields(
+      'completed_service_deposit', weekStart, weekEnd, RECURRING_SERVICE_KEY, visits,
+      { recurring: true, skippedThisWeek },
+    ),
+    ...detailFields(weekStart, weekEnd, RECURRING_SERVICE_KEY, visits, { schedules }),
+    ledger: {
+      sections: [
+        { title: LEDGER_SECTION_TITLE, items: rateRows },
+        { items: [{ title: SUBTOTAL_THIS_WEEK, amount: money(weeklyPrice), style: 'bold' }] },
+        { items: [{
+            title: YOUR_EARNINGS_THIS_WEEK,
+            amount: money(weeklyPrice * currentTier.sitterShare),
+            style: 'bold',
+            action: 'earnings',
+          }] },
+      ],
+    },
+    // The recurring-ONLY extra section, kept off `ledger.sections` on purpose:
+    // production appends it as a separate PriceSection after the standard ones
+    // (price_ledger.py:504-507), so the details screen appends it too rather
+    // than the ledger shape changing for everyone. Title from
+    // `_get_total_price_per_week_title()` (:1097-1100), description from the
+    // provider half of `_get_total_price_per_week()` (:1119-1123).
+    weeklyTotal: {
+      title: SUBTOTAL_PER_WEEK,
+      description: PAID_EACH_TUESDAY,
+      amount: money(weeklyPrice),
+    },
+  }
+}
+
+// ── One-time booking fields the Modify booking screen consumes ───────────────
+// Shape (also documented for the ModifyBookingScreen author):
+//
+//   booking.modify = {
+//     units:            number    // nights / walks / visits being modified
+//     unitLabel:        string    // 'night' | 'day' | 'visit' | 'walk'
+//     unitLabelPlural:  string
+//     rateRows: [{                // one per pet — ServiceRateSelectorComponent
+//       petName:        string    //   the row's left-hand label (:96)
+//       slug:           string    //   add-on type slug, e.g. 'standard-rate'
+//       label:          string    //   'Standard rate' | 'Additional dog rate'
+//       pricePerUnit:   number    //   the EDITABLE value in the rate input
+//       listPrice:      number    //   the sitter's profile rate, rendered as
+//                                 //   `List price: {x}` (:69-80)
+//       unit:           string    //   'night' | 'day' | 'visit' | 'walk'
+//     }]
+//     adjustments: []             // Extras and Adjustments rows. Always empty:
+//                                 // penalty/waiver math is server-side
+//                                 // (AdjustmentsListComponent) and out of scope
+//     subtotal:        Money      // ModifyBookingFormLedger `subtotalPrice`
+//     previousTotal:   Money      // ledger `oldSubtotalPrice` — equal to
+//                                 //   subtotal on load; the screen recomputes
+//                                 //   subtotal as rate rows are edited
+//     amountOwed:      Money      // $0 while subtotal === previousTotal
+//     earnings:        Money      // ledger `providerEarnings`
+//   }
+//
+// Money is this file's `{ amount: '12.00', currencyIso: 'CAD' }`, formatted by
+// the exported `formatMoney`.
+//
+// Present on every NON-recurring booking (production suppresses the whole rates
+// and adjustments block when `isRecurring && hasStay` —
+// ModifyBookingForm.utils.ts:74-89), and on all three lists, because the modify
+// screen is reachable from any conversation.
+//
+// The figures are static mock data by design: production recomputes them with a
+// server pricer round-trip on every field change (`checkPrice`,
+// ModifyBooking.duck.ts), which is explicitly out of scope.
+const buildModifyFields = (client, booking) => {
+  const cfg = lockedRatesFor(client, booking.serviceKey)
+  const units = booking.unitCount ?? 1
+  const d = SERVICE_DETAIL[booking.serviceKey] ?? SERVICE_DETAIL.boarding
+
+  // First pet bills at the standard rate, each additional pet at the
+  // additional-dog rate — the same BookingAddOn shape the ledger uses.
+  // `lockedPrice` is the rate the owner agreed to (the editable value);
+  // `defaultPrice` is today's profile rate (production's "List price").
+  const rateRows = (cfg?.rates?.length ? client.pets : []).map((p, i) => {
+    const rate = cfg.rates[i === 0 ? 0 : 1] ?? cfg.rates[0]
+    return {
+      petName: p.name,
+      slug: rate.slug,
+      label: rate.label,
+      pricePerUnit: rate.lockedPrice,
+      listPrice: rate.defaultPrice,
+      unit: rate.unit,
+    }
+  })
+
+  return {
+    units,
+    unitLabel: d.unit,
+    unitLabelPlural: `${d.unit}s`,
+    rateRows,
+    adjustments: [],
+    subtotal: booking.price,
+    previousTotal: booking.price,
+    amountOwed: money(0),
+    earnings: booking.earnings,
+  }
+}
+
+const withModifyFields = (client) => (booking) =>
+  booking.isRecurring ? booking : { ...booking, modify: buildModifyFields(client, booking) }
+
 const buildArchivedBookings = (client, count) => {
   const out = []
   const cursor = new Date(PROTO_TODAY)
@@ -620,12 +895,27 @@ export const getRelationshipData = (ownerId) => {
     archived = buildArchivedBookings(client, archivedCount)
   }
 
+  // A recurring client's current week is a real booking, and it goes at the head
+  // of `upcoming` so the conversation screen's existing opk lookup finds it.
+  // Both branches above need it: sarah is recurring *and* takes the
+  // cancelledBookings branch, which leaves `upcoming` empty.
+  const recurringWeek = isRecurringClient(client)
+    ? buildRecurringWeekBooking(client, currentTier)
+    : null
+  if (recurringWeek) upcoming = [recurringWeek, ...upcoming]
+
   // Earnings totals are gross-value-aligned (mirrors EarningsMapper in
   // roverdotcom/web), so they reconcile against the GBV-denominated tier
   // thresholds shown in the progress bar. Per-booking sitter earnings still
   // live on each booking's `earnings` field.
+  //
+  // The recurring week is excluded: it is this week's already-charged
+  // conversation, not pending future work, and counting it would move the tier
+  // progress bar and the callout copy for owen / james / sarah.
   const completedAmount = effectiveGbv
-  const pendingAmount = upcoming.reduce((s, b) => s + parseFloat(b.price.amount), 0)
+  const pendingAmount = upcoming
+    .filter(b => !b.isRecurring)
+    .reduce((s, b) => s + parseFloat(b.price.amount), 0)
 
   const tiers = buildTierStates(effectiveGbv, pendingAmount)
   const callout = calloutFor(client, effectiveGbv, pendingAmount)
@@ -646,6 +936,13 @@ export const getRelationshipData = (ownerId) => {
         pending: money(pendingAmount),
       },
     },
-    bookings: { upcoming, past, archived },
+    // `modify` is attached last so every list gets it from one place. It only
+    // adds a key — no existing field is touched — so the surfaces that render
+    // these bookings today are unaffected.
+    bookings: {
+      upcoming: upcoming.map(withModifyFields(client)),
+      past: past.map(withModifyFields(client)),
+      archived: archived.map(withModifyFields(client)),
+    },
   }
 }

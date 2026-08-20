@@ -4,7 +4,7 @@ import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
-import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, BoardingSettingsScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen } from './screens'
+import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, BoardingSettingsScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
 
@@ -136,9 +136,13 @@ export default function App() {
         } />
       </Routes>
 
-      {/* ── Schedule + CurrentWeek (z-20 siblings).
+      {/* ── Schedule + CurrentWeek + ModifyBooking (z-20 siblings).
            In Modification mode, /schedule renders ScheduleScreen (5-week calendar).
-           In Agenda mode, /schedule renders ScheduleOverlay (RelationshipManagement + sheets). ── */}
+           In Agenda mode, /schedule renders ScheduleOverlay (RelationshipManagement + sheets).
+           /modify is the one-time (non-recurring) counterpart: production picks
+           between ModifyBookingProviderButton and ModifyScheduleProviderButton on
+           `is_recurring` (booking_ctas.py:265-267), so the two never coexist for
+           one client and they belong at the same layer. ── */}
       <Routes>
         <Route path="/conversation/:ownerId/schedule" element={
           <SlideOverlay zIndex={20}>
@@ -148,6 +152,11 @@ export default function App() {
         <Route path="/conversation/:ownerId/current-week" element={
           <SlideOverlay zIndex={20}>
             <CurrentWeekScreen />
+          </SlideOverlay>
+        } />
+        <Route path="/conversation/:ownerId/modify" element={
+          <SlideOverlay zIndex={20}>
+            <ModifyBookingScreen />
           </SlideOverlay>
         } />
       </Routes>

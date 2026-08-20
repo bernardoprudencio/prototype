@@ -397,6 +397,11 @@ export const getInboxThreads = () => {
     // stay 'upcoming'.
     let pendingAssigned = false
     for (const booking of upcoming) {
+      // A recurring client's current week is now a real booking in `upcoming`
+      // (relationshipData.js buildRecurringWeekBooking) carrying the same
+      // `${id}-conv-recurring` opk that step 1 above already emitted a thread
+      // for. Skip it here so the inbox keeps one thread per conversation.
+      if (booking.isRecurring) continue
       let status = 'upcoming'
       if (isActiveBooking(booking)) {
         status = 'active'

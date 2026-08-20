@@ -185,13 +185,14 @@ export default function BookingDetailsScreen() {
     const rel = getRelationshipData(ownerId)
     if (!rel) return null
     const { upcoming, past, archived } = rel.bookings
-    const all = [...upcoming, ...past, ...archived]
-    // A conversation opened without a thread id falls back to the synthetic
-    // `${ownerId}-conv-recurring` opk, which no booking carries — production
-    // always has a stay behind the conversation, so land on the client's most
-    // relevant one rather than dead-ending.
-    return all.find(b => b.conversationOpk === conversationOpk)
-      ?? upcoming[0] ?? past[0] ?? archived[0] ?? null
+    // Every conversation resolves to exactly one booking, recurring included:
+    // `${ownerId}-conv-recurring` is now carried by the client's current-week
+    // booking (relationshipData.js buildRecurringWeekBooking). There is
+    // deliberately NO fallback — a miss is a genuine not-found, the way a bad
+    // opk 404s in production, rather than silently rendering someone else's
+    // booking.
+    return [...upcoming, ...past, ...archived]
+      .find(b => b.conversationOpk === conversationOpk) ?? null
   })()
 
   // Visibility is per conversation, so the resolved booking is what gates it.
@@ -242,9 +243,13 @@ export default function BookingDetailsScreen() {
   // drop-off is a window rather than a time, and the start half then shows the
   // window's opening time. Boarding has an agreed drop-off, so Lena's booking
   // leaves the flag unset — it is here for the drop-in and walk service types.
+  // service_summary.py:429-431, :452-464 — the recurring builder appends
+  // SERVICE_INFO_SUFFIX ("this week") to the unit count, so the same chip reads
+  // "3 walks this week" on a recurring conversation.
+  const unitChip = copy.unitCount(booking.unitCount ?? 1, booking.unitLabel ?? 'night', `${booking.unitLabel ?? 'night'}s`)
   const plainChips = [
     ...(booking.flexibleStartTime ? [copy.FLEXIBLE_START_TIME] : []),
-    copy.unitCount(booking.unitCount ?? 1, booking.unitLabel ?? 'night', `${booking.unitLabel ?? 'night'}s`),
+    booking.unitSuffix ? `${unitChip} ${booking.unitSuffix}` : unitChip,
   ]
 
   const additionalRows = []
@@ -258,8 +263,12 @@ export default function BookingDetailsScreen() {
 
   // `_get_provider_title` — shown only while the accordion is collapsed
   // (PriceLedgerAccordion.tsx renders `text` on `text && !expanded`).
+  // price_ledger.py:346-353 forks the same line on recurring-ness: one week's
+  // payment ("…for this week.") instead of the whole stay's.
   const summaryLine = booking.isPaid
-    ? copy.paidForStay(firstName, fmtMoney(booking.price), booking.paidOn)
+    ? (booking.isRecurring
+        ? copy.paidForWeek(firstName, fmtMoney(booking.price), booking.paidOn)
+        : copy.paidForStay(firstName, fmtMoney(booking.price), booking.paidOn))
     : null
 
   return (
@@ -278,7 +287,24 @@ export default function BookingDetailsScreen() {
           <span style={{ ...textStyles.text100, color: colors.link, textDecoration: 'underline' }}>{copy.BACK_TEXT}</span>
         </div>
         <p style={{ ...tx(16, 700, colors.primary), flex: 1, textAlign: 'center' }}>{copy.PAGE_TITLE}</p>
-        <Button variant="default" size="small" style={{ flexShrink: 0 }}>{copy.MODIFY_REQUEST}</Button>
+        {/* `details_buttons` — message_header.py:341-357 deep-copies whichever
+            modify CTA the conversation has and overwrites its title with
+            TEXT_MODIFY_BUTTON (:46, "Modify request") *unconditionally*, so the
+            LABEL does not fork on recurring-ness even though the underlying
+            button class does (booking_ctas.py:265-267). What forks is the
+            destination: ModifyBookingProviderButton → the modify screen;
+            ModifyScheduleProviderButton → the recurring schedule surfaces,
+            which in this prototype need navigation state only
+            ConversationScreen assembles, so the recurring button stays inert
+            here rather than landing on an empty agenda. */}
+        <Button
+          variant="default"
+          size="small"
+          style={{ flexShrink: 0 }}
+          onClick={booking.isRecurring ? undefined : () => navigate(`/conversation/${ownerId}/modify`)}
+        >
+          {copy.MODIFY_REQUEST}
+        </Button>
       </div>
 
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
@@ -310,7 +336,12 @@ export default function BookingDetailsScreen() {
         <SectionTitle title={copy.SERVICE_SUMMARY_TITLE} />
         <div style={{ paddingBottom: spacing.lg }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xs, padding: '12px 0' }}>
-            <p style={{ ...textStyles.text200Semibold, color: colors.primary, margin: 0 }}>{booking.serviceName}</p>
+            {/* service_summary.py:448-451 — the recurring builder's `get_title()`
+                is `super().get_title() + " " + _("Weekly")`, so the DETAILS page
+                appends the word ("Dog walking Weekly") where the conversation
+                booking card prefixes it (booking_card.py:82). `serviceName`
+                carries the card form; `serviceSummaryTitle` the details form. */}
+            <p style={{ ...textStyles.text200Semibold, color: colors.primary, margin: 0 }}>{booking.serviceSummaryTitle ?? booking.serviceName}</p>
             {/* ConversationServiceSummarySubtitle.tsx: 14px primary chips, pet
                 names as semibold blue Links, separated by 10px bullets.
                 Production emits a Bullet after EVERY plain chip, leaving a
@@ -333,6 +364,22 @@ export default function BookingDetailsScreen() {
               the end half right-aligned with a 1px left rule and NO horizontal
               padding, so its text sits flush against the rule. No margins
               between label, date and time: the rhythm is pure line-height. */}
+          {booking.schedules ? (
+            /* service_summary.py:397-420 `build_schedule_section()` — a
+               recurring conversation is non-contiguous, so the contiguous
+               Starts/Ends pair is replaced by a titled list of the days the
+               service actually happens on, one row per day with its times.
+               Title comes from the builder's SCHEDULE_TITLE (:467-468). */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xs, paddingTop: spacing.sm }}>
+              <span style={{ ...textStyles.text100, color: colors.tertiary }}>{booking.scheduleTitle}</span>
+              {booking.schedules.map(s => (
+                <div key={s.day} style={{ display: 'flex', justifyContent: 'space-between', gap: spacing.md }}>
+                  <span style={{ ...textStyles.text200Semibold, color: colors.primary }}>{s.day}</span>
+                  <span style={{ ...textStyles.text200, color: colors.primary, textAlign: 'right' }}>{(s.times ?? []).join(', ')}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: spacing.sm }}>
             <div style={{ flexBasis: '50%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
               <span style={{ ...textStyles.text100, color: colors.tertiary }}>{copy.STARTS}</span>
@@ -345,6 +392,7 @@ export default function BookingDetailsScreen() {
               {booking.endTime && <span style={{ ...textStyles.text200, color: colors.primary }}>{booking.endTime}</span>}
             </div>
           </div>
+          )}
         </div>
 
         {/* ─── 4. Price ledger + the locked-rates switch ───
@@ -394,6 +442,24 @@ export default function BookingDetailsScreen() {
                   ))}
                 </div>
               ))}
+
+              {/* price_ledger.py:504-507 — recurring only, ONE more PriceSection
+                  appended after the standard ones:
+                    if self.conv.is_recurring:
+                        price_sections.append(PriceSection(items=[
+                            self._get_total_price_per_week(request)]))
+                  Its title is `_get_total_price_per_week_title()` (:1097-1100)
+                  and its description the provider half of
+                  `_get_total_price_per_week()` (:1119-1123). Same section markup
+                  as the loop above — an extra section, not a reshaped ledger. */}
+              {ledgerOpen && booking.weeklyTotal && (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: spacing.lg,
+                  padding: '16px 0', borderBottom: `1px solid ${colors.borderInteractive}`,
+                }}>
+                  <LedgerRow item={{ ...booking.weeklyTotal, style: 'bold' }} />
+                </div>
+              )}
             </div>}
 
             {/* ─── Locked rates — a switch BELOW the ledger, not a ledger row ─── */}

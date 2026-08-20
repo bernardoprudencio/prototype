@@ -8,9 +8,10 @@ import { useApp } from '../context/AppContext'
 import { OWNERS } from '../data/owners'
 import { getChatHistory, getInboxThreads } from '../data/threads'
 import { getClient } from '../data/contacts'
-import { getRelationshipData } from '../data/relationshipData'
+import { getRelationshipData, isRecurringClient } from '../data/relationshipData'
 import { getOwnerRelUnit } from '../data/scheduleData'
 import { getConversationStatusDisplay } from '../lib/threadStatus'
+import { MODIFY_BOOKING } from '../data/bookingDetailsCopy'
 
 const fmtDayChange = (c, withDate) => {
   const label = withDate ? `${c.day}, ${c.date}` : c.day
@@ -112,11 +113,28 @@ export default function ConversationScreen() {
 
   const history = getChatHistory(effectiveOpk)
 
-  // The booking behind this conversation. Null on the recurring conversations,
-  // which have no single booking — and which this prototype keeps out of the
-  // locked-rates flow. Drives the "Details" CTA, which navigates to
-  // BookingDetailsScreen (production's /conversations/<opk>/details page).
+  // The booking behind this conversation. In production every conversation has
+  // one, recurring included — each Conversation IS one week
+  // (recurring/models.py:238-250) — so `${ownerId}-conv-recurring` now resolves
+  // to the client's current-week booking (relationshipData.js
+  // buildRecurringWeekBooking) and the Details CTA below stops being disabled.
+  // Drives that CTA, which navigates to BookingDetailsScreen (production's
+  // /conversations/<opk>/details page).
   const client = getClient(ownerId)
+
+  // The schedule CTA forks on recurring-ness, not on a flag — production does
+  // the same in one mapper: `modify_btn = ModifyBookingProviderButton if not
+  // self.conv.is_recurring else ModifyScheduleProviderButton`
+  // (booking_ctas.py:265-267). `ModifyScheduleProviderButton` subclasses
+  // `ModifyBookingProviderButton` and only overrides the title
+  // (cta_buttons.py:582-583), so both point at the same modify page; the
+  // prototype's split is that a recurring client gets the schedule surfaces
+  // (which `scheduleMode` chooses between, untouched here) and a one-time client
+  // gets the Modify booking screen, exactly as production falls through for a
+  // conversation with no recurring relationship
+  // (useConversationActionHandler.ts:428-439).
+  const isRecurring = isRecurringClient(client)
+
   const booking = (() => {
     const rel = getRelationshipData(ownerId)
     if (!rel) return null
@@ -160,9 +178,19 @@ export default function ConversationScreen() {
         </div>
         <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, paddingTop: 12, overflowX: 'auto', paddingBottom: 14, marginBottom: -14 }}>
           <Button variant="primary" style={{ boxShadow: shadows.medium, flexShrink: 0 }}>Leave feedback</Button>
-          <Button variant="default" style={{ flexShrink: 0 }} onClick={onOpenSchedule}>
-            {scheduleMode === 'agenda' ? 'Manage schedule' : 'Modify schedule'}
-          </Button>
+          {isRecurring ? (
+            <Button variant="default" style={{ flexShrink: 0 }} onClick={onOpenSchedule}>
+              {scheduleMode === 'agenda' ? 'Manage schedule' : 'Modify schedule'}
+            </Button>
+          ) : (
+            <Button
+              variant="default"
+              style={{ flexShrink: 0 }}
+              onClick={() => navigate(`/conversation/${ownerId}/modify`)}
+            >
+              {MODIFY_BOOKING}
+            </Button>
+          )}
           <Button
             variant="default"
             style={{ flexShrink: 0 }}
