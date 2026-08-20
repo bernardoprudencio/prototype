@@ -8,6 +8,10 @@
 import { CLIENTS } from './contacts'
 import { peopleImages } from '../assets/images'
 import { PROTO_TODAY } from './owners'
+import {
+  LEDGER_SECTION_TITLE, SUBTOTAL, YOUR_EARNINGS, rateMultiplier,
+} from './bookingDetailsCopy'
+import { lockedRatesFor } from './lockableRates'
 
 export const TIERS = [
   { tierName: 'Tier 1', threshold: 499,      sitterShare: 0.70 },
@@ -18,6 +22,13 @@ export const TIERS = [
 const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 const fmt = (d) => `${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}`
+
+// Production's MONTH_DAY_WEEK_MED (`"D, M d"`, l10n/formats/en_US/formats.py)
+// as used by the booking-details service summary: weekday abbreviation, month
+// abbreviation, zero-padded day, and no year.
+const SHORT_DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+const fmtLong = (d) =>
+  `${SHORT_DAYS[d.getDay()]}, ${SHORT_MONTHS[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}`
 
 const fmtRange = (start, end) => {
   if (start.getMonth() === end.getMonth()) {
@@ -52,6 +63,119 @@ const SERVICES = {
 }
 
 const SERVICE_KEYS = Object.keys(SERVICES)
+
+// ── Booking-details Starts/Ends presentation ────────────────────────────────
+// Production formats times `g:i A` (service_summary.py) and prints each half's
+// date as MONTH_DAY_WEEK_MED. The overnight services have an agreed drop-off
+// and pick-up, so both halves carry a concrete time; the daytime services are
+// booked as a window, which production renders as a "Flexible start time"
+// chip plus the window's opening time (service_summary.py:95-96, :300).
+// `unit` is the subtitle chip's noun ("3 nights", "1 walk").
+const SERVICE_DETAIL = {
+  dog_walking:    { start: '11:00 AM', end: '1:00 PM',  unit: 'walk',  flexible: true },
+  dog_daycare:    { start: '8:00 AM',  end: '6:00 PM',  unit: 'day'  },
+  drop_in_visits: { start: '11:00 AM', end: '1:00 PM',  unit: 'visit', flexible: true },
+  boarding:       { start: '9:00 AM',  end: '11:00 AM', unit: 'night' },
+  house_sitting:  { start: '5:00 PM',  end: '9:00 AM',  unit: 'night' },
+}
+
+// Every booking needs these: BookingDetailsScreen is reachable from any
+// conversation thread, so the Starts/Ends columns and the subtitle chip must
+// resolve for past and archived bookings too — not just the one demo booking
+// that carries a ledger.
+const detailFields = (start, end, serviceKey, span) => {
+  const d = SERVICE_DETAIL[serviceKey] ?? SERVICE_DETAIL.boarding
+  return {
+    startLabel: fmtLong(start),
+    endLabel: fmtLong(end),
+    startTime: d.start,
+    endTime: d.end,
+    unitCount: span,
+    unitLabel: d.unit,
+    ...(d.flexible ? { flexibleStartTime: true } : {}),
+  }
+}
+
+// ── Booking state: payment gates + status block ──────────────────────────────
+// Two consumers, one derivation, because production derives both from the same
+// place — the stay's status and dates.
+//
+// Payment: gates 3 and 5 of `_get_lock_rates_toggle` (price_ledger.py:1725-1727)
+// need `financial_calculator.is_paid()` and a stay that is not cancelled. Also
+// feeds BookingDetailsScreen's `_is_collapsed` ledger check.
+//
+// Status: `BookingStatusMapper.get_conversation_status()` (booking_status.py).
+// Only the provider-side, non-training, non-grooming branches are reachable
+// here. `serviceStatus` stands in for the stay status, so derive the key rather
+// than hand-setting it — an unkeyed booking used to default to 'confirmed' and
+// claim "This booking is paid and confirmed" on an unpaid request.
+//
+//   no_service_deposit        no deposit ever taken. An old request that was
+//                             never booked has no stay, so the provider sees
+//                             `_get_inactive_request_status` → 'archived'
+//                             (booking_status.py:174-176); an explicitly
+//                             cancelled booking had a stay → STAY_STATUS_CANCELLED
+//                             → 'cancelled' (:149-150). Callers pass which.
+//   pending_service_deposit   accepted but unpaid, so there is no stay yet:
+//                             `_get_no_stay_provider_status` → is_pending_status()
+//                             with the provider as request creator →
+//                             'waitingForPayment' (:198-201).
+//   completed_service_deposit `_get_ongoing_stay_status` (:360-406) — starts in
+//                             the future → 'confirmed'; starts later today →
+//                             'confirmedSameDay'; under way → 'ongoing'; already
+//                             ended → 'complete' (STAY_STATUS_COMPLETED, :146).
+//                             Production shows 'leaveFeedback' instead while the
+//                             stay sits in pending-reviews and is still ratable
+//                             by the sitter; ratability is not modelled here.
+//
+// `isOngoing` / `isCompleted` fall out of the same comparison and gate
+// BookingDetailsScreen's Additional information rows (`_is_stay_active`).
+//
+// `statusUnit` is `alternative_rate_unit_translated`, pluralised when
+// `num_units > 1` (booking_status.py:379-381) — that resolves to the service's
+// price unit (services/constants.py:308-316: night / day / visit / walk), which
+// SERVICE_DETAIL above already carries.
+const startOfDay = (d) => { const c = new Date(d); c.setHours(0, 0, 0, 0); return c }
+
+// `earliest_datetime > today` (booking_status.py:391-394) — a stay starting
+// later on today's date is still "confirmed", not yet "ongoing".
+const startsLaterToday = (start, timeLabel) => {
+  const now = new Date()
+  const m = /^(\d+):(\d+)\s*(AM|PM)$/i.exec(timeLabel ?? '')
+  if (!m) return false
+  const t = new Date(start)
+  t.setHours((Number(m[1]) % 12) + (/pm/i.test(m[3]) ? 12 : 0), Number(m[2]), 0, 0)
+  return t > now
+}
+
+const statusFields = (serviceStatus, start, end, serviceKey, span, opts = {}) => {
+  const d = SERVICE_DETAIL[serviceKey] ?? SERVICE_DETAIL.boarding
+  const base = {
+    isPaid: false,
+    isCancelled: false,
+    hasModification: false,
+    isOngoing: false,
+    isCompleted: false,
+    statusUnit: span > 1 ? `${d.unit}s` : d.unit,
+  }
+
+  if (serviceStatus === 'no_service_deposit') {
+    return { ...base, isCancelled: true, statusKey: opts.statusKey ?? 'cancelled' }
+  }
+  if (serviceStatus !== 'completed_service_deposit') {
+    return { ...base, statusKey: 'waitingForPayment' }
+  }
+
+  const today = startOfDay(new Date())
+  const s = startOfDay(start)
+  const e = startOfDay(end)
+  if (s > today) return { ...base, isPaid: true, statusKey: 'confirmed' }
+  if (e < today) return { ...base, isPaid: true, isCompleted: true, statusKey: 'complete' }
+  if (s.getTime() === today.getTime() && startsLaterToday(start, d.start)) {
+    return { ...base, isPaid: true, statusKey: 'confirmedSameDay' }
+  }
+  return { ...base, isPaid: true, isOngoing: true, statusKey: 'ongoing' }
+}
 
 // Deterministic hash so re-renders pick the same bookings for the same client.
 const hash = (s, salt = 0) => {
@@ -117,9 +241,12 @@ const buildPastBookings = (client, count, targetGbv) => {
       dates: span === 1 ? `${fmt(start)}, ${start.getFullYear()}` : fmtRange(start, end),
       serviceName: svc.name,
       serviceIcon: svc.icon,
+      serviceKey,
       earnings: money(earnings),
       serviceStatus: 'completed_service_deposit',
       conversationOpk: `${client.id}-conv-past-${i + 1}`,
+      ...statusFields('completed_service_deposit', start, end, serviceKey, span),
+      ...detailFields(start, end, serviceKey, span),
     })
 
     // Step cursor backwards: span days + 2-6 day gap.
@@ -153,24 +280,51 @@ const buildUpcomingBookings = (client, count, currentTier) => {
       endDate: isoKey(end),
       serviceName: svc.name,
       serviceIcon: svc.icon,
+      serviceKey: 'boarding',
       earnings: money(price * currentTier.sitterShare),
       serviceStatus: 'completed_service_deposit',
       conversationOpk: `${client.id}-conv-up-active`,
+      ...statusFields('completed_service_deposit', start, end, 'boarding', span),
+      ...detailFields(start, end, 'boarding', span),
     })
   }
 
   // Lena gets one demo paid boarding booking, which is what makes the locked
   // rates surfaces reachable: production gates the lock toggle on the
   // conversation being `is_paid()`, browsable and not cancelled. Priced at her
-  // *locked* rates (see contacts.js) rather than the sitter's defaults —
+  // *locked* rates (see lockableRates.js) rather than the sitter's defaults —
   // 3 nights x ($38 standard + $28 additional dog).
+  //
+  // This is the only booking carrying a `ledger`, because it is the only one
+  // BookingDetailsScreen renders. The rows mirror
+  // price_ledger.py:_get_rate_price(): one row per pet, titled with the pet's
+  // name, described by the add-on type, with the "$X x N nights" multiplier as
+  // a sub-line. A sitter's ledger ends at Subtotal + Your earnings — no
+  // service fee, no tax, no due-now (`_get_requester_prices` returns [] for
+  // providers).
   if (client.id === 'lena' && count > 0) {
     const start = new Date(PROTO_TODAY); start.setHours(0,0,0,0); start.setDate(start.getDate() + 6)
     const end   = new Date(PROTO_TODAY); end.setHours(0,0,0,0);   end.setDate(end.getDate() + 9)
-    const locked = client.lockedRates.rates
+    // Paid a week before "today" — derived from PROTO_TODAY, never hardcoded.
+    const paid  = new Date(PROTO_TODAY); paid.setHours(0,0,0,0);  paid.setDate(paid.getDate() - 7)
+    const locked = lockedRatesFor(client, 'boarding').rates
     const nights = 3
     const perNight = locked[0].lockedPrice + locked[1].lockedPrice
     const price = perNight * nights
+
+    // First pet bills at the standard rate, each additional pet at the
+    // additional-dog rate — the same shape as the BookingAddOn rows behind
+    // production's ledger.
+    const rateRows = client.pets.map((p, i) => {
+      const rate = locked[i === 0 ? 0 : 1]
+      return {
+        title: p.name,
+        description: rate.label,
+        text: [rateMultiplier(`$${rate.lockedPrice}`, nights, rate.unit, `${rate.unit}s`)],
+        amount: money(rate.lockedPrice * nights),
+      }
+    })
+
     out.push({
       id: `${client.id}-up-locked`,
       price: money(price),
@@ -179,9 +333,33 @@ const buildUpcomingBookings = (client, count, currentTier) => {
       endDate: isoKey(end),
       serviceName: SERVICES.boarding.name,
       serviceIcon: SERVICES.boarding.icon,
+      serviceKey: 'boarding',
       earnings: money(price * currentTier.sitterShare),
       serviceStatus: 'completed_service_deposit',
       conversationOpk: `${client.id}-conv-up-locked`,
+
+      // ── Booking details page fields ──
+      // Gating inputs for BookingDetailsScreen: a paid, unmodified,
+      // uncancelled stay renders the ledger collapsed (`_is_collapsed`) and
+      // shows the lock-rates switch (`_get_lock_rates_toggle`).
+      ...statusFields('completed_service_deposit', start, end, 'boarding', nights),
+      paidOn: fmt(paid),
+      // The Starts/Ends columns need their own labels and times: `dates` is a
+      // collapsed range ("Aug 25 to 28, 2026") that can't be split back apart.
+      // See detailFields / SERVICE_DETAIL above.
+      ...detailFields(start, end, 'boarding', nights),
+      ledger: {
+        sections: [
+          { title: LEDGER_SECTION_TITLE, items: rateRows },
+          { items: [{ title: SUBTOTAL, amount: money(price), style: 'bold' }] },
+          { items: [{
+              title: YOUR_EARNINGS,
+              amount: money(price * currentTier.sitterShare),
+              style: 'bold',
+              action: 'earnings',
+            }] },
+        ],
+      },
     })
   }
 
@@ -210,9 +388,12 @@ const buildUpcomingBookings = (client, count, currentTier) => {
       endDate: isoKey(end),
       serviceName: svc.name,
       serviceIcon: svc.icon,
+      serviceKey,
       earnings: money(price * currentTier.sitterShare),
       serviceStatus: 'pending_service_deposit',
       conversationOpk: `${client.id}-conv-up-${i + 1}`,
+      ...statusFields('pending_service_deposit', start, end, serviceKey, span),
+      ...detailFields(start, end, serviceKey, span),
     })
 
     cursor.setDate(cursor.getDate() + span + (3 + (seed % 6)))
@@ -245,9 +426,13 @@ const buildArchivedBookings = (client, count) => {
       dates: span === 1 ? `${fmt(start)}, ${start.getFullYear()}` : fmtRange(start, end),
       serviceName: svc.name,
       serviceIcon: svc.icon,
+      serviceKey,
       earnings: money(0),
       serviceStatus: 'no_service_deposit',
       conversationOpk: `${client.id}-conv-arc-${i + 1}`,
+      // An old request that was never booked, so there is no stay behind it.
+      ...statusFields('no_service_deposit', start, end, serviceKey, span, { statusKey: 'archived' }),
+      ...detailFields(start, end, serviceKey, span),
     })
 
     cursor.setDate(cursor.getDate() - span - 7)
@@ -280,9 +465,12 @@ const buildCancelledArchived = (client) => {
       dates: span === 1 ? `${fmt(start)}, ${start.getFullYear()}` : fmtRange(start, end),
       serviceName: svc.name,
       serviceIcon: svc.icon,
+      serviceKey: b.serviceKey,
       earnings: money(0),
       serviceStatus: 'no_service_deposit',
       conversationOpk: `${client.id}-conv-arc-${i + 1}`,
+      ...statusFields('no_service_deposit', start, end, b.serviceKey, span),
+      ...detailFields(start, end, b.serviceKey, span),
     }
 
     cursor.setDate(cursor.getDate() - span - (2 + (seed % 5)))

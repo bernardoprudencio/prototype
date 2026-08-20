@@ -6,6 +6,7 @@ import { getClient } from '../../data/contacts'
 import { Row, LockRatesSheet, Snackbar } from '../../components'
 import { LockIcon, ChevronRightIcon } from '../../assets/icons'
 import { useLockedRates } from '../../lib/useLockedRates'
+import { isLockableConversation } from '../../data/lockableRates'
 import { RATES_SECTION_TITLE, ratesLockedSubtitle, NO_LOCKED_RATES } from '../../data/lockedRatesCopy'
 import RelationshipPageHeader from './RelationshipPageHeader'
 import RelationshipProgressTracker from './RelationshipProgressTracker'
@@ -16,7 +17,15 @@ export default function RelationshipPage() {
   const { ownerId } = useParams()
   const data = getRelationshipData(ownerId)
   const client = getClient(ownerId)
-  const lr = useLockedRates(client)
+  // The relationship page is not a conversation, so it has no gate of its own.
+  // It summarises across services, and its sheet needs one concrete service to
+  // act on — so drive it off the client's most relevant lockable booking.
+  const repBooking = (() => {
+    if (!data) return null
+    const { upcoming, past, archived } = data.bookings
+    return [...upcoming, ...past, ...archived].find(isLockableConversation) ?? null
+  })()
+  const lr = useLockedRates(client, repBooking)
 
   if (!data) {
     return (
@@ -28,9 +37,10 @@ export default function RelationshipPage() {
 
   const { requester, progress, bookings } = data
 
+  // Production opens the conversation for that booking; its "Details" CTA is
+  // the entry point to BookingDetailsScreen.
   const handleCardClick = (conversationOpk) => {
-    // eslint-disable-next-line no-console
-    console.log('booking card click', conversationOpk)
+    navigate(`/conversation/${ownerId}/thread/${conversationOpk}`, { state: { type: 'today' } })
   }
 
   const handleRebook = () => {
@@ -86,7 +96,9 @@ export default function RelationshipPage() {
                 firstRow
                 leftItem={<LockIcon size={24} color={colors.primary} />}
                 label={RATES_SECTION_TITLE}
-                sublabel={lr.locked ? ratesLockedSubtitle(1) : NO_LOCKED_RATES}
+                sublabel={lr.lockedServiceCount > 0
+                  ? ratesLockedSubtitle(lr.lockedServiceCount)
+                  : NO_LOCKED_RATES}
                 rightItem={<ChevronRightIcon />}
                 onClick={() => lr.requestChange(!lr.locked)}
               />

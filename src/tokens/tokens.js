@@ -163,6 +163,7 @@ export const colors = {
 // ─── Radius / Shadows / Typography ────────────────────────────────────────────
 export const radius = {
   primary: 8,
+  secondary: 4,   // Kibble radii.secondary — SwitchField rows, small controls
   round: 99999,
 }
 

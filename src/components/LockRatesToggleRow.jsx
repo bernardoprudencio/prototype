@@ -1,19 +1,36 @@
 import React, { useState } from 'react'
 import BottomSheet from './BottomSheet'
 import Button from './Button'
-import OnOffSwitch from './OnOffSwitch'
+import SwitchField from './SwitchField'
 import { InfoCircleIcon } from '../assets/icons'
-import { colors, textStyles, spacing } from '../tokens'
-import { TOGGLE_ARIA_LABEL, TOOLTIP_TITLE, tooltipBody } from '../data/lockedRatesCopy'
+import { colors, textStyles, spacing, radius } from '../tokens'
+import {
+  TOOLTIP_TITLE, tooltipBody, TOOLTIP_DISMISS, INFO_BUTTON_ARIA_LABEL,
+} from '../data/lockedRatesCopy'
 
 /**
- * LockRatesToggleRow — the locked-rates control, shared by every surface that
- * hosts it (booking details price ledger, modification-screen ledger).
+ * LockRatesToggleRow — the locked-rates control.
  *
- * In production the affordance next to the label is a muted info/question-circle
- * icon that opens a tooltip (web) or popover (native) — there is no padlock
- * badge on the toggle itself. Tapping the switch does not commit: it opens the
- * lock/unlock confirmation sheet, which the host owns.
+ * Thin composition over `SwitchField`; all row layout, typography, hover tint,
+ * click target and label wiring live there. What is locked-rates-specific and
+ * therefore stays here:
+ *
+ *   1. The copy, from lockedRatesCopy.
+ *   2. The info affordance and its tooltip. Production's is a hover Popover
+ *      around a small alert-info icon (`LockedRatesComponent.tsx:33-48`); on the
+ *      price-ledger surface the equivalent control is
+ *      `PriceLedger/components/AlertInfoButton.tsx:20-29` — a circular flat
+ *      Button with zero padding and `color: neutral.900` (#1F2124), not the
+ *      muted tertiary this row previously used. A hover popover has no mobile
+ *      analogue, so the tooltip opens a BottomSheet instead.
+ *   3. The non-optimistic contract. Tapping never commits: production's
+ *      `ConversationLockRates.tsx:29-33` fires the modal-open event and then
+ *      *resets* the field back to `toggle.initial`, so the visual state is only
+ *      authoritative after the round-trip. Here the host owns LockRatesSheet and
+ *      the switch simply reports the requested direction.
+ *
+ * Matches production exactly: `primaryLabelSize="100"`, no secondary label, no
+ * divider, control on the right (ConversationLockRates.tsx:41-47).
  *
  * Props:
  *   label            string   — surface-specific phrasing from lockedRatesCopy
@@ -24,34 +41,33 @@ import { TOGGLE_ARIA_LABEL, TOOLTIP_TITLE, tooltipBody } from '../data/lockedRat
 export default function LockRatesToggleRow({ label, ownerFirstName, checked, onRequestChange }) {
   const [tipOpen, setTipOpen] = useState(false)
 
+  const infoButton = (
+    <button
+      type="button"
+      data-switchfield-accessory
+      aria-label={INFO_BUTTON_ARIA_LABEL}
+      onClick={e => { e.stopPropagation(); setTipOpen(true) }}
+      style={{
+        width: 24, height: 24, flexShrink: 0,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: 'transparent', border: 'none', padding: 0,
+        borderRadius: radius.round,
+        cursor: 'pointer', lineHeight: 1,
+      }}
+    >
+      <InfoCircleIcon size={16} color={colors.primary} />
+    </button>
+  )
+
   return (
     <>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: spacing.sm,
-        minHeight: 56, padding: '8px 0',
-      }}>
-        <span style={{ ...textStyles.text200, color: colors.primary, flex: 1 }}>
-          {label}
-          {' '}
-          <button
-            type="button"
-            aria-label={TOOLTIP_TITLE}
-            onClick={() => setTipOpen(true)}
-            style={{
-              background: 'transparent', border: 'none', padding: 0,
-              cursor: 'pointer', verticalAlign: 'middle', lineHeight: 1,
-            }}
-          >
-            <InfoCircleIcon size={16} color={colors.tertiary} style={{ verticalAlign: 'middle' }} />
-          </button>
-        </span>
-
-        <OnOffSwitch
-          checked={checked}
-          ariaLabel={TOGGLE_ARIA_LABEL}
-          onChange={next => onRequestChange?.(next)}
-        />
-      </div>
+      <SwitchField
+        primaryLabel={label}
+        primaryLabelSize={100}
+        labelAccessory={infoButton}
+        checked={checked}
+        onChange={next => onRequestChange?.(next)}
+      />
 
       {tipOpen && (
         <BottomSheet variant="simple" onDismiss={() => setTipOpen(false)}>
@@ -63,7 +79,7 @@ export default function LockRatesToggleRow({ label, ownerFirstName, checked, onR
               {tooltipBody(ownerFirstName)}
             </p>
             <Button variant="primary" size="default" fullWidth onClick={() => setTipOpen(false)}>
-              Got it
+              {TOOLTIP_DISMISS}
             </Button>
           </div>
         </BottomSheet>

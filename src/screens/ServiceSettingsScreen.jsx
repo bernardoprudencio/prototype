@@ -50,7 +50,7 @@ import AvailabilityModal from '../components/AvailabilityModal'
 import AdditionalPreferencesModal from '../components/AdditionalPreferencesModal'
 import HelpLinkTip from '../components/HelpLinkTip'
 import { useApp } from '../context/AppContext'
-import { useMediaQuery } from '../lib/useMediaQuery'
+import { useIsExtraWide } from '../lib/useMediaQuery'
 
 // Service id → icon component. Each service icon hardcodes its own color so
 // the rendered visual state cannot drift from the data layer.
@@ -334,7 +334,7 @@ export default function ServiceSettingsScreen() {
   // Missing key === collapsed (sub-sections default to collapsed when multiple
   // families render). Transient UI state — does not persist.
   const [expandedSubsections, setExpandedSubsections] = useState({})
-  const isTwoCol = useMediaQuery('(min-width: 880px)')
+  const isTwoCol = useIsExtraWide()
   const onBack = () => navigate('/more')
   const openProfileSheet = () => setProfileSheetOpen(true)
   const closeProfileSheet = () => setProfileSheetOpen(false)

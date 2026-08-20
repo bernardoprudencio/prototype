@@ -5,42 +5,8 @@ import { BackIcon } from '../assets/icons'
 import RadioRow from '../components/RadioRow'
 import Chip from '../components/Chip'
 import Button from '../components/Button'
+import SwitchField from '../components/SwitchField'
 import { BOARDING_SETTINGS, CANCELLATION_POLICY_OPTIONS } from '../data/sitterProfile'
-
-// ─── Local switch ────────────────────────────────────────────────────────────
-// Mobile iOS-style toggle. Track + thumb, color-shifts on the `on` state.
-// Sized to match Kibble StatusSwitch in roverdotcom/web.
-const Switch = ({ on, onChange }) => (
-  <div
-    role="switch"
-    aria-checked={on}
-    onClick={() => onChange?.(!on)}
-    style={{
-      width: 44,
-      height: 26,
-      borderRadius: 99999,
-      background: on ? colors.success : colors.borderInteractive,
-      position: 'relative',
-      flexShrink: 0,
-      cursor: 'pointer',
-      transition: 'background 0.15s',
-    }}
-  >
-    <div
-      style={{
-        position: 'absolute',
-        top: 2,
-        left: on ? 20 : 2,
-        width: 22,
-        height: 22,
-        borderRadius: '50%',
-        background: colors.white,
-        boxShadow: '0px 1px 4px rgba(0,0,0,0.18)',
-        transition: 'left 0.15s',
-      }}
-    />
-  </div>
-)
 
 // ─── Section header (h2) ─────────────────────────────────────────────────────
 // Matches the "SectionHeader" used in roverdotcom/web ServiceForm sections —
@@ -90,28 +56,21 @@ const Sublabel = ({ children }) => (
 )
 
 // ─── Switch row (used by Search Settings + Always available + auto-update) ──
+// Now a thin composition over the shared SwitchField primitive. The row's own
+// 8px vertical padding sits on top of SwitchField's py="2x", preserving this
+// screen's existing 16px rhythm — production wraps the field the same way when a
+// surface wants more room than the field's own padding
+// (ExpandableSwitchCard.tsx:56-79).
 const SwitchRow = ({ label, description, on, onChange }) => (
-  <div
-    style={{
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: 16,
-      paddingTop: 16,
-      paddingBottom: 16,
-    }}
-  >
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div
-        style={{
-          ...textStyles.text200Semibold,
-          color: colors.primary,
-        }}
-      >
-        {label}
-      </div>
-      {description && <Sublabel>{description}</Sublabel>}
-    </div>
-    <Switch on={on} onChange={onChange} />
+  <div style={{ paddingTop: 8, paddingBottom: 8 }}>
+    <SwitchField
+      primaryLabel={label}
+      primaryLabelSize={200}
+      useBoldPrimaryLabel
+      secondaryLabel={description}
+      checked={on}
+      onChange={onChange}
+    />
   </div>
 )
 
@@ -375,20 +334,24 @@ export default function BoardingSettingsScreen() {
               <div
                 key={rate.slug}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  paddingTop: 12,
-                  paddingBottom: 12,
+                  paddingTop: 4,
+                  paddingBottom: 4,
                   borderBottom: `1px solid ${colors.border}`,
                 }}
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ ...textStyles.text200Semibold, color: colors.primary }}>
-                      {rate.label}
-                    </span>
-                    {rate.isNew && (
+                {/* The NEW pill rides along beside the label via SwitchField's
+                    labelAccessory slot — the same slot LockRatesToggleRow uses
+                    for its info button, since Kibble types `primaryLabel` as a
+                    plain string. */}
+                <SwitchField
+                  primaryLabel={rate.label}
+                  primaryLabelSize={200}
+                  useBoldPrimaryLabel
+                  secondaryLabel={
+                    rate.isFree ? 'Offered for free' : `$${rate.price} per ${rate.unit}`
+                  }
+                  labelAccessory={
+                    rate.isNew ? (
                       <span
                         style={{
                           ...textStyles.text100Semibold,
@@ -400,15 +363,11 @@ export default function BoardingSettingsScreen() {
                       >
                         NEW
                       </span>
-                    )}
-                  </div>
-                  <Sublabel>
-                    {rate.isFree
-                      ? 'Offered for free'
-                      : `$${rate.price} per ${rate.unit}`}
-                  </Sublabel>
-                </div>
-                <Switch on={rate.active} onChange={noop} />
+                    ) : null
+                  }
+                  checked={rate.active}
+                  onChange={noop}
+                />
               </div>
             ))}
           </div>

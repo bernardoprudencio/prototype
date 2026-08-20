@@ -36,7 +36,7 @@ No linting or test setup exists in this project.
 **Routing:** React Router v6 with `HashRouter` (in `src/main.jsx`). Every screen is a
 real route declared in `src/App.jsx`. Tab-level routes (`/`, `/inbox`, `/contacts`,
 `/more`, `/service-settings`) render in the base layer; conversation, relationship,
-schedule, testing-mode, and presentation screens are **overlay routes** rendered in
+schedule, booking-details, testing-mode, and presentation screens are **overlay routes** rendered in
 sibling `<Routes>` blocks wrapped in `SlideOverlay` (`position: absolute, inset: 0`)
 at ascending `zIndex`. `SlideOverlay` owns the slide-in/out animation, so overlays
 stack over the active tab without unmounting it.
@@ -45,7 +45,7 @@ stack over the active tab without unmounting it.
 
 **Component Variants:** `Button.jsx` supports `default`, `primary`, `flat`, and `disabled` variants via a `variant` prop. Icons live in `src/assets/icons.jsx` as named React components (50 exports), most wrapping the Rover icon font (`src/assets/rover-icons.css`) via a private `Icon` component.
 
-**Responsive Behavior:** On desktop, the app renders inside a 375×812px phone frame with a CSS shadow shell (`global.css`). On mobile (≤420px viewport), it goes full-screen for native-feeling user tests.
+**Responsive Behavior:** There is no phone frame. `.app-shell` (`global.css`) fills the viewport at every width, and each screen's root is a `height: 100%` flex column with its own inner scroll region. Screens that have a wide layout gate it on the shared breakpoints in `src/lib/useMediaQuery.js` — `useIsWide()` (≥769px) for the schedule screens, `useIsExtraWide()` (≥880px) for Service settings. Every other screen currently has a single column that stretches to fill the viewport; adding a wide layout means adding a breakpoint branch, not a frame.
 
 **No Backend:** All data (pet names, images, service info) is hardcoded in components or imported from `src/assets/images.js`. No API calls or state management libraries.
 
@@ -81,7 +81,8 @@ stack over the active tab without unmounting it.
 |------|-------------|
 | `HomeScreen.jsx` | Dashboard: incomplete cards from last week, today's scheduled walks, promo cards |
 | `InboxScreen.jsx` | Inbox tab: filter chips, sorted thread list, live snippet updates from liveEvents |
-| `ConversationScreen.jsx` | Chat interface; hosts `BookingDetailsSheet` on the `/booking/:conversationOpk` route |
+| `ConversationScreen.jsx` | Chat interface; its "Details" CTA opens `BookingDetailsScreen` |
+| `BookingDetailsScreen.jsx` | Booking details page (mirrors production's `/account/conversations/<opk>/details`): status, service summary, price ledger + locked-rates switch, CTAs, pets, location, additional info, connect |
 | `CurrentWeekScreen.jsx` | Current-week modification screen; contains `PricingLedger` |
 | `EditTemplateScreen.jsx` | Recurring template editor |
 | `RebookScreen.jsx` | Contacts tab: client list |
@@ -123,7 +124,6 @@ stack over the active tab without unmounting it.
 | `ServiceVariantConfigSheet.jsx` | Dev sheet toggling every variant flag |
 | `OnOffSwitch.jsx` / `Snackbar.jsx` | On/off switch and transient bottom toast |
 | `LockRatesToggleRow.jsx` / `LockRatesSheet.jsx` | Locked-rates toggle + lock/unlock confirmation sheet |
-| `BookingDetailsSheet.jsx` | Booking price ledger; hosts the locked-rates toggle |
 
 ## Key Business Logic
 
@@ -142,12 +142,16 @@ stack over the active tab without unmounting it.
 
 **Locked rates** — a sitter freezes the rates one client pays for one service.
 Mirrors production (`roverdotcom/web`): keyed per (owner × service), the lock is a
-single boolean because production's write is full-set replacement, and **recurring
-clients are excluded** (production builds recurring requests `.without_locked_rates()`),
-so only non-recurring clients with a `lockedRates` block show the UI. Wiring lives in
+single boolean because production's write is full-set replacement. Only non-recurring
+clients with a `lockedRates` block show the UI — that is a **deliberate prototype
+scoping choice, not production behaviour**: the recurring exclusion
+(`if self.stay.is_recurring: return None`) lives only on the retiring legacy stay page,
+and the canonical `_get_lock_rates_toggle()` has no such check. What production does do
+is price recurring sentinel requests `.without_locked_rates()` (`recurring/models.py`),
+so a lock never *applies* to a recurring booking. Wiring lives in
 `src/lib/useLockedRates.js`; all copy in `src/data/lockedRatesCopy.js`. Surfaces:
-`BookingDetailsSheet`, `CurrentWeekScreen`'s `PricingLedger`, and the relationship
-page's "Rates" row.
+`BookingDetailsScreen`'s price ledger, `CurrentWeekScreen`'s `PricingLedger`, and the
+relationship page's "Rates" row.
 
 **Data sources in `src/data/`:**
 - `owners.js` — 3 hardcoded clients (Owen, James, Sarah) with pet info, schedule templates, and `getIncompleteCards()` / `getTodayWalks()` / `getOwnerRelUnit()`
@@ -156,7 +160,7 @@ page's "Rates" row.
 - `contacts.js` — The full client roster (recurring and non-recurring), incl. `pricing` and `lockedRates`
 - `relationshipData.js` — Builds each client's relationship page: tier progress + upcoming/past/archived bookings
 - `sitterProfile.js` / `sitterServices.js` — The sitter's own default rates and service configuration
-- `lockedRatesCopy.js` / `hubCopy.js` — Verbatim production copy, single source of truth per feature
+- `lockedRatesCopy.js` / `bookingDetailsCopy.js` / `hubCopy.js` — Verbatim production copy, single source of truth per feature
 
 ## Workflow Rules
 

@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { colors, typography, shadows, textStyles } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
 import { peopleImages } from '../assets/images'
-import { Button, PetAvatar, BannerBlock, ChatBubble, BookingDetailsSheet } from '../components'
+import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
 import { useApp } from '../context/AppContext'
 import { OWNERS } from '../data/owners'
 import { getChatHistory, getInboxThreads } from '../data/threads'
@@ -85,7 +85,6 @@ export default function ConversationScreen() {
   }
 
   const messagesEndRef = useRef(null)
-  const [detailsOpen, setDetailsOpen] = useState(false)
   const [text, setText] = useState('')
   const [sentMessages, setSentMessages] = useState([])
 
@@ -113,9 +112,10 @@ export default function ConversationScreen() {
 
   const history = getChatHistory(effectiveOpk)
 
-  // The booking behind this conversation, used by the details sheet (price
-  // ledger + locked-rates toggle). Null on the recurring conversations, which
-  // have no single booking — and which production excludes from locked rates.
+  // The booking behind this conversation. Null on the recurring conversations,
+  // which have no single booking — and which this prototype keeps out of the
+  // locked-rates flow. Drives the "Details" CTA, which navigates to
+  // BookingDetailsScreen (production's /conversations/<opk>/details page).
   const client = getClient(ownerId)
   const booking = (() => {
     const rel = getRelationshipData(ownerId)
@@ -167,7 +167,7 @@ export default function ConversationScreen() {
             variant="default"
             style={{ flexShrink: 0 }}
             disabled={!booking}
-            onClick={() => setDetailsOpen(true)}
+            onClick={() => navigate(`/conversation/${ownerId}/thread/${effectiveOpk}/details`)}
           >
             Details
           </Button>
@@ -281,13 +281,6 @@ export default function ConversationScreen() {
         )}
       </div>
 
-      {detailsOpen && booking && (
-        <BookingDetailsSheet
-          client={client}
-          booking={booking}
-          onClose={() => setDetailsOpen(false)}
-        />
-      )}
     </div>
   )
 }

@@ -178,7 +178,7 @@ export function AppProvider({ children }) {
   // replacement — lock POSTs the whole rate list, unlock POSTs an empty one — so
   // a single boolean per owner+service faithfully covers every reachable state.
   // Undefined means "not yet touched this session": read the seed from
-  // client.lockedRates.locked instead (see isRatesLocked below).
+  // client.lockedServices instead (see isRatesLocked below).
   const [lockedRatesByOwner, setLockedRatesByOwner] = useState({})  // { [`${ownerId}:${serviceKey}`]: bool }
 
   const persistEnum = (key, next, raw) => {
@@ -215,16 +215,17 @@ export function AppProvider({ children }) {
   const setShowGroomingProfileReviewBanner    = (next) => persistJson(SHOW_GROOMING_PROFILE_REVIEW_KEY,         next, setShowGroomingProfileReviewBannerRaw)
   const setShowLockedRates                    = (next) => persistJson(SHOW_LOCKED_RATES_KEY,                    next, setShowLockedRatesRaw)
 
-  // Falls back to the client's declared seed state until the sitter toggles it.
-  const isRatesLocked = (client) => {
-    if (!client?.lockedRates) return false
-    const key = `${client.id}:${client.lockedRates.serviceKey}`
-    return lockedRatesByOwner[key] ?? client.lockedRates.locked
+  // Keyed on (client x service), as production keys LockedServiceAddOn rows.
+  // Falls back to the client's declared seed list until the sitter toggles it.
+  const isRatesLocked = (client, serviceKey) => {
+    if (!client || !serviceKey) return false
+    const key = `${client.id}:${serviceKey}`
+    return lockedRatesByOwner[key] ?? Boolean(client.lockedServices?.includes(serviceKey))
   }
 
-  const setRatesLocked = (client, locked) => {
-    if (!client?.lockedRates) return
-    const key = `${client.id}:${client.lockedRates.serviceKey}`
+  const setRatesLocked = (client, serviceKey, locked) => {
+    if (!client || !serviceKey) return
+    const key = `${client.id}:${serviceKey}`
     setLockedRatesByOwner(prev => ({ ...prev, [key]: locked }))
   }
 
