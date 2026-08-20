@@ -35,7 +35,8 @@ No linting or test setup exists in this project.
 
 **Routing:** React Router v6 with `HashRouter` (in `src/main.jsx`). Every screen is a
 real route declared in `src/App.jsx`. Tab-level routes (`/`, `/inbox`, `/contacts`,
-`/more`, `/service-settings`) render in the base layer; conversation, relationship,
+`/more`, `/service-settings` and its `services/:family` / `profile/:family` /
+`boarding` sub-pages) render in the base layer; conversation, relationship,
 schedule, booking-details, testing-mode, and presentation screens are **overlay routes** rendered in
 sibling `<Routes>` blocks wrapped in `SlideOverlay` (`position: absolute, inset: 0`)
 at ascending `zIndex`. `SlideOverlay` owns the slide-in/out animation, so overlays
@@ -118,7 +119,9 @@ stack over the active tab without unmounting it.
 | `RelationshipPage/` | Relationship page: header, tier progress tracker, Rates row, booking lists, alt-monetization interstitial |
 | `relationship/RelationshipManagement.jsx` | Full recurring schedule UI: agenda view, add/manage/edit sheets, billing confirmations |
 | `ScheduleScreen.jsx` / `ScheduleOverlay.jsx` | Schedule route wrappers over `RelationshipManagement` |
-| `ServiceSettingsScreen.jsx` / `BoardingSettingsScreen.jsx` | Service hub + boarding rates & settings |
+| `ServiceSettingsScreen.jsx` | Service settings hub. Post-DEV-146752 it is a shallow index: two rows per active family (Services / Profile) drilling into sub-pages, "Other services" sign-up rows, Business / About you / Account actions. Family-scoped banners render inside their family's section, not in a top-of-page stack |
+| `FamilyServicesScreen.jsx` / `FamilyProfileScreen.jsx` | The per-family sub-pages behind those two rows — every service in the family with its state-tinted icon badge, and the family's profile rows plus a pinned "View … profile" action |
+| `BoardingSettingsScreen.jsx` | Boarding rates & settings; reached from the pet sitting services sub-page |
 | `MoreScreen.jsx` / `TestingModeScreen.jsx` | More tab and dev variant entry point |
 | `PresentationsScreen.jsx` / `DeckScreen.jsx` / `MgmtHubDeckScreen.jsx` | Internal review decks |
 
@@ -150,7 +153,9 @@ stack over the active tab without unmounting it.
 | `TimeInput.jsx` / `CalInput.jsx` / `DisabledInput.jsx` | Form inputs |
 | `Select.jsx` / `Textarea.jsx` | Labelled native `<select>` (`appearance: none` + shared `DropdownIcon`) and labelled textarea with inline validation error — the two Kibble primitives `ModifyBookingScreen` needed and the codebase lacked |
 | `SlideOverlay.jsx` | Route-level slide-in overlay wrapper |
-| `HubBanner.jsx` / `MigrationOnboardingBanner.jsx` | Service-hub banners |
+| `HubBanner.jsx` / `MigrationOnboardingBanner.jsx` | Service-hub banners. `HubBanner` has a `paragraph` layout (bold lead + body + inline link + optional `bodyTail`) alongside the default stack |
+| `hubUI.jsx` | Shared service-settings primitives: `SectionHeader` (optional leading icon), `SettingsRow` (optional `needsReview` badge), `SectionGroup`, `Chevron`, `SubPageHeader`, `COLOR_BY_TOKEN` |
+| `ReviewBadge.jsx` / `ServiceIconBadge.jsx` | Yellow "Review" attention badge; 40px state-tinted circular service icon |
 | `HelpLinkTip.jsx` | Inline link that opens a tip sheet |
 | `ServiceVariantConfigSheet.jsx` | Dev sheet toggling every variant flag |
 | `Switch.jsx` / `SwitchField.jsx` | Kibble switch primitive and its labelled form-field wrapper |
@@ -159,6 +164,36 @@ stack over the active tab without unmounting it.
 | `TabBar.jsx` / `UserAvatar.jsx` / `DragHandle.jsx` | Bottom tab bar, sitter avatar, sheet drag affordance |
 | `BulletedParagraphs.jsx` | Numbered bullet list with vertical connector (Kibble pattern port) |
 | `AvailabilityModal.jsx` / `AdditionalPreferencesModal.jsx` / `ConfirmDeactivationModal.jsx` / `ChooseProfileSheet.jsx` / `ResubmitButton.jsx` | Service-settings and profile-review flow pieces |
+
+## Service settings IA
+
+`/service-settings` follows the DEV-146752 Management-hub migration: the hub is an
+index, the detail lives on drill-down pages.
+
+| Route | Screen |
+|---|---|
+| `/service-settings` | `ServiceSettingsScreen` — two rows per active family, Other services, Business, About you, Account actions |
+| `/service-settings/services/:family` | `FamilyServicesScreen` — every service in the family, active and inactive |
+| `/service-settings/profile/:family` | `FamilyProfileScreen` — `FAMILY_PROFILE_ROWS[family]` + pinned "View … profile" |
+| `/service-settings/boarding` | `BoardingSettingsScreen` — back goes to `/service-settings/services/pet_sitting` |
+
+All four are **base-layer tab routes**, not `SlideOverlay` overlays.
+
+**Banner placement is data-driven.** Each family-scoped entry in `hubCopy.js` carries
+`scope: { family, slot }` where slot is `'services'` or `'profile'`.
+`ServiceSettingsScreen`'s `bannersFor(family, slot)` reads the dev flags, matches on
+`scope`, and renders the banner between the section header and the Services row
+(`services`) or below the Profile row (`profile`). The same selector drives the yellow
+`ReviewBadge` on those rows — a row wears the badge exactly when its slot has a banner.
+Only account-wide states (resubmit, away manual/auto, CIAF onboarding) still stack at
+the top; the verification error renders under Business → Verification, gated on the
+existing `backgroundCheckStatus === 'error'` flag.
+
+**Service state → badge tint.** `SERVICE_STATE` is ACTIVE / AWAY / PENDING / INACTIVE.
+`serviceBadgeTone(state)` in `sitterServices.js` returns `[paletteFamily, shade]` pairs
+that `ServiceIconBadge` resolves against `palette` — green / yellow / blue / neutral.
+`getActiveServiceStatusLines` emits the matching status line, INACTIVE included, since
+the services sub-page lists every service regardless of state.
 
 ## Key Business Logic
 

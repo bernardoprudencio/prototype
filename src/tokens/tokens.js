@@ -191,7 +191,9 @@ export const spacing = {
 
 // ─── Text styles (used by ported v1 screens) ─────────────────────────────────
 const averta = "'Averta', sans-serif"
-const bogart = "'Bogart', sans-serif"
+// The only Bogart face loaded in global.css is 'Bogart-Semibold'; keep the
+// plain family name as a fallback for anywhere it gets loaded under that alias.
+const bogart = "'Bogart-Semibold', 'Bogart', sans-serif"
 
 export const textStyles = {
   display400: { fontFamily: bogart, fontWeight: 600, fontSize: 26, lineHeight: 1.25, letterSpacing: 0 },

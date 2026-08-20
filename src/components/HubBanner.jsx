@@ -28,12 +28,15 @@ const SEVERITY_STYLES = {
 // `layout="paragraph"` collapses title + body + cta into a single inline
 // paragraph (bold lead, plain follow-up, inline link). Matches the
 // production GroomingProfileReviewBanner shape, which uses a Kibble Alert
-// with no icon and a single <Paragraph> of three inline spans.
+// with no icon and a single <Paragraph> of three inline spans. `bodyTail`
+// (paragraph layout only) is the run of plain text that follows the inline
+// link — needed by the verification-error copy, whose CTA sits mid-sentence.
 export default function HubBanner({
   severity = 'info',
   title,
   body,
   cta,
+  bodyTail,
   onDismiss,
   layout = 'stack',
   hideIcon = false,
@@ -106,6 +109,8 @@ export default function HubBanner({
           {body && <span>{body}</span>}
           {cta && ' '}
           {renderCta()}
+          {bodyTail && ' '}
+          {bodyTail && <span>{bodyTail}</span>}
         </p>
 
         {onDismiss && (

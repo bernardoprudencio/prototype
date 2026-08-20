@@ -185,7 +185,12 @@ const SEARCH_STATUS_OPTIONS = [
 const SERVICE_STATE_OPTIONS = [
   { id: SERVICE_STATE.ACTIVE,   label: 'Active'   },
   { id: SERVICE_STATE.AWAY,     label: 'Away'     },
+  { id: SERVICE_STATE.PENDING,  label: 'Pending'  },
   { id: SERVICE_STATE.INACTIVE, label: 'Inactive' },
+]
+const GROOMING_BANNER_OPTIONS = [
+  { id: 'review',       label: 'Under review'  },
+  { id: 'not_findable', label: 'Not findable'  },
 ]
 const ACCEPTANCE_OPTIONS = [
   { id: ACCEPTANCE_RESTRICTION.NONE,           label: 'All'            },
@@ -217,15 +222,14 @@ export default function ServiceVariantConfigSheet({
     showAvailabilityModal,          setShowAvailabilityModal,
     showAdditionalPreferencesModal, setShowAdditionalPreferencesModal,
     showConfirmServiceDeactivation, setShowConfirmServiceDeactivation,
-    showShortNoticeRateCallout,     setShowShortNoticeRateCallout,
     showServiceSettingsHelpTip,     setShowServiceSettingsHelpTip,
     showRegionalAlertCalifornia,    setShowRegionalAlertCalifornia,
     showShortNoticeRateBanner,      setShowShortNoticeRateBanner,
     showHubFetchError,              setShowHubFetchError,
-    showMissingInfo,                setShowMissingInfo,
     showCiafMigrationOnboarding,        setShowCiafMigrationOnboarding,
     showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBanner,
     showGroomingProfileReviewBanner,    setShowGroomingProfileReviewBanner,
+    groomingBannerVariant,              setGroomingBannerVariant,
     showLockedRates,                    setShowLockedRates,
   } = useApp()
 
@@ -340,25 +344,6 @@ export default function ServiceVariantConfigSheet({
       </ConfigRow>
 
       <ConfigRow
-        label="Missing information line"
-        note="Adds a 'Missing information' line to rows with unset optional settings (post-submission only)."
-      >
-        <OptionToggle
-          value={boolToId(showMissingInfo)}
-          onChange={(id) => setShowMissingInfo(idToBool(id))}
-          options={BOOL_OPTIONS}
-        />
-      </ConfigRow>
-
-      <ConfigRow label="Short-notice rate callout">
-        <OptionToggle
-          value={boolToId(showShortNoticeRateCallout)}
-          onChange={(id) => setShowShortNoticeRateCallout(idToBool(id))}
-          options={BOOL_OPTIONS}
-        />
-      </ConfigRow>
-
-      <ConfigRow
         label="Service settings help tip"
         note="Only shows when profile is approved"
       >
@@ -369,7 +354,10 @@ export default function ServiceVariantConfigSheet({
         />
       </ConfigRow>
 
-      <ConfigRow label="California regional alert">
+      <ConfigRow
+        label="California regional alert"
+        note="Renders inside the Pet sitting section, above the Services row."
+      >
         <OptionToggle
           value={boolToId(showRegionalAlertCalifornia)}
           onChange={(id) => setShowRegionalAlertCalifornia(idToBool(id))}
@@ -377,7 +365,10 @@ export default function ServiceVariantConfigSheet({
         />
       </ConfigRow>
 
-      <ConfigRow label="Short-notice rate banner">
+      <ConfigRow
+        label="Short-notice rate banner"
+        note="Renders inside the Pet sitting section, above the Services row."
+      >
         <OptionToggle
           value={boolToId(showShortNoticeRateBanner)}
           onChange={(id) => setShowShortNoticeRateBanner(idToBool(id))}
@@ -398,7 +389,7 @@ export default function ServiceVariantConfigSheet({
 
       <ConfigRow
         label="Training credentials banner"
-        note="Warning shown to sitters who need to upload dog-training credentials."
+        note="Renders inside the Training section, below the Profile row."
       >
         <OptionToggle
           value={boolToId(showTrainingCredentialsUploadBanner)}
@@ -408,8 +399,8 @@ export default function ServiceVariantConfigSheet({
       </ConfigRow>
 
       <ConfigRow
-        label="Grooming profile review banner"
-        note="Notice that a groomer profile is under review (up to 20 days)."
+        label="Grooming attention banner"
+        note="Renders inside the Grooming section, above the Services row."
       >
         <OptionToggle
           value={boolToId(showGroomingProfileReviewBanner)}
@@ -417,6 +408,19 @@ export default function ServiceVariantConfigSheet({
           options={BOOL_OPTIONS}
         />
       </ConfigRow>
+
+      {showGroomingProfileReviewBanner && (
+        <ConfigRow
+          label="Grooming banner copy"
+          note="Under review = profile still being approved. Not findable = approved but not yet in search."
+        >
+          <OptionToggle
+            value={groomingBannerVariant}
+            onChange={setGroomingBannerVariant}
+            options={GROOMING_BANNER_OPTIONS}
+          />
+        </ConfigRow>
+      )}
 
       <ConfigRow
         label="Locked rates"

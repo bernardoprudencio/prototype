@@ -4,7 +4,7 @@ import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
-import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, BoardingSettingsScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen } from './screens'
+import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, BoardingSettingsScreen, FamilyServicesScreen, FamilyProfileScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
 
@@ -69,6 +69,8 @@ export default function App() {
         <Route path="/more" element={<MoreScreen />} />
         <Route path="/inbox" element={<InboxScreen />} />
         <Route path="/service-settings" element={<ServiceSettingsScreen />} />
+        <Route path="/service-settings/services/:family" element={<FamilyServicesScreen />} />
+        <Route path="/service-settings/profile/:family" element={<FamilyProfileScreen />} />
         <Route path="/service-settings/boarding" element={<BoardingSettingsScreen />} />
       </Routes>
 
