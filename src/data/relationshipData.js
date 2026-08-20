@@ -257,6 +257,12 @@ const tierIndexFor = (amount) => {
   return 2
 }
 
+// The machine-readable half of a booking's dates. `dates` above is the display
+// string; every builder also emits this pair because ModifyBookingScreen seeds
+// its date inputs off `startDate` / `endDate`, and the conversation screen can
+// route any conversation's opk to that screen.
+const isoKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+
 // ── Booking generator ─────────────────────────────────────────────────────────
 // Walks dates backwards from PROTO_TODAY and produces booking objects whose
 // summed `price` values approximately reconcile to the client's gbv.
@@ -311,6 +317,8 @@ const buildPastBookings = (client, count, targetGbv) => {
       earnings: money(earnings),
       serviceStatus: 'completed_service_deposit',
       conversationOpk: `${client.id}-conv-past-${i + 1}`,
+      startDate: isoKey(start),
+      endDate: isoKey(end),
       ...statusFields('completed_service_deposit', start, end, serviceKey, span),
       ...detailFields(start, end, serviceKey, span),
     })
@@ -323,7 +331,6 @@ const buildPastBookings = (client, count, targetGbv) => {
   return bookings
 }
 
-const isoKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 
 const buildUpcomingBookings = (client, count, currentTier) => {
   const out = []
@@ -710,6 +717,8 @@ const buildArchivedBookings = (client, count) => {
       earnings: money(0),
       serviceStatus: 'no_service_deposit',
       conversationOpk: `${client.id}-conv-arc-${i + 1}`,
+      startDate: isoKey(start),
+      endDate: isoKey(end),
       // An old request that was never booked, so there is no stay behind it.
       ...statusFields('no_service_deposit', start, end, serviceKey, span, { statusKey: 'archived' }),
       ...detailFields(start, end, serviceKey, span),
@@ -749,6 +758,8 @@ const buildCancelledArchived = (client) => {
       earnings: money(0),
       serviceStatus: 'no_service_deposit',
       conversationOpk: `${client.id}-conv-arc-${i + 1}`,
+      startDate: isoKey(start),
+      endDate: isoKey(end),
       ...statusFields('no_service_deposit', start, end, b.serviceKey, span),
       ...detailFields(start, end, b.serviceKey, span),
     }

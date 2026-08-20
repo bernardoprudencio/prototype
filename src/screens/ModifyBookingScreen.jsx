@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { colors, radius, shadows, spacing, textStyles, typography } from '../tokens'
 import { BackIcon, InfoCircleIcon } from '../assets/icons'
@@ -235,6 +235,10 @@ export default function ModifyBookingScreen() {
   const ownerFirstName = client?.displayName?.split(' ')[0] ?? ''
 
   // ── Form state ─────────────────────────────────────────────────────────────
+  // Seeded from `booking`, so it has to be re-seeded when `booking` changes.
+  // In normal use it never does — the overlay mounts fresh from the CTA — but
+  // the opk is a route param, so an in-place URL change swaps the booking under
+  // a live component and the dates would keep the previous stay's values.
   const [reason, setReason] = useState('')
   const [startDate, setStartDate] = useState(booking?.startDate ?? '')
   const [endDate, setEndDate] = useState(booking?.endDate ?? '')
@@ -245,6 +249,20 @@ export default function ModifyBookingScreen() {
   )
   const [message, setMessage] = useState('')
   const [messageTouched, setMessageTouched] = useState(false)
+
+  // Re-seed on booking change. An effect rather than a render-phase assignment:
+  // a render-phase update here is silently dropped, so the dates would keep the
+  // previous stay's values.
+  const bookingId = booking?.id ?? null
+  const seededFor = useRef(bookingId)
+  useEffect(() => {
+    if (seededFor.current === bookingId) return
+    seededFor.current = bookingId
+    setStartDate(booking?.startDate ?? '')
+    setEndDate(booking?.endDate ?? '')
+    setSelectedPets((client?.pets ?? []).map(p => p.id))
+    setPetRates({})
+  }, [bookingId, booking, client])
 
   const serviceKey = booking?.serviceKey ?? null
 
