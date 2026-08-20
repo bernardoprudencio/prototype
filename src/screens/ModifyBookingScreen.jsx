@@ -191,25 +191,46 @@ const ADJUSTMENTS = [
 ]
 
 export default function ModifyBookingScreen() {
-  const { ownerId } = useParams()
+  const { ownerId, conversationOpk } = useParams()
   const navigate = useNavigate()
 
   const client = getClient(ownerId)
   const rel = getRelationshipData(ownerId)
 
-  // The booking this page modifies. Prefer the one carrying a ledger (the paid
-  // demo booking), then any upcoming one — a page that modifies a booking needs
-  // a future booking to modify. The past-booking fallback exists only so the
-  // route never renders empty for a client with no upcoming stay (amelia);
-  // production would not offer the CTA there at all.
+  // The booking this page modifies. When the route carries an opk that is the
+  // whole answer — production's modify page is per-conversation, so the CTA that
+  // sent us here already names the booking.
+  //
+  // Without an opk, fall back to the paid demo booking (the one carrying a
+  // ledger), then any upcoming one — a page that modifies a booking needs a
+  // future booking to modify. The past-booking fallback exists only so the route
+  // never renders empty for a client with no upcoming stay (amelia); production
+  // would not offer the CTA there at all.
+  //
+  // Recurring bookings are excluded from every fallback. A recurring client's
+  // current week sits at the head of `upcoming` (relationshipData.js
+  // buildRecurringWeekBooking) and it is not this page's subject: production
+  // routes a recurring conversation to ModifyScheduleProviderButton instead
+  // (booking_ctas.py:265-267), and `withModifyFields` correspondingly gives
+  // recurring bookings no `modify` block.
+  //
   // `getOwnerRelUnit` is deliberately NOT used: it is the recurring-template
   // accessor and throws for clients without a template, which is every client
   // this page serves.
   const booking = useMemo(() => {
-    const upcoming = rel?.bookings?.upcoming ?? []
-    const past = rel?.bookings?.past ?? []
+    const upcoming = (rel?.bookings?.upcoming ?? []).filter(b => !b.isRecurring)
+    const past = (rel?.bookings?.past ?? []).filter(b => !b.isRecurring)
+    if (conversationOpk) {
+      // Archived is searched too: the conversation screen offers the CTA on
+      // every thread, so an archived opk should still resolve to its booking
+      // rather than render the empty state. Production gates the CTA itself and
+      // would not offer modify on a cancelled booking at all.
+      const archived = (rel?.bookings?.archived ?? []).filter(b => !b.isRecurring)
+      return [...upcoming, ...past, ...archived]
+        .find(b => b.conversationOpk === conversationOpk) ?? null
+    }
     return upcoming.find(b => b.ledger) ?? upcoming[0] ?? past[0] ?? null
-  }, [rel])
+  }, [rel, conversationOpk])
 
   const ownerFirstName = client?.displayName?.split(' ')[0] ?? ''
 

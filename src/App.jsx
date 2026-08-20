@@ -154,6 +154,16 @@ export default function App() {
             <CurrentWeekScreen />
           </SlideOverlay>
         } />
+        {/* Two paths, one screen — mirroring the details route above. A thread
+            opened for one specific booking keeps its opk in the URL so the
+            modify page acts on *that* conversation; the bare path is the
+            fallback for conversations opened without an opk (HomeScreen's
+            incomplete cards). Production is always per-conversation. */}
+        <Route path="/conversation/:ownerId/thread/:conversationOpk/modify" element={
+          <SlideOverlay zIndex={20}>
+            <ModifyBookingScreen />
+          </SlideOverlay>
+        } />
         <Route path="/conversation/:ownerId/modify" element={
           <SlideOverlay zIndex={20}>
             <ModifyBookingScreen />

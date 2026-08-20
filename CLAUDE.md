@@ -72,21 +72,30 @@ stack over the active tab without unmounting it.
 `/testing-mode`, `/presentations`; 20 —
 `/conversation/:ownerId/thread/:conversationOpk/details`,
 `/conversation/:ownerId/schedule`, `/conversation/:ownerId/current-week`,
+`/conversation/:ownerId/thread/:conversationOpk/modify` and its opk-less fallback
 `/conversation/:ownerId/modify`; 30 —
 `/conversation/:ownerId/schedule/edit-template`.
 
 **Navigation path:**
 1. HomeScreen or InboxScreen → tap card/thread → `navigate('/conversation/:ownerId')` (or `.../thread/:conversationOpk`) → conversation overlay slides in
-2. Conversation's schedule CTA **forks on recurring-ness**, mirroring `booking_ctas.py:265-267`
-   (`ModifyScheduleProviderButton` vs `ModifyBookingProviderButton`). The derivation is
-   `isRecurringClient(client)` = `Boolean(client.recurringSchedule)`, exported from
-   `relationshipData.js` and true for exactly owen / james / sarah:
-   - **recurring** → "Manage schedule" / "Modify schedule" → `/schedule` or `/current-week`
-     (`ScheduleOverlay` / `CurrentWeekScreen`), still selected by the `scheduleMode` dev flag
-   - **one-time** → "Modify booking" → `/conversation/:ownerId/modify` → `ModifyBookingScreen`,
-     in *both* `scheduleMode` values. Production does the same: the recurring-agenda redirect
+2. Conversation's schedule CTA **forks per conversation, not per client**, mirroring
+   `booking_ctas.py:265-267` (`ModifyScheduleProviderButton` vs
+   `ModifyBookingProviderButton`). Production's subject there is `self.conv.is_recurring` —
+   FK presence on *that conversation* (`conversations/models/conversation.py:632-633`) — so
+   the prototype reads `booking.isRecurring` off the booking resolved for the conversation's
+   opk. **Do not use `isRecurringClient(client)` here**: a recurring client also books one-off
+   stays, and each of those is a plain non-recurring conversation, so a client-level fork
+   hands owen / james / sarah the schedule surfaces on every thread they have:
+   - **recurring conversation** (the `${id}-conv-recurring` week) → "Manage schedule" /
+     "Modify schedule" → `/schedule` or `/current-week` (`ScheduleOverlay` /
+     `CurrentWeekScreen`), still selected by the `scheduleMode` dev flag
+   - **one-time conversation** → "Modify booking" →
+     `/conversation/:ownerId/thread/:conversationOpk/modify` → `ModifyBookingScreen`, in
+     *both* `scheduleMode` values. Production does the same: the recurring-agenda redirect
      requires a recurring relationship (`useConversationActionHandler.ts:428-439`) and
-     otherwise falls through to ModifyBookingPage
+     otherwise falls through to ModifyBookingPage. The opk travels in the URL because the
+     modify page is per-conversation; `ModifyBookingScreen` filters `isRecurring` bookings out
+     of every fallback so the opk-less route can never land on the recurring week
 3. Conversation "Details" → `.../thread/:conversationOpk/details` → `BookingDetailsScreen`.
    Enabled for every conversation, recurring included — see "Recurring conversations" below
 4. Overlay back → `navigate(-1)` → overlay slides out, the tab underneath is still mounted
@@ -233,7 +242,7 @@ ledger surfaces. Both live in `lockedRatesCopy.js`.
 - `threads.js` — Inbox thread metadata + `getChatHistory(conversationOpk)`: last message, service label, status, alert, unread flag
 - `contacts.js` — The full client roster (10 clients, recurring and non-recurring). Per-client fields include `recurringSchedule` (with its own nested `pricing`), `lockedServices`, `pets`, `gbv` / `tierName`, `cancelledBookings`. There is **no** top-level `pricing` and no `lockedRates` block
 - `lockableRates.js` — The sitter's lockable rate rows per browsable service, `isLockableConversation()`, and each client's locked-price snapshot
-- `relationshipData.js` — Builds each client's relationship page: tier progress + upcoming/past/archived bookings; also the `SERVICES` catalog that supplies every booking's `serviceKey`, the `isRecurringClient` derivation, `buildRecurringWeekBooking()`, and the `booking.modify` block (rate rows, adjustments, previous total) that `ModifyBookingScreen` consumes
+- `relationshipData.js` — Builds each client's relationship page: tier progress + upcoming/past/archived bookings; also the `SERVICES` catalog that supplies every booking's `serviceKey`, the client-level `isRecurringClient` derivation (which gates *building* the recurring week — not the CTA fork, see Navigation path step 2), `buildRecurringWeekBooking()`, and the `booking.modify` block (rate rows, adjustments, previous total) that `ModifyBookingScreen` consumes
 - `sitterProfile.js` / `sitterServices.js` — The sitter's own default rates and service configuration
 - `moreMenu.js` — More-tab row definitions
 - `lockedRatesCopy.js` / `bookingDetailsCopy.js` / `modifyBookingCopy.js` / `hubCopy.js` — Verbatim production copy, single source of truth per feature. Every string carries a provenance comment naming the production file and line it was read from; `PROTOTYPE-ONLY` marks the few that have no production equivalent

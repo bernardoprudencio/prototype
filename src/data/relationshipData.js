@@ -22,9 +22,14 @@ import { lockedRatesFor } from './lockableRates'
 // (conversations/models/conversation.py:632-633). The prototype's stand-in for
 // that FK is the client's `recurringSchedule` block, which is present on
 // exactly owen, james and sarah and absent on the other seven clients
-// (contacts.js). Exported so the conversation screen's CTA fork and this
-// module's booking builders read the same single derivation — in production
-// both come from one mapper (booking_ctas.py).
+// (contacts.js).
+//
+// This is a *client*-level question ("does a recurring relationship exist?"),
+// which is only the right input for deciding whether to build a recurring-week
+// booking at all. It is NOT the input for the conversation screen's CTA fork:
+// production's `self.conv.is_recurring` is per-conversation, and a recurring
+// client's one-off stays are plain non-recurring conversations. That fork reads
+// `booking.isRecurring` instead — see ConversationScreen.jsx.
 export const isRecurringClient = (client) => Boolean(client?.recurringSchedule)
 
 export const TIERS = [
