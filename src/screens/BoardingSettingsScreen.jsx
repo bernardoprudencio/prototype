@@ -137,7 +137,7 @@ const DAYS = [
 
 export default function BoardingSettingsScreen() {
   const navigate = useNavigate()
-  const onBack = () => navigate('/service-settings')
+  const onBack = () => navigate('/service-settings/services/pet_sitting')
 
   // Seed local form state from mock; toggles update the visual only.
   const [active, setActive] = useState(BOARDING_SETTINGS.active)

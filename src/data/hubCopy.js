@@ -29,23 +29,26 @@ export const HUB_COPY = {
     ctaLabel: 'Update your status',
   },
 
+  // California rates notice. In the migrated IA this renders inside the pet
+  // sitting section, above the Services row. Figma 4233:17554.
   californiaProviderGroup: {
     severity: 'info',
-    title: null,
+    title: 'Review rates',
     body: 'There is a new experience for entering rates that better reflects the amount you will earn for each service.',
     ctaLabel: 'Learn more',
+    scope: { family: 'pet_sitting', slot: 'services' },
   },
 
+  // Short-notice rates prompt. The pre-migration IA had two of these — a
+  // top-of-hub banner and an inline callout inside the services list. The
+  // migrated IA has one placement: inside the pet sitting section, above the
+  // Services row, which it badges "Review". Figma 4233:17449.
   shortNoticeRateBanner: {
     severity: 'info',
     title: 'Review your short notice rates',
     body: 'Set a short notice rate for each service to charge for last-minute bookings.',
     ctaLabel: 'Review rates',
-  },
-
-  shortNoticeRateCallout: {
-    title: 'Short notice rate',
-    body: 'You can charge more for last-minute requests by setting a short notice rate.',
+    scope: { family: 'pet_sitting', slot: 'services' },
   },
 
   resubmitButton: {
@@ -117,11 +120,14 @@ export const HUB_COPY = {
 
   // Training credentials upload prompt. Kibble Alert severity=WARNING.
   // Production: src/frontend/react-lib/.../HubPage/components/TrainingCredentialsUploadBanner.tsx
+  // Migrated IA places this inside the Training section, below the Profile
+  // row, and badges Profile "Review". Figma 4233:17746.
   trainingCredentialsUpload: {
     severity: 'warning',
     title: 'Add your dog training credentials',
     body: 'These documents help us review and approve your profile.',
     ctaLabel: 'Upload credentials',
+    scope: { family: 'training', slot: 'profile' },
   },
 
   // Grooming profile review notice. Kibble Alert severity=WARNING, no icon,
@@ -133,6 +139,34 @@ export const HUB_COPY = {
     body: "This can take up to 20 days. We'll let you know when it's done.",
     ctaLabel: 'Learn more',
     ctaHref: 'https://support.rover.com/hc/en-us/articles/45572014256788-How-do-I-become-a-groomer-on-Rover',
+    scope: { family: 'grooming', slot: 'services' },
+  },
+
+  // Second grooming state: profile approved but the services are not yet
+  // findable in search. Figma 4233:17659.
+  groomingNotFindable: {
+    severity: 'warning',
+    boldLead: "Pet parents can't find your grooming services yet.",
+    body: 'Check your email for required steps to start getting booked. Need help? groomingsupport@rover.com',
+    scope: { family: 'grooming', slot: 'services' },
+  },
+
+  // Verification error. Renders under the Business → Verification row and
+  // badges that row "Review". The CTA is an inline underlined link inside the
+  // sentence in production; the prototype renders it as the banner CTA.
+  // Figma 4233:17405.
+  verificationError: {
+    severity: 'error',
+    title: 'Verification error',
+    body: "We've encountered a problem. Please",
+    ctaLabel: 're-enter and save',
+    bodyTail: 'your information.',
+  },
+
+  // Yellow attention badge rendered on hub and sub-page rows that need the
+  // provider's attention. Figma 4233:17354.
+  reviewBadge: {
+    label: 'Review',
   },
 
   // Service-row status copy — used by getActiveServiceStatusLines in sitterServices.js,
@@ -141,8 +175,9 @@ export const HUB_COPY = {
     active: 'Active',
     away: 'Away',
     inactive: 'Inactive',
-    restrictionRepeatOnly: 'Not accepting new customers',
-    restrictionRecurringOnly: 'Not accepting new customers for weekly care',
-    restrictionOneTimeOnly: 'Not accepting new customers for one-time care',
+    pending: 'Awaiting Approval',
+    restrictionRepeatOnly: 'Not accepting new pet owners',
+    restrictionRecurringOnly: 'Not accepting new pet owners for weekly care',
+    restrictionOneTimeOnly: 'Not accepting new pet owners for one-time care',
   },
 }

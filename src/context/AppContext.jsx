@@ -36,15 +36,17 @@ const ACCEPTANCE_RESTRICTIONS_KEY          = 'acceptanceRestrictions'
 const SHOW_AVAILABILITY_MODAL_KEY          = 'showAvailabilityModal'
 const SHOW_ADDITIONAL_PREFERENCES_MODAL_KEY = 'showAdditionalPreferencesModal'
 const SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY = 'showConfirmServiceDeactivation'
-const SHOW_SHORT_NOTICE_RATE_CALLOUT_KEY   = 'showShortNoticeRateCallout'
 const SHOW_SERVICE_SETTINGS_HELP_TIP_KEY   = 'showServiceSettingsHelpTip'
 const SHOW_REGIONAL_ALERT_CALIFORNIA_KEY   = 'showRegionalAlertCalifornia'
 const SHOW_SHORT_NOTICE_RATE_BANNER_KEY    = 'showShortNoticeRateBanner'
 const SHOW_HUB_FETCH_ERROR_KEY             = 'showHubFetchError'
-const SHOW_MISSING_INFO_KEY                = 'showMissingInfo'
 const SHOW_CIAF_MIGRATION_ONBOARDING_KEY        = 'showCiafMigrationOnboarding'
 const SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY      = 'showTrainingCredentialsUploadBanner'
 const SHOW_GROOMING_PROFILE_REVIEW_KEY          = 'showGroomingProfileReviewBanner'
+// Which grooming attention banner renders when the flag above is on:
+//   'review'       — "Your groomer profile is under review."
+//   'not_findable' — "Pet parents can't find your grooming services yet."
+const GROOMING_BANNER_VARIANT_KEY               = 'groomingBannerVariant'
 const SHOW_LOCKED_RATES_KEY                     = 'showLockedRates'
 
 const readInitialEnum = (key, fallback) => {
@@ -73,15 +75,14 @@ const readInitialSearchStatus             = () => readInitialEnum(SEARCH_STATUS_
 const readInitialShowAvailabilityModal           = () => readInitialBool(SHOW_AVAILABILITY_MODAL_KEY,           false)
 const readInitialShowAdditionalPreferencesModal  = () => readInitialBool(SHOW_ADDITIONAL_PREFERENCES_MODAL_KEY, false)
 const readInitialShowConfirmServiceDeactivation  = () => readInitialBool(SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY, true)
-const readInitialShowShortNoticeRateCallout      = () => readInitialBool(SHOW_SHORT_NOTICE_RATE_CALLOUT_KEY,    false)
 const readInitialShowServiceSettingsHelpTip      = () => readInitialBool(SHOW_SERVICE_SETTINGS_HELP_TIP_KEY,    false)
 const readInitialShowRegionalAlertCalifornia     = () => readInitialBool(SHOW_REGIONAL_ALERT_CALIFORNIA_KEY,    false)
 const readInitialShowShortNoticeRateBanner       = () => readInitialBool(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     false)
 const readInitialShowHubFetchError               = () => readInitialBool(SHOW_HUB_FETCH_ERROR_KEY,              false)
-const readInitialShowMissingInfo                 = () => readInitialBool(SHOW_MISSING_INFO_KEY,                 false)
 const readInitialShowCiafMigrationOnboarding     = () => readInitialBool(SHOW_CIAF_MIGRATION_ONBOARDING_KEY,    false)
 const readInitialShowTrainingCredentialsUpload   = () => readInitialBool(SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY,  false)
 const readInitialShowGroomingProfileReview       = () => readInitialBool(SHOW_GROOMING_PROFILE_REVIEW_KEY,      false)
+const readInitialGroomingBannerVariant           = () => readInitialEnum(GROOMING_BANNER_VARIANT_KEY, 'review')
 const readInitialShowLockedRates                 = () => readInitialBool(SHOW_LOCKED_RATES_KEY,                 true)
 
 export function AppProvider({ children }) {
@@ -162,15 +163,14 @@ export function AppProvider({ children }) {
   const [showAvailabilityModal,           setShowAvailabilityModalRaw]           = useState(readInitialShowAvailabilityModal)
   const [showAdditionalPreferencesModal,  setShowAdditionalPreferencesModalRaw]  = useState(readInitialShowAdditionalPreferencesModal)
   const [showConfirmServiceDeactivation,  setShowConfirmServiceDeactivationRaw]  = useState(readInitialShowConfirmServiceDeactivation)
-  const [showShortNoticeRateCallout,      setShowShortNoticeRateCalloutRaw]      = useState(readInitialShowShortNoticeRateCallout)
   const [showServiceSettingsHelpTip,      setShowServiceSettingsHelpTipRaw]      = useState(readInitialShowServiceSettingsHelpTip)
   const [showRegionalAlertCalifornia,     setShowRegionalAlertCaliforniaRaw]     = useState(readInitialShowRegionalAlertCalifornia)
   const [showShortNoticeRateBanner,       setShowShortNoticeRateBannerRaw]       = useState(readInitialShowShortNoticeRateBanner)
   const [showHubFetchError,               setShowHubFetchErrorRaw]               = useState(readInitialShowHubFetchError)
-  const [showMissingInfo,                 setShowMissingInfoRaw]                 = useState(readInitialShowMissingInfo)
   const [showCiafMigrationOnboarding,        setShowCiafMigrationOnboardingRaw]        = useState(readInitialShowCiafMigrationOnboarding)
   const [showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBannerRaw] = useState(readInitialShowTrainingCredentialsUpload)
   const [showGroomingProfileReviewBanner,     setShowGroomingProfileReviewBannerRaw]     = useState(readInitialShowGroomingProfileReview)
+  const [groomingBannerVariant,               setGroomingBannerVariantRaw]               = useState(readInitialGroomingBannerVariant)
   const [showLockedRates,                     setShowLockedRatesRaw]                     = useState(readInitialShowLockedRates)
 
   // Locked-rates state per (owner x service). Production keys LockedServiceAddOn
@@ -204,15 +204,14 @@ export function AppProvider({ children }) {
   const setShowAvailabilityModal          = (next) => persistJson(SHOW_AVAILABILITY_MODAL_KEY,           next, setShowAvailabilityModalRaw)
   const setShowAdditionalPreferencesModal = (next) => persistJson(SHOW_ADDITIONAL_PREFERENCES_MODAL_KEY, next, setShowAdditionalPreferencesModalRaw)
   const setShowConfirmServiceDeactivation = (next) => persistJson(SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY, next, setShowConfirmServiceDeactivationRaw)
-  const setShowShortNoticeRateCallout     = (next) => persistJson(SHOW_SHORT_NOTICE_RATE_CALLOUT_KEY,    next, setShowShortNoticeRateCalloutRaw)
   const setShowServiceSettingsHelpTip     = (next) => persistJson(SHOW_SERVICE_SETTINGS_HELP_TIP_KEY,    next, setShowServiceSettingsHelpTipRaw)
   const setShowRegionalAlertCalifornia    = (next) => persistJson(SHOW_REGIONAL_ALERT_CALIFORNIA_KEY,    next, setShowRegionalAlertCaliforniaRaw)
   const setShowShortNoticeRateBanner      = (next) => persistJson(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     next, setShowShortNoticeRateBannerRaw)
   const setShowHubFetchError              = (next) => persistJson(SHOW_HUB_FETCH_ERROR_KEY,              next, setShowHubFetchErrorRaw)
-  const setShowMissingInfo                = (next) => persistJson(SHOW_MISSING_INFO_KEY,                 next, setShowMissingInfoRaw)
   const setShowCiafMigrationOnboarding        = (next) => persistJson(SHOW_CIAF_MIGRATION_ONBOARDING_KEY,        next, setShowCiafMigrationOnboardingRaw)
   const setShowTrainingCredentialsUploadBanner = (next) => persistJson(SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY,     next, setShowTrainingCredentialsUploadBannerRaw)
   const setShowGroomingProfileReviewBanner    = (next) => persistJson(SHOW_GROOMING_PROFILE_REVIEW_KEY,         next, setShowGroomingProfileReviewBannerRaw)
+  const setGroomingBannerVariant              = (next) => persistEnum(GROOMING_BANNER_VARIANT_KEY,              next, setGroomingBannerVariantRaw)
   const setShowLockedRates                    = (next) => persistJson(SHOW_LOCKED_RATES_KEY,                    next, setShowLockedRatesRaw)
 
   // Keyed on (client x service), as production keys LockedServiceAddOn rows.
@@ -257,15 +256,14 @@ export function AppProvider({ children }) {
       showAvailabilityModal,          setShowAvailabilityModal,
       showAdditionalPreferencesModal, setShowAdditionalPreferencesModal,
       showConfirmServiceDeactivation, setShowConfirmServiceDeactivation,
-      showShortNoticeRateCallout,     setShowShortNoticeRateCallout,
       showServiceSettingsHelpTip,     setShowServiceSettingsHelpTip,
       showRegionalAlertCalifornia,    setShowRegionalAlertCalifornia,
       showShortNoticeRateBanner,      setShowShortNoticeRateBanner,
       showHubFetchError,              setShowHubFetchError,
-      showMissingInfo,                setShowMissingInfo,
       showCiafMigrationOnboarding,        setShowCiafMigrationOnboarding,
       showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBanner,
       showGroomingProfileReviewBanner,    setShowGroomingProfileReviewBanner,
+      groomingBannerVariant,              setGroomingBannerVariant,
       showLockedRates,                    setShowLockedRates,
       isRatesLocked,                      setRatesLocked,
     }}>

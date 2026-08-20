@@ -15,9 +15,9 @@
  *      pet-sitting exception applied.
  *
  * Rendering rules:
- *   - A family with any ACTIVE service → primary section with that family's
- *     services list + Profile rows. INACTIVE services in the same family
- *     appear under an "Add a new service" expandable row.
+ *   - A family with any ACTIVE service → hub section with two rows, Services
+ *     and Profile, each drilling into its own sub-page. The services sub-page
+ *     lists every service in the family, INACTIVE ones included.
  *   - A family with no ACTIVE services but in geo (per `isFamilyInGeo`) →
  *     one row in the "Other services" section. Pet sitting is always in geo,
  *     so it always falls back to this row when no pet-sitting services are
@@ -28,13 +28,14 @@
 
 // ─── Per-service state ───────────────────────────────────────────────────────
 export const SERVICE_STATE = {
-  ACTIVE:   'active',   // configured; appears in the family's services list
+  ACTIVE:   'active',   // configured and searchable
   AWAY:     'away',     // active but not searchable
-  INACTIVE: 'inactive', // not configured; appears under "Add a new service"
+  PENDING:  'pending',  // submitted, awaiting Rover approval
+  INACTIVE: 'inactive', // not configured
 }
 
 // ─── Per-service customer-acceptance restriction ─────────────────────────────
-// Independent of SERVICE_STATE. Drives the "Not accepting new customers…" copy
+// Independent of SERVICE_STATE. Drives the "Not accepting new pet owners…" copy
 // rendered after the inline status text on an ACTIVE/AWAY service row.
 export const ACCEPTANCE_RESTRICTION = {
   NONE:           'none',
@@ -63,23 +64,43 @@ export const FAMILY_LABEL = {
 }
 
 // Content shown when a family appears as a single row in "Other services".
+// Copy read from the Management-hub migration Figma (DEV-146752), mobile hub
+// frame 4233:11300.
 export const FAMILY_SIGNUP = {
   [SERVICE_FAMILY.PET_SITTING]: {
-    label:    'Get started with pet sitting',
-    sublabel: 'Boarding, House Sitting, Doggy Day Care, Drop-In Visits, and Dog Walking',
+    label:    'Sign up for pet sitting services',
+    sublabel: 'Get paid to play with pets.',
   },
   [SERVICE_FAMILY.TRAINING]: {
-    label:    'Get started with dog training',
-    sublabel: 'Credentials required. Share your training certifications to get started.',
+    label:    'Sign up for dog training',
+    sublabel: 'Offer professional reward\u2013based dog training.',
   },
   [SERVICE_FAMILY.GROOMING]: {
-    label:    'Get started with grooming',
-    sublabel: "In your place or the pet parent's home",
+    label:    'Sign up for grooming',
+    sublabel: "Work from your home or the pet owner's home.",
+  },
+}
+
+// ─── Family hub rows ─────────────────────────────────────────────────────────
+// In the migrated IA each active family collapses to exactly two hub rows —
+// Services and Profile — that drill into their own sub-page. Figma 4233:11300.
+export const FAMILY_ROW_COPY = {
+  [SERVICE_FAMILY.PET_SITTING]: {
+    services: 'Configure your pet sitting services',
+    profile:  'Edit your pet sitting profile, photos, and more',
+  },
+  [SERVICE_FAMILY.TRAINING]: {
+    services: 'Configure your training services',
+    profile:  'Edit your training profile, photos, and more',
+  },
+  [SERVICE_FAMILY.GROOMING]: {
+    services: 'Configure your grooming services',
+    profile:  'Edit your grooming profile, photos, and more',
   },
 }
 
 // ─── Service catalog ─────────────────────────────────────────────────────────
-// `acceptingNew` controls the "Not accepting new customers" status sublabel
+// `acceptingNew` controls the "Not accepting new pet owners" status sublabel
 // shown beneath an ACTIVE service.
 export const SERVICES = [
   { id: 'boarding',      family: SERVICE_FAMILY.PET_SITTING, label: 'Boarding',       acceptingNew: true  },
@@ -93,7 +114,8 @@ export const SERVICES = [
 
 // ─── Variant 2 default — matches Figma node 386:16335 ────────────────────────
 // Boarding, Doggy Day Care, Drop-In active; House Sitting, Dog Walking inactive
-// (revealed via "Add a new service"); training + grooming available for sign-up.
+// (listed with an "Inactive" status on the services sub-page); training +
+// grooming available for sign-up.
 export const DEFAULT_SERVICE_STATES = {
   boarding:      SERVICE_STATE.ACTIVE,
   house_sitting: SERVICE_STATE.INACTIVE,
@@ -118,15 +140,6 @@ export const DEFAULT_ACCEPTANCE_RESTRICTIONS = {
   dog_walking:   ACCEPTANCE_RESTRICTION.NONE,
   dog_training:  ACCEPTANCE_RESTRICTION.NONE,
   grooming:      ACCEPTANCE_RESTRICTION.NONE,
-}
-
-// Row ids that render the "Missing information" status line when the
-// `showMissingInfo` testing-mode toggle is on. Covers one overnight service
-// (boarding), one short service (dog_walking), and the About profile row.
-export const MISSING_INFO_DEMO_ROWS = ['boarding', 'dog_walking', 'about']
-
-export function isMissingInfoRow(rowId) {
-  return MISSING_INFO_DEMO_ROWS.includes(rowId)
 }
 
 // ─── Variant presets ─────────────────────────────────────────────────────────
@@ -217,29 +230,38 @@ export const PRESET_LABEL = {
 
 // ─── Family-specific Profile rows ────────────────────────────────────────────
 /**
- * Rows that render under the Profile subsection of each active family in
- * ServiceSettingsScreen. Rows are family-specific — pet sitting, training, and
- * grooming each show a different set per Figma (UX2-2136).
+ * Rows rendered by `FamilyProfileScreen` (`/service-settings/profile/:family`).
+ * Each family gets its own set per the Management-hub migration Figma —
+ * pet sitting 582:57749, training 1194:52491, grooming 1194:52281.
  *
- * Each row is `{ id, label, sublabel, completionKey? }`. `completionKey` is a
- * dotted path into `SITTER_PROFILE.profile` (see `src/data/sitterProfile.js`)
- * that the screen reads to decide whether to show a green check on that row.
+ * Each row is `{ id, label, sublabel }`. `needsReview` rows pick up the yellow
+ * "Review" badge when their family's attention banner variant is on.
  */
 export const FAMILY_PROFILE_ROWS = {
   [SERVICE_FAMILY.PET_SITTING]: [
     { id: 'about',        label: 'About',        sublabel: 'Share your pet care experience and approach.' },
     { id: 'photos',       label: 'Photos',       sublabel: 'Manage your profile gallery.' },
-    { id: 'testimonials', label: 'Testimonials', sublabel: 'Ask people to write about your pet care experience.', completionKey: 'petSitting.testimonialsComplete' },
+    { id: 'testimonials', label: 'Testimonials', sublabel: 'Ask people to write about your pet care experience.' },
   ],
   [SERVICE_FAMILY.TRAINING]: [
-    { id: 'about',        label: 'About',        sublabel: 'Highlight your training experience and qualifications.' },
-    { id: 'photos',       label: 'Photos',       sublabel: 'Manage your profile gallery.' },
-    { id: 'credentials',  label: 'Credentials',  sublabel: 'This will show on your profile and the search page.' },
-    { id: 'testimonials', label: 'Testimonials', sublabel: 'Ask people to write about your trainer experience.', completionKey: 'training.testimonialsComplete' },
+    { id: 'credentials',  label: 'Training credentials', sublabel: 'Add credentials to your profile.' },
+    { id: 'details',      label: 'Training details',     sublabel: 'Fill out your training bio to highlight your training qualifications for pet owners.' },
+    { id: 'photos',       label: 'Photos',               sublabel: 'Highlight your best work.' },
+    { id: 'testimonials', label: 'Testimonials',         sublabel: 'Ask people to write about your training experience.' },
   ],
   [SERVICE_FAMILY.GROOMING]: [
-    { id: 'edit_profile', label: 'Edit profile', sublabel: 'Bio, photos, credentials, testimonials, and more — all in one place.' },
+    { id: 'about',        label: 'About',        sublabel: 'Headline, experience, and more' },
+    { id: 'photos',       label: 'Photos',       sublabel: 'Highlight your best work' },
+    { id: 'testimonials', label: 'Testimonials', sublabel: 'References from past clients' },
   ],
+}
+
+// Row that carries the "Review" badge on each family's profile sub-page when
+// that family's attention banner is on (Figma 4233:17353 / 4233:17746).
+export const FAMILY_PROFILE_REVIEW_ROW = {
+  [SERVICE_FAMILY.PET_SITTING]: 'about',
+  [SERVICE_FAMILY.TRAINING]:    'credentials',
+  [SERVICE_FAMILY.GROOMING]:    'about',
 }
 
 export function getFamilyProfileRows(family) {
@@ -281,14 +303,19 @@ export function isFamilyInGeo(family, familyInGeo) {
  * When `restriction` is provided it wins over the legacy `acceptingNew` field.
  *
  * Lines:
- * - state=ACTIVE        → ['Active' tertiary, ...optional restriction line]
- * - state=AWAY          → ['Away' price, ...optional restriction line]
- * - state=INACTIVE      → []  (no inline status rendered for inactive rows)
+ * - state=ACTIVE   → ['Active' tertiary, ...optional restriction line]
+ * - state=AWAY     → ['Away' price, ...optional restriction line]
+ * - state=PENDING  → ['Awaiting Approval' link]
+ * - state=INACTIVE → ['Inactive' tertiary]
+ *
+ * The services sub-page lists every service in the family regardless of state,
+ * so INACTIVE now renders a visible status line (Figma 582:56416) rather than
+ * the empty array the old inline "Add a new service" expansion needed.
  *
  * Restriction copy (only appended when state is ACTIVE or AWAY):
- * - REPEAT_ONLY    → 'Not accepting new customers'
- * - RECURRING_ONLY → 'Not accepting new customers for weekly care'
- * - ONE_TIME_ONLY  → 'Not accepting new customers for one-time care'
+ * - REPEAT_ONLY    → 'Not accepting new pet owners'
+ * - RECURRING_ONLY → 'Not accepting new pet owners for weekly care'
+ * - ONE_TIME_ONLY  → 'Not accepting new pet owners for one-time care'
  */
 export function getActiveServiceStatusLines(svc, opts) {
   if (!svc) return []
@@ -299,20 +326,21 @@ export function getActiveServiceStatusLines(svc, opts) {
     opts?.restriction ??
     (svc.acceptingNew === false ? ACCEPTANCE_RESTRICTION.REPEAT_ONLY : ACCEPTANCE_RESTRICTION.NONE)
 
-  if (state === SERVICE_STATE.INACTIVE) return []
+  if (state === SERVICE_STATE.INACTIVE) return [{ text: 'Inactive', color: 'tertiary' }]
+  if (state === SERVICE_STATE.PENDING)  return [{ text: 'Awaiting Approval', color: 'tertiary' }]
 
   const lines = []
   if (state === SERVICE_STATE.AWAY) {
-    lines.push({ text: 'Away', color: 'price' })
+    lines.push({ text: 'Away', color: 'tertiary' })
   } else {
     lines.push({ text: 'Active', color: 'tertiary' })
   }
 
   if (restriction && restriction !== ACCEPTANCE_RESTRICTION.NONE) {
     let text = null
-    if (restriction === ACCEPTANCE_RESTRICTION.REPEAT_ONLY)    text = 'Not accepting new customers'
-    if (restriction === ACCEPTANCE_RESTRICTION.RECURRING_ONLY) text = 'Not accepting new customers for weekly care'
-    if (restriction === ACCEPTANCE_RESTRICTION.ONE_TIME_ONLY)  text = 'Not accepting new customers for one-time care'
+    if (restriction === ACCEPTANCE_RESTRICTION.REPEAT_ONLY)    text = 'Not accepting new pet owners'
+    if (restriction === ACCEPTANCE_RESTRICTION.RECURRING_ONLY) text = 'Not accepting new pet owners for weekly care'
+    if (restriction === ACCEPTANCE_RESTRICTION.ONE_TIME_ONLY)  text = 'Not accepting new pet owners for one-time care'
     if (text) lines.push({ text, color: 'tertiary' })
   }
 
@@ -320,13 +348,16 @@ export function getActiveServiceStatusLines(svc, opts) {
 }
 
 /**
- * Joins inactive service labels into the "Add a new service" sublabel.
- * Two items → "A or B". 3+ items → "A, B, or C" (Rover style uses the Oxford comma).
+ * Circular service-icon badge tones per state. Values read straight from the
+ * Management-hub migration Figma (582:56416) and mapped onto `palette`.
  */
-export function joinServiceLabels(services) {
-  const labels = services.map((s) => s.label)
-  if (labels.length === 0) return ''
-  if (labels.length === 1) return labels[0]
-  if (labels.length === 2) return `${labels[0]} or ${labels[1]}`
-  return `${labels.slice(0, -1).join(', ')}, or ${labels[labels.length - 1]}`
+export const SERVICE_BADGE_TONE = {
+  [SERVICE_STATE.ACTIVE]:   { bg: ['green',   200], fg: ['green',   800] },
+  [SERVICE_STATE.AWAY]:     { bg: ['yellow',  200], fg: ['yellow',  700] },
+  [SERVICE_STATE.PENDING]:  { bg: ['blue',    200], fg: ['blue',    800] },
+  [SERVICE_STATE.INACTIVE]: { bg: ['neutral', 200], fg: ['neutral', 500] },
+}
+
+export function serviceBadgeTone(state) {
+  return SERVICE_BADGE_TONE[state] ?? SERVICE_BADGE_TONE[SERVICE_STATE.INACTIVE]
 }

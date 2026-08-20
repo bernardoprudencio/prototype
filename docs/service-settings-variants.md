@@ -1,5 +1,14 @@
 # Service Settings — Variant Iteration
 
+> **Partly superseded.** The Management-hub migration (DEV-146752) reshaped
+> `/service-settings` into a shallow index with per-family `services/:family`
+> and `profile/:family` sub-pages. The variant-flag model below is still live;
+> the parts describing inline Services/Profile sub-sections, the
+> "Add a new service" row, the "Missing information" line
+> (`showMissingInfo` / `isMissingInfoRow`), `joinServiceLabels`, and profile-row
+> `completionKey` completion checkmarks are not — all of those were removed in
+> that migration. See `CLAUDE.md` for the current structure.
+
 ## Context
 
 The Service settings screen ([src/screens/ServiceSettingsScreen.jsx](src/screens/ServiceSettingsScreen.jsx)) currently renders a single "all pet-sitting services active" variant from `SITTER_PROFILE.services` in [src/data/sitterProfile.js](src/data/sitterProfile.js).

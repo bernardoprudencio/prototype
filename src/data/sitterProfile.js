@@ -39,7 +39,7 @@ export function getServiceStatusLines(svc) {
   if (svc.status === SERVICE_STATUS.ACTIVE) {
     const lines = [{ text: 'Active', color: 'tertiary' }]
     if (svc.acceptingNew === false) {
-      lines.push({ text: 'Not accepting new customers', color: 'tertiary' })
+      lines.push({ text: 'Not accepting new pet owners', color: 'tertiary' })
     }
     return lines
   }

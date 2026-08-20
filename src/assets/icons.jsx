@@ -107,8 +107,8 @@ export const MoreTabIcon = ({ color = c.tertiary }) => (
   </svg>
 )
 
-export const PawIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32" fill={c.primary}>
+export const PawIcon = ({ size = 16, color = c.primary }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color}>
     <path d="M11.506 9.287c-1.52 0-2.755-1.603-2.755-3.581s1.233-3.581 2.755-3.581c1.521 0 2.755 1.603 2.755 3.581s-1.234 3.581-2.755 3.581Z"/>
     <path fillRule="evenodd" d="M22.463 30.549c-1.34 0-2.634-.483-3.711-1.4l-.358-.307C17.3 27.9 16.877 27.574 16 27.574c-.877 0-1.3.326-2.394 1.269l-.358.307c-1.288 1.098-2.886 1.571-4.5 1.345-1.679-.238-3.152-1.2-4.15-2.709-1.943-2.94-1.403-7.137 1.204-9.354l7.446-6.336c1.619-1.379 3.885-1.379 5.504 0l7.446 6.336c2.607 2.218 3.147 6.414 1.204 9.354-.997 1.509-2.471 2.471-4.149 2.709a5.86 5.86 0 0 1-.79.054ZM16 25.074c1.851 0 2.858.868 4.025 1.874l.346.297c.735.626 1.638.901 2.53.773.961-.136 1.818-.709 2.415-1.612 1.271-1.921.939-4.645-.737-6.071l-7.446-6.336c-.689-.586-1.576-.586-2.266 0l-7.446 6.336c-1.677 1.427-2.008 4.15-.737 6.071.598.903 1.455 1.477 2.415 1.612.896.127 1.793-.147 2.53-.773l.346-.297c1.167-1.006 2.174-1.874 4.025-1.874Z" clipRule="evenodd"/>
     <path d="M17.74 5.706c0 1.978 1.233 3.581 2.754 3.581s2.755-1.603 2.755-3.581-1.234-3.581-2.755-3.581c-1.522 0-2.755 1.603-2.755 3.581Zm9.733 8.718c-1.38 0-2.5-1.357-2.5-3.03 0-1.673 1.12-3.03 2.5-3.03 1.381 0 2.5 1.357 2.5 3.03 0 1.673-1.119 3.03-2.5 3.03ZM2.02 11.394c0 1.673 1.12 3.03 2.5 3.03 1.381 0 2.5-1.357 2.5-3.03 0-1.673-1.119-3.03-2.5-3.03-1.38 0-2.5 1.357-2.5 3.03Z"/>
@@ -263,6 +263,15 @@ export const PromoIcon = ({ size = 24, color = c.primary }) => (
 export const ListIcon = ({ size = 24, color = c.primary }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color} aria-hidden="true">
     <path d="M4 6a2 2 0 1 1 4 0 2 2 0 0 1-4 0zm0 10a2 2 0 1 1 4 0 2 2 0 0 1-4 0zm0 10a2 2 0 1 1 4 0 2 2 0 0 1-4 0zM11 5h17v2H11V5zm0 10h17v2H11v-2zm0 10h17v2H11v-2z"/>
+  </svg>
+)
+
+// Grid-of-squares + plus — section header icon for "Other services" (the
+// services the provider could still sign up for). Sourced from the
+// Management-hub migration Figma (DEV-146752).
+export const GridPlusIcon = ({ size = 24, color = c.primary }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true">
+    <path fillRule="evenodd" clipRule="evenodd" d="M3 3h7.5v7.5H3V3Zm1.5 1.5v4.5H9V4.5H4.5ZM13.5 3H21v7.5h-7.5V3ZM15 4.5V9h4.5V4.5H15ZM3 13.5h7.5V21H3v-7.5ZM4.5 15v4.5H9V15H4.5Zm13.5-1.5v3h3V18h-3v3h-1.5v-3h-3v-1.5h3v-3H18Z"/>
   </svg>
 )
 
