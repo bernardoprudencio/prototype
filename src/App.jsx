@@ -4,7 +4,7 @@ import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
-import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, BoardingSettingsScreen, FamilyServicesScreen, FamilyProfileScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen } from './screens'
+import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, ServiceSettingsLayout, BusinessPane, AboutYouPane, OtherServicesPane, BoardingSettingsScreen, FamilyServicesScreen, FamilyProfileScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
 
@@ -68,10 +68,17 @@ export default function App() {
         <Route path="/contacts" element={<RebookScreen />} />
         <Route path="/more" element={<MoreScreen />} />
         <Route path="/inbox" element={<InboxScreen />} />
-        <Route path="/service-settings" element={<ServiceSettingsScreen />} />
-        <Route path="/service-settings/services/:family" element={<FamilyServicesScreen />} />
-        <Route path="/service-settings/profile/:family" element={<FamilyProfileScreen />} />
+        {/* Boarding has no desktop frame — it stays a full-bleed page outside
+            the two-pane shell. */}
         <Route path="/service-settings/boarding" element={<BoardingSettingsScreen />} />
+        <Route path="/service-settings" element={<ServiceSettingsLayout />}>
+          <Route index element={<ServiceSettingsScreen />} />
+          <Route path="services/:family" element={<FamilyServicesScreen />} />
+          <Route path="profile/:family" element={<FamilyProfileScreen />} />
+          <Route path="business" element={<BusinessPane />} />
+          <Route path="about" element={<AboutYouPane />} />
+          <Route path="other" element={<OtherServicesPane />} />
+        </Route>
       </Routes>
 
       {/* ── Conversation overlay (z-10) ── */}

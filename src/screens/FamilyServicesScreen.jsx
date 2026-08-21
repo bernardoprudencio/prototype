@@ -1,5 +1,5 @@
 import React from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { colors } from '../tokens'
 import {
   BoardingIcon,
@@ -19,6 +19,7 @@ import {
 } from '../data/sitterServices'
 import ServiceIconBadge from '../components/ServiceIconBadge'
 import { Chevron, SettingsRow, SubPageHeader } from '../components/hubUI'
+import FamilyPaneHeader from './FamilyPaneHeader'
 import { useApp } from '../context/AppContext'
 
 // Service id → icon component. The badge tints the icon per service state, so
@@ -52,6 +53,7 @@ export default function FamilyServicesScreen() {
   const navigate = useNavigate()
   const { family } = useParams()
   const { serviceStates, acceptanceRestrictions } = useApp()
+  const { isWide } = useOutletContext()
 
   const services = getFamilyServices(family)
   if (!FAMILY_LABEL[family] || services.length === 0) {
@@ -70,17 +72,33 @@ export default function FamilyServicesScreen() {
   const noop = () => {}
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
-      <SubPageHeader
-        title={`${FAMILY_LABEL[family]} services`}
-        onBack={() => navigate('/service-settings')}
-      />
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: isWide ? 'auto' : '100%',
+        background: colors.white,
+      }}
+    >
+      {isWide ? (
+        <FamilyPaneHeader family={family} activeTab="services" />
+      ) : (
+        <SubPageHeader
+          title={`${FAMILY_LABEL[family]} services`}
+          onBack={() => navigate('/service-settings')}
+        />
+      )}
 
       <div
         className="hide-scrollbar"
-        style={{ flex: 1, overflowY: 'auto', paddingLeft: 16, paddingRight: 16 }}
+        style={{
+          flex: 1,
+          overflowY: isWide ? 'visible' : 'auto',
+          paddingLeft: isWide ? 0 : 16,
+          paddingRight: isWide ? 0 : 16,
+        }}
       >
-        <div style={{ maxWidth: 1140, width: '100%', margin: '0 auto', paddingTop: 8, paddingBottom: 40 }}>
+        <div style={{ maxWidth: 1140, width: '100%', margin: '0 auto', paddingTop: 8, paddingBottom: isWide ? 0 : 40 }}>
           {ordered.map((svc) => {
             const state = stateOf(svc)
             return (

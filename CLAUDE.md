@@ -119,8 +119,11 @@ stack over the active tab without unmounting it.
 | `RelationshipPage/` | Relationship page: header, tier progress tracker, Rates row, booking lists, alt-monetization interstitial |
 | `relationship/RelationshipManagement.jsx` | Full recurring schedule UI: agenda view, add/manage/edit sheets, billing confirmations |
 | `ScheduleScreen.jsx` / `ScheduleOverlay.jsx` | Schedule route wrappers over `RelationshipManagement` |
-| `ServiceSettingsScreen.jsx` | Service settings hub. Post-DEV-146752 it is a shallow index: two rows per active family (Services / Profile) drilling into sub-pages, "Other services" sign-up rows, Business / About you / Account actions. Family-scoped banners render inside their family's section, not in a top-of-page stack |
-| `FamilyServicesScreen.jsx` / `FamilyProfileScreen.jsx` | The per-family sub-pages behind those two rows — every service in the family with its state-tinted icon badge, and the family's profile rows plus a pinned "View … profile" action |
+| `ServiceSettingsLayout.jsx` | The `/service-settings` layout route: every dev-flag read, all the sheets/modals, `bannersFor`, the nav model, and the ≥769px sidebar shell. Panes get the shared state via `<Outlet context>` |
+| `ServiceSettingsScreen.jsx` | The **mobile** hub index: two rows per active family (Services / Profile) drilling into sub-pages, "Other services" sign-up rows, Business / About you / Account actions. Family-scoped banners render inside their family's section, not in a top-of-page stack. Redirects to the first sidebar item at ≥769px |
+| `hubSections.jsx` | Row lists shared by both widths (`BusinessRows`, `AboutYouRows`, `OtherServicesRows`, `AccountActionsRows`, `AccountWideBanners`) plus the three wide-only panes `BusinessPane` / `AboutYouPane` / `OtherServicesPane` |
+| `FamilyPaneHeader.jsx` | Wide-width family-pane chrome: `PaneTitle` + both slots' banners + the Services \| Profile `PaneTabs` |
+| `FamilyServicesScreen.jsx` / `FamilyProfileScreen.jsx` | The per-family views — every service in the family with its state-tinted icon badge, and the family's profile rows plus a pinned "View … profile" action. `SubPageHeader` below 769px, `FamilyPaneHeader` above |
 | `BoardingSettingsScreen.jsx` | Boarding rates & settings; reached from the pet sitting services sub-page |
 | `MoreScreen.jsx` / `TestingModeScreen.jsx` | More tab and dev variant entry point |
 | `PresentationsScreen.jsx` / `DeckScreen.jsx` / `MgmtHubDeckScreen.jsx` | Internal review decks |
@@ -154,7 +157,7 @@ stack over the active tab without unmounting it.
 | `Select.jsx` / `Textarea.jsx` | Labelled native `<select>` (`appearance: none` + shared `DropdownIcon`) and labelled textarea with inline validation error — the two Kibble primitives `ModifyBookingScreen` needed and the codebase lacked |
 | `SlideOverlay.jsx` | Route-level slide-in overlay wrapper |
 | `HubBanner.jsx` / `MigrationOnboardingBanner.jsx` | Service-hub banners. `HubBanner` has a `paragraph` layout (bold lead + body + inline link + optional `bodyTail`) alongside the default stack |
-| `hubUI.jsx` | Shared service-settings primitives: `SectionHeader` (optional leading icon), `SettingsRow` (optional `needsReview` badge), `SectionGroup`, `Chevron`, `SubPageHeader`, `COLOR_BY_TOKEN` |
+| `hubUI.jsx` | Shared service-settings primitives: `SectionHeader` (optional leading icon), `SettingsRow` (optional `needsReview` badge), `SectionGroup`, `Chevron`, `SubPageHeader` (mobile-only), `COLOR_BY_TOKEN`, plus the wide-width `HubSideNav` / `PaneTitle` / `PaneTabs` |
 | `ReviewBadge.jsx` / `ServiceIconBadge.jsx` | Yellow "Review" attention badge; 40px state-tinted circular service icon |
 | `HelpLinkTip.jsx` | Inline link that opens a tip sheet |
 | `ServiceVariantConfigSheet.jsx` | Dev sheet toggling every variant flag |
@@ -167,27 +170,56 @@ stack over the active tab without unmounting it.
 
 ## Service settings IA
 
-`/service-settings` follows the DEV-146752 Management-hub migration: the hub is an
-index, the detail lives on drill-down pages.
+`/service-settings` follows the DEV-146752 Management-hub migration, and it has **two
+layouts behind one route tree**: below 769px a mobile index that drills down, at 769px
+and up a two-pane master–detail. `ServiceSettingsLayout` is a **nested layout route**
+that owns the sidebar, every dev-flag read, and every sheet/modal, and shares state with
+its panes through `<Outlet context={…} />` / `useOutletContext()` — there is no separate
+React context for the hub.
 
-| Route | Screen |
+| Route | Pane |
 |---|---|
-| `/service-settings` | `ServiceSettingsScreen` — two rows per active family, Other services, Business, About you, Account actions |
+| `/service-settings` | `ServiceSettingsScreen` — the mobile index (two rows per active family, Other services, Business, About you, Account actions). At ≥769px it `<Navigate replace>`s to the first sidebar item |
 | `/service-settings/services/:family` | `FamilyServicesScreen` — every service in the family, active and inactive |
 | `/service-settings/profile/:family` | `FamilyProfileScreen` — `FAMILY_PROFILE_ROWS[family]` + pinned "View … profile" |
-| `/service-settings/boarding` | `BoardingSettingsScreen` — back goes to `/service-settings/services/pet_sitting` |
+| `/service-settings/business` | `BusinessPane` (`hubSections.jsx`) — **wide-only** |
+| `/service-settings/about` | `AboutYouPane` — **wide-only** |
+| `/service-settings/other` | `OtherServicesPane` — **wide-only**, and only while a family is inactive-but-in-geo |
+| `/service-settings/boarding` | `BoardingSettingsScreen` — sits *outside* the layout route (no desktop frame exists); back goes to `/service-settings/services/pet_sitting` |
 
-All four are **base-layer tab routes**, not `SlideOverlay` overlays.
+All of them are **base-layer tab routes**, not `SlideOverlay` overlays. The three
+wide-only addresses redirect to the index below 769px, so the mobile IA is unchanged;
+`useIsWide()` (≥769px) is the single gate — the old `extraWide` / `useIsExtraWide`
+breakpoint is gone.
 
-**Banner placement is data-driven.** Each family-scoped entry in `hubCopy.js` carries
-`scope: { family, slot }` where slot is `'services'` or `'profile'`.
-`ServiceSettingsScreen`'s `bannersFor(family, slot)` reads the dev flags, matches on
-`scope`, and renders the banner between the section header and the Services row
-(`services`) or below the Profile row (`profile`). The same selector drives the yellow
-`ReviewBadge` on those rows — a row wears the badge exactly when its slot has a banner.
-Only account-wide states (resubmit, away manual/auto, CIAF onboarding) still stack at
-the top; the verification error renders under Business → Verification, gated on the
-existing `backgroundCheckStatus === 'error'` flag.
+**Wide layout.** `HubSideNav` | 1px full-height rule | `<Outlet />`, capped at
+`maxWidth: 1140`. The sidebar is `33%` (min 280 / max 375), so it lands on Figma's 280 at
+769px and 375 at 1280px. The right pane pads 48px left / 20px right. The three new
+primitives — `HubSideNav`, `PaneTitle`, `PaneTabs` — live in `hubUI.jsx` alongside the
+row primitives they reuse; `SubPageHeader` is **mobile-only** and never renders in the
+two-pane layout. The family panes replace it with `FamilyPaneHeader`: `PaneTitle` (bare
+family label + "View profile" + the Resubmit pill) → banners → `PaneTabs`
+(Services | Profile). A pane whose family leaves the sidebar (its last service
+deactivated) redirects to the first nav item, so the selected item and the visible pane
+never disagree.
+
+**Banner placement is data-driven, and differs by width.** Each family-scoped entry in
+`hubCopy.js` carries `scope: { family, slot }` where slot is `'services'` or `'profile'`.
+The layout's `bannersFor(family, slot)` reads the dev flags and matches on `scope`; the
+mobile index renders each slot's banners between the section header and the Services row
+(`services`) or below the Profile row (`profile`), while the wide family pane renders
+**both** slots' banners together, between the pane title and the tab bar. The same
+selector drives the yellow `ReviewBadge`: on mobile a row wears it when its slot has a
+banner; on the sidebar the badge is **per family** (services ∪ profile) and shows even
+while a different family is selected. **Tabs are never badged.** Only account-wide states
+(resubmit, away manual/auto, CIAF onboarding) stack above everything — full viewport
+width at wide; the verification error renders under Business → Verification at both
+widths, gated on `backgroundCheckStatus === 'error'`.
+
+**Width-dependent details.** "Insights" gains "(app only)" at wide
+(`HUB_COPY.insightsRow.labelWide`). The Other-services sign-up icons are
+`palette.orange[700]` at **both** widths. Business and About you get no "View profile"
+link in the two-pane layout.
 
 **Service state → badge tint.** `SERVICE_STATE` is ACTIVE / AWAY / PENDING / INACTIVE.
 `serviceBadgeTone(state)` in `sitterServices.js` returns `[paletteFamily, shade]` pairs
