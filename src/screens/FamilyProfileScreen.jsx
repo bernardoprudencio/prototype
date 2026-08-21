@@ -1,5 +1,5 @@
 import React from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { colors } from '../tokens'
 import {
   FAMILY_LABEL,
@@ -9,6 +9,7 @@ import {
 } from '../data/sitterServices'
 import Button from '../components/Button'
 import { Chevron, SettingsRow, SubPageHeader } from '../components/hubUI'
+import FamilyPaneHeader from './FamilyPaneHeader'
 import { useApp } from '../context/AppContext'
 
 /**
@@ -24,6 +25,7 @@ export default function FamilyProfileScreen() {
   const navigate = useNavigate()
   const { family } = useParams()
   const { showTrainingCredentialsUploadBanner } = useApp()
+  const { isWide } = useOutletContext()
 
   const rows = getFamilyProfileRows(family)
   if (!FAMILY_LABEL[family] || rows.length === 0) {
@@ -38,14 +40,30 @@ export default function FamilyProfileScreen() {
   const noop = () => {}
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
-      <SubPageHeader title={`${label} profile`} onBack={() => navigate('/service-settings')} />
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: isWide ? 'auto' : '100%',
+        background: colors.white,
+      }}
+    >
+      {isWide ? (
+        <FamilyPaneHeader family={family} activeTab="profile" />
+      ) : (
+        <SubPageHeader title={`${label} profile`} onBack={() => navigate('/service-settings')} />
+      )}
 
       <div
         className="hide-scrollbar"
-        style={{ flex: 1, overflowY: 'auto', paddingLeft: 16, paddingRight: 16 }}
+        style={{
+          flex: 1,
+          overflowY: isWide ? 'visible' : 'auto',
+          paddingLeft: isWide ? 0 : 16,
+          paddingRight: isWide ? 0 : 16,
+        }}
       >
-        <div style={{ maxWidth: 1140, width: '100%', margin: '0 auto', paddingTop: 8, paddingBottom: 40 }}>
+        <div style={{ maxWidth: 1140, width: '100%', margin: '0 auto', paddingTop: 8, paddingBottom: isWide ? 0 : 40 }}>
           {rows.map((row) => (
             <SettingsRow
               key={row.id}
@@ -63,13 +81,13 @@ export default function FamilyProfileScreen() {
           (Figma 607:42368). */}
       <div
         style={{
-          padding: '12px 16px',
+          padding: isWide ? '12px 0' : '12px 16px',
           background: colors.white,
           display: 'flex',
           flexShrink: 0,
         }}
       >
-        <Button variant="default" fullWidth onClick={noop}>
+        <Button variant="default" fullWidth={!isWide} onClick={noop}>
           {`View ${label.toLowerCase()} profile`}
         </Button>
       </div>

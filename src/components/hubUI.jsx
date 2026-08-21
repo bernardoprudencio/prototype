@@ -1,6 +1,7 @@
 import React from 'react'
-import { colors, typography, textStyles } from '../tokens'
-import { BackIcon, ChevronRightIcon } from '../assets/icons'
+import { colors, radius, typography, textStyles } from '../tokens'
+import { BackIcon, BlockedIcon, ChevronRightIcon } from '../assets/icons'
+import { HUB_COPY } from '../data/hubCopy'
 import ReviewBadge from './ReviewBadge'
 
 // Shared row/section primitives for the service-settings hub and its two
@@ -219,5 +220,201 @@ export const SubPageHeader = ({ title, onBack }) => (
     >
       {title}
     </h1>
+  </div>
+)
+
+// ── Wide-width (side-menu) primitives ────────────────────────────────────────
+// At >=769px the hub becomes a master-detail layout: this sidebar picks the
+// section, and the family panes pick their slot with `PaneTabs`. Figma
+// 608:55002 (desktop), 1548:5507 (tablet).
+
+/**
+ * Left sidebar. `items` are `{ key, label, Icon, to, badge }`; the selected row
+ * gets a grey pill. The "Review" badge is per nav item, not per tab — Figma
+ * 4233:41097 shows Pet sitting and Business badged while Training is selected,
+ * and no frame ever badges a tab.
+ */
+export const HubSideNav = ({ title, items, activeKey, onSelect, onStopProviding }) => (
+  <nav style={{ display: 'flex', flexDirection: 'column' }}>
+    <h1
+      style={{
+        ...textStyles.display400,
+        color: colors.primary,
+        margin: 0,
+        paddingLeft: 16,
+        paddingRight: 16,
+        paddingBottom: 24,
+      }}
+    >
+      {title}
+    </h1>
+
+    {items.map((item) => {
+      const selected = item.key === activeKey
+      return (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => onSelect(item)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            width: '100%',
+            height: 56,
+            paddingLeft: 16,
+            paddingRight: 16,
+            border: 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+            borderRadius: radius.primary,
+            background: selected ? colors.bgSecondary : 'transparent',
+          }}
+        >
+          {item.Icon && (
+            <span
+              style={{
+                display: 'inline-flex',
+                width: 24,
+                height: 24,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <item.Icon size={24} color={colors.primary} />
+            </span>
+          )}
+          <span
+            style={{
+              ...(selected ? textStyles.text200Semibold : textStyles.text200),
+              color: colors.primary,
+              flex: 1,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {item.label}
+          </span>
+          {item.badge && <ReviewBadge />}
+        </button>
+      )
+    })}
+
+    <div
+      style={{
+        marginTop: 24,
+        marginBottom: 24,
+        borderTop: `1px solid ${colors.border}`,
+      }}
+    />
+
+    <div style={{ paddingLeft: 16, paddingRight: 16 }}>
+      <SettingsRow
+        label={HUB_COPY.accountActions.stopProviding.label}
+        labelColor={colors.destructive}
+        sublabel={HUB_COPY.accountActions.stopProviding.sublabel}
+        rightItem={<BlockedIcon />}
+        onPress={onStopProviding}
+      />
+    </div>
+  </nav>
+)
+
+/**
+ * Right-pane title row: Bogart display title, optional right-hand link
+ * ("View profile") and optional `rightSlot` — where `ResubmitButton` lands on
+ * the family panes. Figma 3399:5777.
+ */
+export const PaneTitle = ({ title, rightLinkLabel, onRightLink, rightSlot }) => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      // Wraps rather than overlapping when the pane is narrow and the row
+      // carries both the "View profile" link and the Resubmit pill.
+      flexWrap: 'wrap',
+      gap: 16,
+      paddingTop: 24,
+      paddingBottom: 16,
+    }}
+  >
+    <h1
+      style={{
+        ...textStyles.display400,
+        color: colors.primary,
+        margin: 0,
+        minWidth: 0,
+      }}
+    >
+      {title}
+    </h1>
+    {(rightLinkLabel || rightSlot) && (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+        {rightLinkLabel && (
+          <button
+            type="button"
+            onClick={onRightLink}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              ...textStyles.link100Semibold,
+              color: colors.link,
+            }}
+          >
+            {rightLinkLabel}
+          </button>
+        )}
+        {rightSlot}
+      </div>
+    )}
+  </div>
+)
+
+/**
+ * Services | Profile tabs on the family panes — the wide-width replacement for
+ * the mobile drill-down. `tabs` are `{ key, label }`. The codebase has no other
+ * tab primitive (the bottom `TabBar` is a different pattern), and this is the
+ * only surface that uses one, so it lives here. Figma 608:55002.
+ */
+export const PaneTabs = ({ tabs, activeKey, onSelect }) => (
+  <div
+    style={{
+      display: 'flex',
+      gap: 32,
+      borderBottom: `1px solid ${colors.border}`,
+      marginBottom: 8,
+    }}
+  >
+    {tabs.map((tab) => {
+      const active = tab.key === activeKey
+      return (
+        <button
+          key={tab.key}
+          type="button"
+          onClick={() => onSelect(tab)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            paddingBottom: 12,
+            cursor: 'pointer',
+            // The 3px active underline overlaps the container rule rather than
+            // sitting under it.
+            marginBottom: -1,
+            borderBottom: `3px solid ${active ? colors.primary : 'transparent'}`,
+            ...(active ? textStyles.text200Semibold : textStyles.text200),
+            color: colors.primary,
+          }}
+        >
+          {tab.label}
+        </button>
+      )
+    })}
   </div>
 )

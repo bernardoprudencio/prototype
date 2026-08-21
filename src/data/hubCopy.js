@@ -169,6 +169,46 @@ export const HUB_COPY = {
     label: 'Review',
   },
 
+  // ── Wide-width (side-menu) layout ──────────────────────────────────────────
+  // The two-pane master-detail layout adopted at >=769px. Figma 608:55002
+  // (desktop), 1548:5507 (tablet).
+
+  // Left sidebar. The display title replaces the mobile screen's sticky header,
+  // and "Other services" is a nav item here rather than a hub section.
+  // Figma 608:55002, 613:41571.
+  sideNav: {
+    title: 'Service settings',
+    otherServices: 'Other services',
+  },
+
+  // Services | Profile tabs on the family panes. At wide widths these replace
+  // the mobile drill-down: the sidebar picks the family, the tabs pick the slot.
+  // Figma 608:55002.
+  familyTabs: {
+    services: 'Services',
+    profile: 'Profile',
+  },
+
+  // Account actions. Shared by the mobile hub's "Account actions" section and
+  // the wide layout's sidebar footer row, which is why it lives here rather
+  // than inline in the screen. Figma 4233:17354 (mobile), 608:55002 (wide).
+  accountActions: {
+    heading: 'Account actions',
+    stopProviding: {
+      label: 'Stop providing services',
+      sublabel: 'Confirm you no longer want to provide services on Rover',
+    },
+  },
+
+  // Business -> Insights row. Production's label is width-dependent: the mobile
+  // hub says "Insights" because the destination is in-app, the web layout spells
+  // that out. Figma 643:10693 (wide), 4233:17746 (narrow).
+  insightsRow: {
+    label: 'Insights',
+    labelWide: 'Insights (app only)',
+    sublabel: 'Check your profile and business performance',
+  },
+
   // Service-row status copy — used by getActiveServiceStatusLines in sitterServices.js,
   // duplicated here for reference. Edit sitterServices.js, not this file, if changing.
   serviceStatus: {

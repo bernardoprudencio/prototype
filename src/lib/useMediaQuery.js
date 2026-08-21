@@ -20,13 +20,10 @@ export function useMediaQuery(query) {
 // for "is there room for a wide layout?", and a screen that has one should gate
 // it on these rather than reading `window.innerWidth` on every resize tick.
 export const BREAKPOINTS = {
-  // Two-column threshold used by the schedule screens. Equivalent to the
-  // `window.innerWidth > 768` checks these screens hand-rolled before.
+  // Two-column threshold, shared by the schedule screens and the service-settings
+  // master-detail layout. Equivalent to the `window.innerWidth > 768` checks the
+  // schedule screens hand-rolled before.
   wide: '(min-width: 769px)',
-  // Service settings opts into a later threshold because its two columns carry
-  // full rate tables rather than a 360px sidebar.
-  extraWide: '(min-width: 880px)',
 }
 
 export const useIsWide = () => useMediaQuery(BREAKPOINTS.wide)
-export const useIsExtraWide = () => useMediaQuery(BREAKPOINTS.extraWide)
