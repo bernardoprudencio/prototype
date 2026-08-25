@@ -23,7 +23,10 @@ const truncate = {
   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
 }
 
-export default function RebookUserCard({ contact, onClick }) {
+// `isWide` turns the row into a card: production's chevron is scoped to
+// `max-width: 719px` and the desktop card carries a full border rather than a
+// single bottom rule (RebookUserCard.tsx:25,130-134).
+export default function RebookUserCard({ contact, onClick, isWide = false }) {
   return (
     <div
       role={onClick ? 'button' : undefined}
@@ -31,7 +34,9 @@ export default function RebookUserCard({ contact, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '12px 16px',
-        borderBottom: `1px solid ${colors.border}`,
+        border: isWide ? `1px solid ${colors.border}` : undefined,
+        borderRadius: isWide ? 8 : undefined,
+        borderBottom: isWide ? undefined : `1px solid ${colors.border}`,
         background: colors.white,
         cursor: onClick ? 'pointer' : 'default',
       }}>
@@ -63,7 +68,7 @@ export default function RebookUserCard({ contact, onClick }) {
       </div>
 
       {contact.tierName && <Pill>{contact.tierName}</Pill>}
-      <ChevronRightIcon />
+      {!isWide && <ChevronRightIcon />}
     </div>
   )
 }

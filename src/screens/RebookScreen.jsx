@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { colors, typography, radius, shadows } from '../tokens'
 import { DropdownSmallIcon } from '../assets/icons'
 import { Chip, Button, TabBar } from '../components'
+import { useIsWide } from '../lib/useMediaQuery'
 import { CLIENTS, SITTERS, SORT_OPTIONS, sortClients } from '../data/contacts'
 import RebookUserCard from './RebookUserCard'
 
@@ -93,6 +94,8 @@ export default function RebookScreen() {
     if (path) navigate(path)
   }
 
+  const isWide = useIsWide()
+
   const [section, setSection] = useState('clients')
   const [sortOrder, setSortOrder] = useState('alphabetical')
   const [sortSheetOpen, setSortSheetOpen] = useState(false)
@@ -103,17 +106,27 @@ export default function RebookScreen() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
       {/* ─── Header ─── */}
-      <div style={{ borderBottom: `1px solid ${colors.border}`, padding: '24px 16px 16px', flexShrink: 0 }}>
-        <h1 style={{
-          fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26,
-          lineHeight: 1.25, color: colors.primary, margin: 0,
-        }}>
-          Contacts
-        </h1>
+      <div style={{
+        borderBottom: `1px solid ${colors.border}`, flexShrink: 0,
+        padding: isWide ? '24px 0 16px' : '24px 16px 16px',
+      }}>
+        {/* The rule stays full-bleed; the title moves onto the same left edge as
+            the card grid below it. */}
+        <div style={isWide ? { maxWidth: 1140, margin: '0 auto', padding: '0 16px' } : undefined}>
+          <h1 style={{
+            fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26,
+            lineHeight: 1.25, color: colors.primary, margin: 0,
+          }}>
+            Contacts
+          </h1>
+        </div>
       </div>
 
       {/* ─── Scroll Content ─── */}
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
+        {/* At wide width everything under the header shares one 1140 column, so
+            the chips and the sort row line up with the card grid. */}
+        <div style={isWide ? { maxWidth: 1140, margin: '0 auto' } : undefined}>
         {/* Section chips */}
         <div style={{ display: 'flex', gap: 8, padding: '16px 16px 0' }}>
           <Chip
@@ -153,15 +166,21 @@ export default function RebookScreen() {
           </div>
         )}
 
-        {/* List */}
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {/* List — a stacked list of rows below the breakpoint, a two-column card
+            grid above it (RebookPageBase.tsx:20-29, minus production's
+            three-column step at 1140px, which would need a second breakpoint). */}
+        <div style={isWide ? {
+          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, padding: 16,
+        } : { display: 'flex', flexDirection: 'column' }}>
           {(section === 'clients' ? sortedClients : SITTERS).map(c => (
             <RebookUserCard
               key={c.id}
               contact={c}
+              isWide={isWide}
               onClick={section === 'clients' ? () => navigate(`/contacts/${c.id}`) : undefined}
             />
           ))}
+        </div>
         </div>
       </div>
 

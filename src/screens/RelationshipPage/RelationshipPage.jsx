@@ -7,6 +7,7 @@ import { Row, LockRatesSheet, Snackbar } from '../../components'
 import { LockIcon, ChevronRightIcon } from '../../assets/icons'
 import { useLockedRates } from '../../lib/useLockedRates'
 import { isLockableConversation } from '../../data/lockableRates'
+import { useIsWide } from '../../lib/useMediaQuery'
 import { RATES_SECTION_TITLE, ratesLockedSubtitle, NO_LOCKED_RATES } from '../../data/lockedRatesCopy'
 import RelationshipPageHeader from './RelationshipPageHeader'
 import RelationshipProgressTracker from './RelationshipProgressTracker'
@@ -15,6 +16,7 @@ import BookingItems from './BookingItems'
 export default function RelationshipPage() {
   const navigate = useNavigate()
   const { ownerId } = useParams()
+  const isWide = useIsWide()
   const data = getRelationshipData(ownerId)
   const client = getClient(ownerId)
   // The relationship page is not a conversation, so it has no gate of its own.
@@ -71,10 +73,21 @@ export default function RelationshipPage() {
       />
 
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
-        <div style={{
+        <div style={isWide ? {
+          // Production's relationship page is internally two-column at desktop:
+          // the tracker on the left, the booking lists filling the rest
+          // (RelationshipPage.tsx:227-233), capped there at 1200 and here at
+          // the prototype's 1140.
+          maxWidth: 1140, margin: '0 auto',
+          display: 'flex', alignItems: 'flex-start', gap: 16,
+          padding: '16px 16px 24px',
+        } : {
           display: 'flex', flexDirection: 'column', gap: 16,
           padding: '16px 16px 24px',
         }}>
+        <div style={isWide
+          ? { width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }
+          : { display: 'contents' }}>
           <RelationshipProgressTracker
             heading={progress.heading}
             tiers={progress.tiers}
@@ -104,7 +117,13 @@ export default function RelationshipPage() {
               />
             </div>
           )}
+        </div>
 
+        {/* Rates stays in the left column with the tracker — it is
+            prototype-only, and production has no rates module here to place. */}
+        <div style={isWide
+          ? { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }
+          : { display: 'contents' }}>
           {bookings.upcoming.length > 0 && (
             <BookingItems
               type="upcoming"
@@ -132,6 +151,7 @@ export default function RelationshipPage() {
               onCardClick={handleCardClick}
             />
           )}
+        </div>
         </div>
       </div>
 
