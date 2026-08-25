@@ -4,7 +4,7 @@ import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, SlideOverlay, WebNavBar } from './components'
-import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, ServiceSettingsLayout, BusinessPane, AboutYouPane, OtherServicesPane, BoardingSettingsScreen, FamilyServicesScreen, FamilyProfileScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen, StubScreen } from './screens'
+import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, ServiceSettingsLayout, BusinessPane, AboutYouPane, OtherServicesPane, BoardingSettingsScreen, FamilyServicesScreen, FamilyProfileScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen, StubScreen, DashboardScreen } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
 import { useIsWide } from './lib/useMediaQuery'
@@ -56,6 +56,18 @@ export default function App() {
     owner: walk.owner,
   })
 
+  // One element, two addresses — `/` below the wide breakpoint and `/home` at
+  // every width. Its sheet callbacks stay wired to the ActionSheet/ReviewSheet
+  // below exactly as before.
+  const home = (
+    <HomeScreen
+      loadTime={loadTime}
+      onOpenActionSheet={openIncompleteSheet}
+      onOpenReviewSheet={(card) => setReviewSheetCard(card)}
+      onOpenTodaySheet={openTodaySheet}
+    />
+  )
+
   return (
     <div className="app-shell" style={{ fontFamily: typography.fontFamily }}>
       {/* ── Navigation model is chosen by width ──
@@ -73,14 +85,14 @@ export default function App() {
       <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
       {/* ── Tab routes (base layer) ── */}
       <Routes>
-        <Route path="/" element={
-          <HomeScreen
-            loadTime={loadTime}
-            onOpenActionSheet={openIncompleteSheet}
-            onOpenReviewSheet={(card) => setReviewSheetCard(card)}
-            onOpenTodaySheet={openTodaySheet}
-          />
-        } />
+        {/* The landing page is chosen by width. Production has two distinct
+            surfaces here and neither is the other's responsive variant: the web
+            landing for a logged-in sitter is the dashboard at `/account/`
+            (`account/urls.py:28`), while `HomeScreen` is the app's home. Both
+            keep a dedicated address below so either is reachable at any width. */}
+        <Route path="/" element={isWide ? <DashboardScreen /> : home} />
+        <Route path="/home" element={home} />
+        <Route path="/dashboard" element={<DashboardScreen />} />
         <Route path="/contacts" element={<RebookScreen />} />
         <Route path="/more" element={<MoreScreen />} />
         <Route path="/inbox" element={<InboxScreen />} />
