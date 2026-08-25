@@ -27,7 +27,7 @@ export const BackIcon = () => (
     <path transform="scale(-1,1) translate(-32,0)" d="M12.32 22.27l5.442-6.35-5.442-6.348a1 1 0 1 1 1.518-1.302l5.722 6.675a1.5 1.5 0 0 1 0 1.952l-5.721 6.675a1 1 0 1 1-1.519-1.302z"/>
   </svg>
 )
-export const BellIcon = () => <Icon name="in-bell" />
+export const BellIcon = (props) => <Icon name="in-bell" {...props} />
 export const LockIcon = (props) => <Icon name="in-lock" {...props} />
 export const InfoCircleIcon = (props) => <Icon name="in-info-circle" {...props} />
 export const ChevronUpIcon = () => (
@@ -377,4 +377,35 @@ export const GroomingIcon = ({ color = c.success }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <path d="M4.52913 10.1602L7.18934 7.5L6.2418 6.55245C5.57934 7.1419 4.70649 7.5 3.75 7.5C1.67893 7.5 0 5.82107 0 3.75C0 1.67893 1.67893 0 3.75 0C5.82107 0 7.5 1.67893 7.5 3.75C7.5 4.31748 7.37395 4.85553 7.14832 5.33765L8.25 6.43934L9.35168 5.33765C9.12605 4.85553 9 4.31748 9 3.75C9 1.67893 10.6789 0 12.75 0C14.8211 0 16.5 1.67893 16.5 3.75C16.5 5.82107 14.8211 7.5 12.75 7.5C11.7935 7.5 10.9207 7.1419 10.2582 6.55245L9.31066 7.5L11.9709 10.1602C12.496 10.6854 12.7282 11.4359 12.5913 12.1659L10.7636 21.9139C10.5368 23.1235 9.48065 24 8.25 24C7.40757 24 6.64692 23.5893 6.1781 22.9421C3.65277 22.0581 2.09983 19.4266 2.63956 16.7279L3.63443 11.7536C3.70634 11.394 3.86404 11.0617 4.08942 10.7823C4.19811 10.5544 4.34576 10.3436 4.52913 10.1602ZM5.54807 20.9094L4.47625 15.193L4.11044 17.0221C3.80793 18.5346 4.41226 20.018 5.54807 20.9094ZM5.58979 11.2209C5.41473 11.3959 5.33734 11.6461 5.38296 11.8894L7.21072 21.6375C7.30449 22.1376 7.74117 22.5 8.25 22.5C8.75883 22.5 9.19551 22.1376 9.28928 21.6375L11.117 11.8894C11.1627 11.6461 11.0853 11.3959 10.9102 11.2209L10.1893 10.5H6.31066L5.58979 11.2209ZM3.75 6C4.99264 6 6 4.99264 6 3.75C6 2.50736 4.99264 1.5 3.75 1.5C2.50736 1.5 1.5 2.50736 1.5 3.75C1.5 4.99264 2.50736 6 3.75 6ZM12.75 6C13.9926 6 15 4.99264 15 3.75C15 2.50736 13.9926 1.5 12.75 1.5C11.5074 1.5 10.5 2.50736 10.5 3.75C10.5 4.99264 11.5074 6 12.75 6ZM7.5 12H9V13.5H7.5V12ZM18 22.5V21H15V19.5H18V18H15V16.5H18V15H15V13.5H18V12H15V10.5H18V9H15V7.5H20.25C22.3211 7.5 24 9.17893 24 11.25V20.25C24 22.3211 22.3211 24 20.25 24H15V22.5H18ZM19.5 9V22.5H20.25C21.4926 22.5 22.5 21.4926 22.5 20.25V11.25C22.5 10.0074 21.4926 9 20.25 9H19.5Z" fill={color}/>
   </svg>
+)
+
+// ─── Web navigation (desktop top bar) ────────────────────────────────────────
+// Production's SSR NavBar draws these from individual SVG assets; the icon font
+// already bundled here carries equivalents, so the prototype uses the font
+// rather than adding new files.
+
+// The Rover wordmark. The Django header renders this same font glyph at 35px in
+// brand green (`_headers.scss:213-224`, `.rover-logo-icon`); the SSR navbar uses
+// `rover-logo.svg` at 105x35, which the glyph matches at that size.
+export const RoverLogoIcon = ({ size = 35, color = c.brand }) => (
+  <Icon name="logo-rover" size={size} color={color} />
+)
+
+// "Promote your profile" (`ReferLink.tsx:84-98`). Production uses
+// `megaphone.svg`; the icon font has no megaphone, so this substitutes the
+// share glyph — the closest available and the one the Django header pairs with
+// the same link.
+export const MegaphoneIcon = ({ size = 16, color = 'currentColor' }) => (
+  <Icon name="share" size={size} color={color} />
+)
+
+// Contact list / shortlist (`ContactList.tsx`, production `profile-cart.svg`).
+export const CartIcon = ({ size = 16, color = 'currentColor' }) => (
+  <Icon name="in-cart" size={size} color={color} />
+)
+
+// Inbox in the web navbar (production `chat-inbox.svg`). Distinct from
+// `InboxIcon`, which is the 24px app tab-bar glyph.
+export const ChatInboxIcon = ({ size = 16, color = 'currentColor' }) => (
+  <Icon name="in-chat" size={size} color={color} />
 )

@@ -111,6 +111,13 @@ img {
   overflow: hidden;
   position: relative;
   background: #fff;
+  /* A column of [optional web navbar] + [content pane]. Above the wide
+     breakpoint the navbar occupies the first row; below it, App renders no
+     navbar and the pane is the whole shell. The pane — not the shell — is the
+     positioning context for the route overlays, so nav chrome stays above them
+     instead of being covered. */
+  display: flex;
+  flex-direction: column;
 }
 
 /* ─── Animations ─── */

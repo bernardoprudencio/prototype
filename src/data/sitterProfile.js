@@ -139,6 +139,12 @@ export const BOARDING_SETTINGS = {
 }
 
 // ─── Sitter profile (hardcoded for prototype) ────────────────────────────────
+// The sitter's own first name. Production's navbar avatar toggle renders
+// `user.firstName` (`DesktopMenu.tsx`); nothing in the prototype held the
+// sitter's own name before the web nav needed it — every other name in the data
+// belongs to a client.
+export const SITTER_FIRST_NAME = 'Bernardo'
+
 export const SITTER_PROFILE = {
   services: [
     { id: 'boarding',      label: 'Boarding',       status: SERVICE_STATUS.ACTIVE,   acceptingNew: true  },
