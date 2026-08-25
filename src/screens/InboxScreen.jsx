@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useMemo } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { colors, spacing, textStyles, typography } from '../tokens'
 import TabBar from '../components/TabBar'
 import Chip from '../components/Chip'
@@ -8,6 +8,7 @@ import { DropdownIcon } from '../assets/icons'
 import { getClient } from '../data/contacts'
 import { getInboxThreads } from '../data/threads'
 import { useAppContext } from '../context/AppContext'
+import { useIsWide } from '../lib/useMediaQuery'
 
 // Filter definitions
 // Primary = all except archived; others filter by status or special fields
@@ -23,6 +24,8 @@ const FILTER_RIGHT = [
   { id: 'archived', label: 'Archived' },
 ]
 
+const FILTERS = [...FILTER_LEFT, ...FILTER_RIGHT]
+
 function applyFilter(threads, filterId) {
   switch (filterId) {
     case 'primary':  return threads.filter(t => t.status !== 'archived')
@@ -37,26 +40,43 @@ function applyFilter(threads, filterId) {
 export default function InboxScreen() {
   const navigate = useNavigate()
   const { liveEvents } = useAppContext()
-  const [activeFilter, setActiveFilter] = useState('primary')
+  const isDesktop = useIsWide()
+
+  // The filter lives in the URL, as it does in production
+  // (useWebState.ts:10-20), so /inbox/past deep-links to the Past folder. A
+  // bare /inbox resolves to Primary without redirecting, which keeps every
+  // existing link to /inbox working.
+  const { slug } = useParams()
+  const activeFilter = FILTERS.some(f => f.id === slug) ? slug : 'primary'
+  const setActiveFilter = (id) => navigate(`/inbox/${id}`)
+
   const allThreads = useMemo(() => getInboxThreads(), [])
   const filtered = applyFilter(allThreads, activeFilter)
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
+  const chip = (f) => (
+    <Chip key={f.id} size="small" label={f.label} selected={activeFilter === f.id} checkmark onClick={() => setActiveFilter(f.id)} />
+  )
 
-      {/* ── Header (matches Contacts header) ── */}
-      <div style={{ borderBottom: `1px solid ${colors.border}`, padding: '24px 16px 16px', flexShrink: 0 }}>
-        <h1 style={{
-          fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26,
-          lineHeight: 1.25, color: colors.primary, margin: 0,
-        }}>
-          Inbox
-        </h1>
+  const header = (
+      <div style={{
+        borderBottom: `1px solid ${colors.border}`, flexShrink: 0,
+        padding: isDesktop ? '24px 0 16px' : '24px 16px 16px',
+      }}>
+        {/* The rule stays full-bleed; only the title moves in to sit on the same
+            left edge as the rail below it. */}
+        <div style={isDesktop ? { maxWidth: 1140, margin: '0 auto', padding: `0 ${spacing.xl}px` } : undefined}>
+          <h1 style={{
+            fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26,
+            lineHeight: 1.25, color: colors.primary, margin: 0,
+          }}>
+            Inbox
+          </h1>
+        </div>
       </div>
+  )
 
-      {/* ── Scrollable region: chips + sorted row + thread list ── */}
-      <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
-        {/* Filter chips — full row horizontally scrollable */}
+  // Mobile: one horizontally-scrolling strip, the two groups split by a rule.
+  const chipStrip = (
         <div className="hide-scrollbar" style={{
           display: 'flex',
           alignItems: 'center',
@@ -74,9 +94,7 @@ export default function InboxScreen() {
             borderRight: `1px solid ${colors.border}`,
             flexShrink: 0,
           }}>
-            {FILTER_LEFT.map(f => (
-              <Chip key={f.id} size="small" label={f.label} selected={activeFilter === f.id} checkmark onClick={() => setActiveFilter(f.id)} />
-            ))}
+            {FILTER_LEFT.map(chip)}
           </div>
 
           {/* Right group: status chips */}
@@ -87,13 +105,28 @@ export default function InboxScreen() {
             padding: `0 ${spacing.lg}px`,
             flexShrink: 0,
           }}>
-            {FILTER_RIGHT.map(f => (
-              <Chip key={f.id} size="small" label={f.label} selected={activeFilter === f.id} checkmark onClick={() => setActiveFilter(f.id)} />
-            ))}
+            {FILTER_RIGHT.map(chip)}
           </div>
         </div>
+  )
 
-        {/* Sorted by row */}
+  // PROTOTYPE-ONLY placement. Production's desktop rail is six folder rows
+  // ("All conversations", "Pending requests", …) — a second taxonomy this
+  // prototype doesn't have, and one that drops Unread. The chips themselves are
+  // production's (inbox/api/domain/inbox.py:47-57) and Kibble's own
+  // FilterChipGroup already wraps (InboxStatusList.tsx:49-70); only putting
+  // them in the rail is ours. Rail width and gutter are production's
+  // (InboxPageBase.tsx:150,207).
+  const chipRail = (
+        <div style={{
+          width: 280, flexShrink: 0, position: 'sticky', top: 0, alignSelf: 'flex-start',
+          display: 'flex', flexWrap: 'wrap', gap: spacing.sm,
+        }}>
+          {FILTERS.map(chip)}
+        </div>
+  )
+
+  const sortedRow = (
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -108,8 +141,9 @@ export default function InboxScreen() {
             color: colors.secondary,
           }}>Sorted by recent activity</span>
         </div>
+  )
 
-        {filtered.length === 0 ? (
+  const list = filtered.length === 0 ? (
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -148,6 +182,7 @@ export default function InboxScreen() {
               thread={thread}
               owner={owner}
               displayMessage={displayMessage}
+              size={isDesktop ? 'default' : 'small'}
               onClick={() => {
                 if (thread.bookingId) {
                   navigate(`/conversation/${thread.ownerId}/thread/${thread.conversationOpk}`, { state: { type: 'today' } })
@@ -157,7 +192,40 @@ export default function InboxScreen() {
               }}
             />
           )
-        })}
+        })
+
+  // ── Desktop: filter rail left, conversations in the main container ──
+  // Tapping a thread is still a full-page push to the conversation; production
+  // has no inline detail pane here either.
+  if (isDesktop) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
+        {header}
+        <div className="hide-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div style={{
+            maxWidth: 1140, margin: '0 auto', padding: `${spacing.xl}px ${spacing.xl}px`,
+            display: 'flex', alignItems: 'flex-start', gap: 56,
+          }}>
+            {chipRail}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {sortedRow}
+              {list}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
+      {header}
+
+      {/* ── Scrollable region: chips + sorted row + thread list ── */}
+      <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
+        {chipStrip}
+        {sortedRow}
+        {list}
       </div>
 
       {/* ── Tab bar ── */}

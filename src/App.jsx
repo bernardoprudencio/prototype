@@ -95,7 +95,10 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardScreen />} />
         <Route path="/contacts" element={<RebookScreen />} />
         <Route path="/more" element={<MoreScreen />} />
-        <Route path="/inbox" element={<InboxScreen />} />
+        {/* The active filter is a URL segment, matching production
+            (useWebState.ts:10-20). Optional, so a bare /inbox still resolves to
+            Primary and every existing link keeps working. */}
+        <Route path="/inbox/:slug?" element={<InboxScreen />} />
         {/* Boarding has no desktop frame — it stays a full-bleed page outside
             the two-pane shell. */}
         <Route path="/service-settings/boarding" element={<BoardingSettingsScreen />} />

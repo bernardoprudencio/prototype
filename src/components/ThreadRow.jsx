@@ -6,7 +6,13 @@ import { getThreadStatusDisplay } from '../lib/threadStatus'
 const dateOnly = (ts) => ts.replace(/\s+\d{1,2}:\d{2}\s*(AM|PM)/i, '').trim()
 const buildSnippet = (text, sender) => sender === 'you' ? `You: ${text}` : text
 
-export default function ThreadRow({ thread, owner, displayMessage, onClick }) {
+// Production grows the row at desktop rather than swapping component: the
+// avatar goes `small` -> `default` and the title `Heading 100` -> `Heading 200`
+// (InboxItem.tsx:116,127). Same here — one component, one size prop.
+export default function ThreadRow({ thread, owner, displayMessage, onClick, size = 'small' }) {
+  const isLarge = size === 'default'
+  const avatarPx = isLarge ? 48 : 32
+  const titleStyle = isLarge ? textStyles.heading200 : textStyles.heading100
   const snippet = buildSnippet(displayMessage.text, displayMessage.sender)
   const { serviceLabel, alert } = thread
   const statusDisplay = getThreadStatusDisplay(thread)
@@ -28,11 +34,11 @@ export default function ThreadRow({ thread, owner, displayMessage, onClick }) {
               <img
                 src={peopleImages[thread.ownerId]}
                 alt={owner.name}
-                style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', display: 'block', border: `1px solid ${colors.white}` }}
+                style={{ width: avatarPx, height: avatarPx, borderRadius: '50%', objectFit: 'cover', display: 'block', border: `1px solid ${colors.white}` }}
               />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ ...textStyles.heading100, color: colors.primary, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{owner.name}</p>
+              <p style={{ ...titleStyle, color: colors.primary, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{owner.name}</p>
               <p style={{ ...textStyles.text100, color: colors.tertiary, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{owner.petNames}</p>
             </div>
             <div style={{ flexShrink: 0 }}>
