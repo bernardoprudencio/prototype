@@ -132,12 +132,24 @@ export default function App() {
       </Routes>
 
       {/* ── Booking details (z-20, over the conversation).
-           Production's /account/conversations/<opk>/details page. ── */}
+           Production's /account/conversations/<opk>/details page.
+
+           Below the breakpoint only. At wide width the details live in the
+           conversation's own left rail, and this address renders nothing —
+           which makes it visually identical to the conversation URL underneath
+           it. That is production's behaviour, not a shortcut:
+           ConversationDetailsPage.tsx:24 early-returns on `!isSmDown` before it
+           ever consults the route match, and the thread pane only hides itself
+           below 992px (ConversationPageContent.tsx:179). The route stays
+           declared so navigating here at wide is a legal no-op rather than a
+           blank screen. ── */}
       <Routes>
         <Route path="/conversation/:ownerId/thread/:conversationOpk/details" element={
-          <SlideOverlay zIndex={20}>
-            <BookingDetailsScreen />
-          </SlideOverlay>
+          isWide ? null : (
+            <SlideOverlay zIndex={20}>
+              <BookingDetailsScreen />
+            </SlideOverlay>
+          )
         } />
       </Routes>
 

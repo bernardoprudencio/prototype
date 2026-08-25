@@ -175,9 +175,29 @@ const FlatRow = ({ leftItem, label, lines = [] }) => (
   </div>
 )
 
-export default function BookingDetailsScreen() {
+/**
+ * One component, two wrappers.
+ *
+ * `chrome` is what separates them. As the mobile overlay (`chrome: true`) this
+ * is production's `/account/conversations/<opk>/details` page: its own 56px nav
+ * header, its own scroll region. As the desktop conversation's left rail
+ * (`chrome: false`) it is headerless and hands scroll ownership up to the page —
+ * production does exactly this, `ConversationDetailsHeader` returning `null`
+ * when `!isSmDown` (ConversationDetailsHeader.tsx:57) and the rail box carrying
+ * `height: "fit-content"` rather than a scroller (ConversationDetailsPage.tsx:24-38).
+ *
+ * `opk` overrides the URL's `conversationOpk`: the rail renders inside a
+ * conversation route that may carry no thread segment at all, so the caller
+ * passes the opk it already resolved.
+ *
+ * `ctas` is the stacked button block. Production drops it into the rail between
+ * the price ledger and the pets section (ConversationDetailsContent.tsx:49-65,
+ * DetailsActions after DetailsWarnings), which is where it renders below.
+ */
+function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
   const navigate = useNavigate()
-  const { ownerId, conversationOpk } = useParams()
+  const { ownerId, conversationOpk: opkFromUrl } = useParams()
+  const conversationOpk = opkProp ?? opkFromUrl
   const onBack = () => navigate(-1)
 
   const client = getClient(ownerId)
@@ -272,7 +292,10 @@ export default function BookingDetailsScreen() {
     : null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
+    <div style={chrome
+      ? { display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }
+      : { background: colors.white }}>
+      {chrome && <>
       {/* ─── Nav header — ConversationDetailsHeader.tsx:54-135 ───
           `flexDirection="row" gap="3x" px="4x"`: a back control with an
           underlined "Back" link, the React-Native-only centred title, and
@@ -301,13 +324,18 @@ export default function BookingDetailsScreen() {
           variant="default"
           size="small"
           style={{ flexShrink: 0 }}
-          onClick={booking.isRecurring ? undefined : () => navigate(`/conversation/${ownerId}/modify`)}
+          onClick={booking.isRecurring ? undefined : () => navigate(`/conversation/${ownerId}/thread/${conversationOpk}/modify`)}
         >
           {copy.MODIFY_REQUEST}
         </Button>
       </div>
+      </>}
 
-      <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
+      {/* At wide width the page owns the scroll and the rail's own container
+          owns the padding, so this stops being a scroller. */}
+      <div className="hide-scrollbar" style={chrome
+        ? { flex: 1, overflowY: 'auto', padding: '0 16px' }
+        : { height: 'auto', overflowY: 'visible' }}>
 
         {/* ─── 1. Booking status — pt="6x" pb="2x", column gap="2x" ─── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm, paddingTop: spacing.xl, paddingBottom: spacing.sm }}>
@@ -320,7 +348,10 @@ export default function BookingDetailsScreen() {
         </div>
 
         {/* ─── 2. Message {shortName} ─── */}
-        <div
+        {/* A way back to the thread — which only means anything while the thread
+            is the page you left. In the rail it is already on screen, so the row
+            goes rather than sitting there inert. */}
+        {chrome && <div
           onClick={onBack}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -330,7 +361,7 @@ export default function BookingDetailsScreen() {
         >
           <span style={{ ...textStyles.link100Semibold, color: colors.link }}>{copy.messageOwner(firstName)}</span>
           <ChevronRightIcon color={colors.link} />
-        </div>
+        </div>}
 
         {/* ─── 3. Service summary ─── */}
         <SectionTitle title={copy.SERVICE_SUMMARY_TITLE} />
@@ -474,6 +505,13 @@ export default function BookingDetailsScreen() {
           </div>
         )}
 
+        {/* ─── Booking CTAs — rail only.
+             ConversationDetailsActions.tsx:27 returns null when `isSmDown`, so
+             this block exists at desktop and nowhere else; below the breakpoint
+             the same CTAs live in the conversation header's scroller
+             (ConversationUnderHeaderButtons.tsx:39-48). ─── */}
+        {ctas && <div style={{ paddingBottom: spacing.xl }}>{ctas}</div>}
+
         {/* ─── 5. Pets information (sitter-only) ─── */}
         <SectionTitle title={copy.petsTitle(client.pets.length)} />
         <div style={{ paddingBottom: spacing.xl }}>
@@ -577,4 +615,14 @@ export default function BookingDetailsScreen() {
       <Snackbar message={lr.snackbar} onDone={lr.dismissSnackbar} />
     </div>
   )
+}
+
+/** The mobile overlay at `/conversation/:ownerId/thread/:opk/details`. */
+export default function BookingDetailsScreen() {
+  return <BookingDetails chrome />
+}
+
+/** The desktop conversation's left rail. */
+export function BookingDetailsPane({ opk, ctas }) {
+  return <BookingDetails chrome={false} opk={opk} ctas={ctas} />
 }

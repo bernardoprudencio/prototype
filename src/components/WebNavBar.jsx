@@ -23,7 +23,9 @@ import { getInboxThreads } from '../data/threads'
  * `WebNavMenu`.
  */
 
-const BAR_HEIGHT    = 60
+// Exported so surfaces that need viewport math below the bar (the two-pane
+// conversation's sticky thread column) don't re-derive it.
+export const BAR_HEIGHT = 60
 const CONTENT_WIDTH = 1140
 const ICON_SIZE     = 16
 

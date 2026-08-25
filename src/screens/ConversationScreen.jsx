@@ -3,7 +3,9 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { colors, typography, shadows, textStyles } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
 import { peopleImages } from '../assets/images'
-import { Button, PetAvatar, BannerBlock, ChatBubble } from '../components'
+import { Button, PetAvatar, BannerBlock, ChatBubble, WEB_NAV_BAR_HEIGHT } from '../components'
+import { BookingDetailsPane } from './BookingDetailsScreen'
+import { useIsWide } from '../lib/useMediaQuery'
 import { useApp } from '../context/AppContext'
 import { OWNERS } from '../data/owners'
 import { getChatHistory, getInboxThreads } from '../data/threads'
@@ -46,6 +48,8 @@ export default function ConversationScreen() {
     ownerUnits,
     scheduleMode,
   } = useApp()
+
+  const isDesktop = useIsWide()
 
   const type = state?.type ?? 'today'
   const card = state?.card ?? null
@@ -103,12 +107,17 @@ export default function ConversationScreen() {
   const clientName = isToday ? owner?.name : card?.client
   const clientImg  = isToday ? owner?.image : peopleImages[card?.clientKey] ?? peopleImages.owen
 
+  // `block: 'nearest'` keeps this from walking up and scrolling the page too:
+  // at desktop the thread is a scroller nested inside the page scroller, and the
+  // default 'start' would drag the details rail up with every new message. The
+  // end marker sits at the bottom of its scroller, so the inner result is
+  // identical either way.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+    messagesEndRef.current?.scrollIntoView({ behavior: 'instant', block: 'nearest' })
   }, [ownerId, type, cardId])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [sentMessages, liveEvents.length])
 
   const history = getChatHistory(effectiveOpk)
@@ -166,17 +175,66 @@ export default function ConversationScreen() {
     )
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
-      {/* ─── Header ─── */}
+  // ── Booking CTAs ──
+  // One list, two placements. Below the breakpoint they are the horizontal
+  // scroller under the header (ConversationUnderHeaderButtons.tsx:39-48); at
+  // desktop they stack full-width in the details rail, because
+  // ConversationDetailsActions.tsx:27 returns null when `isSmDown`.
+  const feedbackCta = (
+    <Button variant="primary" fullWidth={isDesktop} style={{ boxShadow: shadows.medium, flexShrink: 0 }}>Leave feedback</Button>
+  )
+  const bookingCta = isRecurring ? (
+    <Button variant="default" fullWidth={isDesktop} style={{ flexShrink: 0 }} onClick={onOpenSchedule}>
+      {scheduleMode === 'agenda' ? 'Manage schedule' : 'Modify schedule'}
+    </Button>
+  ) : (
+    <Button
+      variant="default"
+      fullWidth={isDesktop}
+      style={{ flexShrink: 0 }}
+      onClick={() => navigate(`/conversation/${ownerId}/thread/${effectiveOpk}/modify`)}
+    >
+      {MODIFY_BOOKING}
+    </Button>
+  )
+
+  const ctaStrip = (
+    <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, paddingTop: 12, overflowX: 'auto', paddingBottom: 14, marginBottom: -14 }}>
+      {feedbackCta}
+      {bookingCta}
+      {/* Details has no desktop counterpart — the rail it opens is already on
+          screen (message_header.py:198-215). */}
+      <Button
+        variant="default"
+        style={{ flexShrink: 0 }}
+        disabled={!booking}
+        onClick={() => navigate(`/conversation/${ownerId}/thread/${effectiveOpk}/details`)}
+      >
+        Details
+      </Button>
+    </div>
+  )
+
+  const railCtas = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {feedbackCta}
+      {bookingCta}
+    </div>
+  )
+
+  const header = (
       <div style={{
         borderBottom: `1px solid ${colors.border}`,
-        boxShadow: shadows.headerShadow,
+        boxShadow: isDesktop ? 'none' : shadows.headerShadow,
         padding: '12px 16px', flexShrink: 0, zIndex: 3,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', minHeight: 62, padding: '8px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flexShrink: 0 }} onClick={onBack}>
-            <BackIcon />
+          {/* No back affordance at desktop — ConversationHeader.tsx:86-98 drops it. */}
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: isDesktop ? 'default' : 'pointer', flexShrink: 0 }}
+            onClick={isDesktop ? undefined : onBack}
+          >
+            {!isDesktop && <BackIcon />}
             <PetAvatar size={48} images={[clientImg]} />
           </div>
           <div style={{ flex: 1, marginLeft: 8, minWidth: 0 }}>
@@ -185,34 +243,12 @@ export default function ConversationScreen() {
           </div>
           <div style={{ cursor: 'pointer', flexShrink: 0 }}><MoreIcon /></div>
         </div>
-        <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, paddingTop: 12, overflowX: 'auto', paddingBottom: 14, marginBottom: -14 }}>
-          <Button variant="primary" style={{ boxShadow: shadows.medium, flexShrink: 0 }}>Leave feedback</Button>
-          {isRecurring ? (
-            <Button variant="default" style={{ flexShrink: 0 }} onClick={onOpenSchedule}>
-              {scheduleMode === 'agenda' ? 'Manage schedule' : 'Modify schedule'}
-            </Button>
-          ) : (
-            <Button
-              variant="default"
-              style={{ flexShrink: 0 }}
-              onClick={() => navigate(`/conversation/${ownerId}/thread/${effectiveOpk}/modify`)}
-            >
-              {MODIFY_BOOKING}
-            </Button>
-          )}
-          <Button
-            variant="default"
-            style={{ flexShrink: 0 }}
-            disabled={!booking}
-            onClick={() => navigate(`/conversation/${ownerId}/thread/${effectiveOpk}/details`)}
-          >
-            Details
-          </Button>
-        </div>
+        {!isDesktop && ctaStrip}
       </div>
+  )
 
-      {/* ─── Messages ─── */}
-      <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>
+  const threadPane = (
+      <div className="hide-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}>
         {history.map((item, i) => {
           if (item.type === 'divider') return <DayDivider key={`h-${i}`} label={item.label} />
           if (item.type === 'bubble')  return <ChatBubble key={`h-${i}`} message={item.text} time={item.time} isOwner={item.isOwner} showCheck={item.showCheck} />
@@ -287,8 +323,9 @@ export default function ConversationScreen() {
 
         <div ref={messagesEndRef} />
       </div>
+  )
 
-      {/* ─── Composer ─── */}
+  const composer = (
       <div style={{
         borderTop: `1px solid ${colors.border}`, padding: '8px 12px',
         display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0,
@@ -317,7 +354,51 @@ export default function ConversationScreen() {
           <Button variant="primary" icon={<SendIcon />} onClick={sendMessage} />
         )}
       </div>
+  )
 
+  // ── Desktop: details rail left, thread right ──
+  // The page owns the scroll and the rail scrolls with it
+  // (ConversationDetailsPage.tsx:27-33); the thread column is the sticky one
+  // (ConversationPageContent.tsx:182), so the composer stays on screen while
+  // the rail runs past.
+  if (isDesktop) {
+    const GUTTER = 24
+    return (
+      <div className="hide-scrollbar" style={{ height: '100%', overflowY: 'auto', background: colors.white }}>
+        <div style={{
+          maxWidth: 1140, margin: '0 auto', padding: GUTTER,
+          display: 'flex', alignItems: 'flex-start', gap: GUTTER,
+        }}>
+          <div style={{
+            width: 375, flexShrink: 0,
+            border: `1px solid ${colors.border}`, borderRadius: 8,
+            padding: `0 ${GUTTER - 8}px`, background: colors.white,
+          }}>
+            {/* The rail renders under `/conversation/:ownerId` too, where the URL
+                carries no opk — hand it the one the thread already resolved. */}
+            <BookingDetailsPane opk={effectiveOpk} ctas={railCtas} />
+          </div>
+          <div style={{
+            flex: 1, minWidth: 0,
+            position: 'sticky', top: GUTTER,
+            height: `calc(100dvh - ${WEB_NAV_BAR_HEIGHT + GUTTER * 2}px)`,
+            display: 'flex', flexDirection: 'column',
+            border: `1px solid ${colors.border}`, borderRadius: 8, overflow: 'hidden',
+          }}>
+            {header}
+            {threadPane}
+            {composer}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
+      {header}
+      {threadPane}
+      {composer}
     </div>
   )
 }
