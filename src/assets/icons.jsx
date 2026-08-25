@@ -40,9 +40,18 @@ export const ChevronDownIcon = () => (
     <path d="M22.35 12.24a1 1 0 1 1 1.3 1.52l-6.674 5.72a1.5 1.5 0 0 1-1.952 0l-6.675-5.72a1 1 0 0 1 1.302-1.52L16 17.684l6.35-5.442z"/>
   </svg>
 )
-export const ChevronRightIcon = ({ color = c.tertiary }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32" fill={color}>
+export const ChevronRightIcon = ({ color = c.tertiary, size = 24 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color}>
     <path d="M12.32 22.27l5.442-6.35-5.442-6.348a1 1 0 1 1 1.518-1.302l5.722 6.675a1.5 1.5 0 0 1 0 1.952l-5.721 6.675a1 1 0 1 1-1.519-1.302z"/>
+  </svg>
+)
+// The mirror of ChevronRightIcon, added for the calendar's month/week paging.
+// `BackIcon` above is the same mirrored path but hardcodes its fill and size,
+// so it cannot serve as a paging control next to a right chevron.
+export const ChevronLeftIcon = ({ color = c.tertiary, size = 24 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color}>
+    <path d="M12.32 22.27l5.442-6.35-5.442-6.348a1 1 0 1 1 1.518-1.302l5.722 6.675a1.5 1.5 0 0 1 0 1.952l-5.721 6.675a1 1 0 1 1-1.519-1.302z"
+      transform="scale(-1,1) translate(-32,0)"/>
   </svg>
 )
 export const EditIcon = ({ size = 24, color = c.primary }) => (
