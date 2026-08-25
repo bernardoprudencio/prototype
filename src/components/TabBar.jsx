@@ -1,5 +1,6 @@
 import React from 'react'
 import { colors, typography } from '../tokens'
+import { useIsWide } from '../lib/useMediaQuery'
 import {
   HomeFilledIcon, HomeOutlineIcon, InboxIcon,
   CalendarIcon, PersonIcon, MoreTabIcon,
@@ -14,6 +15,12 @@ const TABS = [
 ]
 
 export default function TabBar({ activeTab = 'home', onTabSelect }) {
+  // Above the wide breakpoint the app shell renders the web navbar instead, so
+  // the app tab bar stands down. Gated here rather than in each of the four
+  // screens that render a TabBar, so callers need no change.
+  const isWide = useIsWide()
+  if (isWide) return null
+
   return (
     <div style={{
       display: 'flex', borderTop: `1px solid ${colors.border}`,

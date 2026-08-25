@@ -3,10 +3,12 @@ import { Routes, Route, useNavigate } from 'react-router-dom'
 import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
-import { ActionSheet, ReviewSheet, SlideOverlay } from './components'
-import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, ServiceSettingsLayout, BusinessPane, AboutYouPane, OtherServicesPane, BoardingSettingsScreen, FamilyServicesScreen, FamilyProfileScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen } from './screens'
+import { ActionSheet, ReviewSheet, SlideOverlay, WebNavBar } from './components'
+import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, ServiceSettingsLayout, BusinessPane, AboutYouPane, OtherServicesPane, BoardingSettingsScreen, FamilyServicesScreen, FamilyProfileScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen, StubScreen } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
+import { useIsWide } from './lib/useMediaQuery'
+import { WEB_STUB_PAGES } from './data/webNavItems'
 
 export default function App() {
   const navigate = useNavigate()
@@ -16,6 +18,7 @@ export default function App() {
   const [reviewSheetCard, setReviewSheetCard] = useState(null)
 
   const loadTime = useLoadTime()
+  const isWide = useIsWide()
 
   const handleComplete = (card) => {
     const ts = formatActionTimestamp()
@@ -54,7 +57,20 @@ export default function App() {
   })
 
   return (
-    <div className="app-shell" style={{ fontFamily: typography.fontFamily, position: 'relative', overflow: 'hidden' }}>
+    <div className="app-shell" style={{ fontFamily: typography.fontFamily }}>
+      {/* ── Navigation model is chosen by width ──
+           At the wide breakpoint the app becomes web: rover.com's desktop navbar
+           sits above the content and `TabBar` stands itself down. Below it, this
+           renders nothing and the app's bottom tab bar is the nav. */}
+      {isWide && <WebNavBar />}
+
+      {/* ── Content pane ──
+           `position: relative` here rather than on `.app-shell` is what keeps the
+           `SlideOverlay` routes (absolute, inset 0) inside the pane instead of
+           over the navbar. `minHeight: 0` is load-bearing: every screen root is
+           `height: 100%` with its own inner scroller, and without it this flex
+           child refuses to shrink and those scrollers never engage. */}
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
       {/* ── Tab routes (base layer) ── */}
       <Routes>
         <Route path="/" element={
@@ -71,6 +87,12 @@ export default function App() {
         {/* Boarding has no desktop frame — it stays a full-bleed page outside
             the two-pane shell. */}
         <Route path="/service-settings/boarding" element={<BoardingSettingsScreen />} />
+        {/* Web navbar destinations that exist in production but have no
+            prototype screen yet. Reachable from the avatar dropdown at wide
+            width; each is where the real web screen lands later. */}
+        {WEB_STUB_PAGES.map(({ path, title }) => (
+          <Route key={path} path={path} element={<StubScreen title={title} />} />
+        ))}
         <Route path="/service-settings" element={<ServiceSettingsLayout />}>
           <Route index element={<ServiceSettingsScreen />} />
           <Route path="services/:family" element={<FamilyServicesScreen />} />
@@ -189,7 +211,9 @@ export default function App() {
         } />
       </Routes>
 
-      {/* ── Global modals ── */}
+      </div>
+
+      {/* ── Global modals (outside the content pane — they cover the navbar) ── */}
       <ActionSheet
         visible={!!sheetItem}
         type={sheetItem?.type}
