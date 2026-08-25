@@ -11,11 +11,13 @@ import {
   runOptimisticMutation, SHEET_MODE, toISODate,
 } from '../../lib/calendarUtils'
 import { useApp } from '../../context/AppContext'
+import { TAB_PATHS } from '../../lib/tabPaths'
 import Snackbar from '../../components/Snackbar'
+import TabBar from '../../components/TabBar'
 import AvailabilitySheet from './AvailabilitySheet'
 import CalendarHeader from './CalendarHeader'
+import CompactLayout from './CompactLayout'
 import MonthLayout from './MonthLayout'
-import StubScreen from '../StubScreen'
 
 const CONTENT_WIDTH = 1140
 
@@ -63,8 +65,14 @@ function isValidIsoDate(value) {
  * flag — that is what keeps the POC's rollback path reachable without inventing
  * random failures during user testing.
  *
- * Deferred: the compact layout is commit 6, the 3-day layout and view switcher
- * commit 7.
+ * Both widths render from this one container, as in the POC: `NewCalendarPage`
+ * picks a layout by `useIsCompact()` and passes every layout the same props.
+ * Here that gate is `useIsWide()` (769px, the prototype's only breakpoint) and
+ * the two layouts are `MonthLayout` / `CompactLayout`. The compact branch also
+ * renders the `TabBar` — `/calendar` is the third tab, and it is this commit
+ * that makes tapping it do anything.
+ *
+ * Deferred: the 3-day layout and the view switcher are commit 7.
  */
 export default function CalendarScreen() {
   const navigate = useNavigate()
@@ -287,12 +295,21 @@ export default function CalendarScreen() {
     if (booking.conversationUrl) navigate(booking.conversationUrl, { state: { type: 'today' } })
   }
 
-  // The compact layout arrives in commit 6. Until then `/calendar` is only
-  // reachable at wide width — the web navbar's dropdown is wide-only and the
-  // `CALENDAR` tab is still unwired — so this branch is a placeholder rather
-  // than a squeezed desktop layout.
-  if (!isWide) {
-    return <StubScreen title="Calendar" note="The compact calendar is not built yet." />
+  // Every prop below is shared by both layouts, exactly as `NewCalendarPage`
+  // spreads one object into whichever layout `useIsCompact()` selects.
+  const layoutProps = {
+    data,
+    selectedDate,
+    rangeStart,
+    rangeEnd,
+    gca,
+    isConfirmingAvailability,
+    onConfirmAvailability: handleConfirmAvailability,
+    onPrevMonth: () => goToMonth(-1),
+    onNextMonth: () => goToMonth(1),
+    onDayClick: handleDayClick,
+    onOpenSheet: handleOpenSheet,
+    onOpenConversation: openConversation,
   }
 
   return (
@@ -308,30 +325,24 @@ export default function CalendarScreen() {
         {assertiveMsg.text}
       </div>
 
-      <div className="hide-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-        {/* `NewCalendarPage` pads 40px at desktop (`padding="10x"`); the page
-            caps at the prototype's shared 1140px content width. */}
-        <div style={{
-          maxWidth: CONTENT_WIDTH, margin: '0 auto',
-          padding: `${CAL_DIMS.pagePadY}px ${CAL_DIMS.pagePadX}px`,
-        }}>
-          <CalendarHeader year={viewYear} />
-          <MonthLayout
-            data={data}
-            selectedDate={selectedDate}
-            rangeStart={rangeStart}
-            rangeEnd={rangeEnd}
-            gca={gca}
-            isConfirmingAvailability={isConfirmingAvailability}
-            onConfirmAvailability={handleConfirmAvailability}
-            onPrevMonth={() => goToMonth(-1)}
-            onNextMonth={() => goToMonth(1)}
-            onDayClick={handleDayClick}
-            onOpenSheet={handleOpenSheet}
-            onOpenConversation={openConversation}
-          />
+      {isWide ? (
+        <div className="hide-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          {/* `NewCalendarPage` pads 40px at desktop (`padding="10x"`); the page
+              caps at the prototype's shared 1140px content width. */}
+          <div style={{
+            maxWidth: CONTENT_WIDTH, margin: '0 auto',
+            padding: `${CAL_DIMS.pagePadY}px ${CAL_DIMS.pagePadX}px`,
+          }}>
+            <CalendarHeader year={viewYear} />
+            <MonthLayout {...layoutProps} />
+          </div>
         </div>
-      </div>
+      ) : (
+        // The compact layout owns its own header (the month/year `<h1>` plus the
+        // collapse toggle), its own scroller, and the fixed selection bar, so it
+        // takes the flex slot whole rather than sitting inside a shared one.
+        <CompactLayout {...layoutProps} />
+      )}
 
       <AvailabilitySheet
         isOpen={sheetMode !== null}
@@ -347,6 +358,14 @@ export default function CalendarScreen() {
       />
 
       <Snackbar message={snackbar} onDone={() => setSnackbar('')} />
+
+      {/* Third tab, and until this commit the only one whose route was
+          missing from every `TAB_PATHS` map. `TabBar` stands itself down at
+          wide width, so no gate is needed here. */}
+      <TabBar activeTab="calendar" onTabSelect={(id) => {
+        const path = TAB_PATHS[id]
+        if (path) navigate(path)
+      }} />
     </div>
   )
 }

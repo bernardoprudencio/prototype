@@ -9,6 +9,7 @@ import { getClient } from '../data/contacts'
 import { getInboxThreads } from '../data/threads'
 import { useAppContext } from '../context/AppContext'
 import { useIsWide } from '../lib/useMediaQuery'
+import { TAB_PATHS } from '../lib/tabPaths'
 
 // Filter definitions
 // Primary = all except archived; others filter by status or special fields
@@ -230,7 +231,7 @@ export default function InboxScreen() {
 
       {/* ── Tab bar ── */}
       <TabBar activeTab="inbox" onTabSelect={(id) => {
-        const path = { home: '/', inbox: '/inbox', rebook: '/contacts', more: '/more' }[id]
+        const path = TAB_PATHS[id]
         if (path) navigate(path)
       }} />
     </div>

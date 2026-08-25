@@ -7,6 +7,7 @@ import { formatHeaderDate } from '../hooks/useDate'
 import { Button, PetAvatar, UserAvatar, TabBar, Row } from '../components'
 import { getTodayWalks } from '../data/owners'
 import { getIncompleteCards } from '../data/scheduleData'
+import { TAB_PATHS } from '../lib/tabPaths'
 
 const INCOMPLETE_CARDS = getIncompleteCards()
 import { useApp } from '../context/AppContext'
@@ -16,7 +17,6 @@ const PROMO_CARDS = [
   { bg: colors.cyan100, title: 'Share more, earn more', desc: 'Earn a $100 reward for every two customers you invite who book.', cta: 'Start Sharing', img: petImages.promo2 },
 ]
 
-const TAB_PATHS = { home: '/', inbox: '/inbox', rebook: '/contacts', more: '/more' }
 
 export default function HomeScreen({ onOpenActionSheet, onOpenReviewSheet, onOpenTodaySheet, loadTime }) {
   const navigate = useNavigate()

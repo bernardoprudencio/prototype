@@ -1,9 +1,10 @@
 import React from 'react'
-import { colors, radius, textStyles } from '../../tokens'
+import { colors, textStyles } from '../../tokens'
 import { CAL_COLORS, CAL_DIMS } from './calendarTheme'
 import { HEADER } from '../../data/calendarCopy'
 import { bookingsForDate, formatLongDate, monthNameOnly, toISODate } from '../../lib/calendarUtils'
 import { ChevronLeftIcon, ChevronRightIcon } from '../../assets/icons'
+import NavButton from './NavButton'
 import MonthGrid from './MonthGrid'
 import EventCard from './EventCard'
 import GcaBlurb from './GcaBlurb'
@@ -14,28 +15,6 @@ import SelectionSummary from './SelectionSummary'
 // `rightRailWidth`, but 320px is the *left* column in both desktop layouts —
 // hence `railWidth` in `calendarTheme.js`.
 const SHELL_GRID_TEMPLATE = `${CAL_DIMS.railWidth}px minmax(0, 1fr)`
-
-/** Circular flat icon button — Kibble `Button icon circular variant="flat" size="small"`. */
-function NavButton({ label, disabled, onClick, children }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      style={{
-        width: 32, height: 32, padding: 0,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        background: 'transparent', border: 'none', borderRadius: radius.round,
-        cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.4 : 1,
-        flexShrink: 0,
-      }}
-    >
-      {children}
-    </button>
-  )
-}
 
 /**
  * Port of `layouts/NewCalendarPageMonth.tsx` — the POC's default and by far its

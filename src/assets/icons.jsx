@@ -30,13 +30,13 @@ export const BackIcon = () => (
 export const BellIcon = (props) => <Icon name="in-bell" {...props} />
 export const LockIcon = (props) => <Icon name="in-lock" {...props} />
 export const InfoCircleIcon = (props) => <Icon name="in-info-circle" {...props} />
-export const ChevronUpIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32" fill={c.tertiary}>
+export const ChevronUpIcon = ({ color = c.tertiary, size = 24 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color}>
     <path d="M22.35 19.6L16 14.159l-6.35 5.443a1 1 0 1 1-1.3-1.519l6.674-5.72a1.5 1.5 0 0 1 1.952 0l6.675 5.72a1 1 0 0 1-1.302 1.519z"/>
   </svg>
 )
-export const ChevronDownIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32" fill={c.tertiary}>
+export const ChevronDownIcon = ({ color = c.tertiary, size = 24 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color}>
     <path d="M22.35 12.24a1 1 0 1 1 1.3 1.52l-6.674 5.72a1.5 1.5 0 0 1-1.952 0l-6.675-5.72a1 1 0 0 1 1.302-1.52L16 17.684l6.35-5.442z"/>
   </svg>
 )

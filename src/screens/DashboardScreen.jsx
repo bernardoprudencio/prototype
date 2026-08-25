@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { colors, spacing } from '../tokens'
 import TabBar from '../components/TabBar'
 import { useIsWide } from '../lib/useMediaQuery'
+import { TAB_PATHS } from '../lib/tabPaths'
 import {
   ProfileWidget, CalendarWidget, AltMonetizationWidget, WalletWidget,
   SitterResources, NewMessages, PromoteProfile,
@@ -75,7 +76,7 @@ export default function DashboardScreen() {
       {/* Below 769px this is the app's nav; at wide `TabBar` stands itself down
           and the web navbar in `App.jsx` takes over. */}
       <TabBar activeTab="home" onTabSelect={(id) => {
-        const path = { home: '/', inbox: '/inbox', rebook: '/contacts', more: '/more' }[id]
+        const path = TAB_PATHS[id]
         if (path) navigate(path)
       }} />
     </div>

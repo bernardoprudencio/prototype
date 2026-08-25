@@ -4,8 +4,8 @@ import { colors, typography, radius, shadows } from '../tokens'
 import { ChevronRightIcon, SettingsIcon, ChartIcon } from '../assets/icons'
 import { TabBar } from '../components'
 import { SITTER_MORE_MENU, SITTER_MORE_MENU_BANNER } from '../data/moreMenu'
+import { TAB_PATHS } from '../lib/tabPaths'
 
-const TAB_PATHS = { home: '/', inbox: '/inbox', rebook: '/contacts', more: '/more' }
 
 // Mirrors roverdotcom/web .../components/buttons/MenuRow:
 // height 56, pt 8, px 20, icon 24, ml 12, title default weight 16/24,

@@ -133,4 +133,9 @@ export const CAL_TYPE = {
   dayNumber: { fontFamily: averta, fontWeight: 600, fontSize: 13, lineHeight: 1.25 },
   // Booking stub / "+N more" — Kibble `Text size="50"`.
   stub: { fontFamily: averta, fontWeight: 400, fontSize: 11, lineHeight: 1.35 },
+  // The mini-month / week-strip day-of-week letter. 12px semibold, and
+  // deliberately *not* the uppercase-plus-tracking `dowHeader` above: the mini
+  // grids render single letters, so there is nothing to letter-space
+  // (V1MiniMonthCalendar.tsx:192-200, CompactWeekStrip.tsx:175-183).
+  miniDowHeader: { fontFamily: averta, fontWeight: 600, fontSize: 12, lineHeight: 1 },
 }
