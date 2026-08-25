@@ -54,6 +54,18 @@ export const ChevronLeftIcon = ({ color = c.tertiary, size = 24 }) => (
       transform="scale(-1,1) translate(-32,0)"/>
   </svg>
 )
+// `@rover/icons` plus.svg / minus.svg, verbatim paths. Added for the capacity
+// Stepper, which is the codebase's first +/- control.
+export const PlusIcon = ({ size = 24, color = c.secondary }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color} aria-hidden="true">
+    <path d="M17 15h12a1 1 0 1 1 0 2H17v12a1 1 0 1 1-2 0V17H3a1 1 0 1 1 0-2h12V3a1 1 0 1 1 2 0v12z"/>
+  </svg>
+)
+export const MinusIcon = ({ size = 24, color = c.secondary }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color} aria-hidden="true">
+    <path d="M3 15h26a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2z"/>
+  </svg>
+)
 export const EditIcon = ({ size = 24, color = c.primary }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color} aria-hidden="true">
     <path d="M4.834 24.834l2.331 2.332 2.259-1.004 19.369-19.37a2.536 2.536 0 0 0-3.586-3.585L23.414 5l2.293 2.293-1.414 1.414L22 6.414 5.838 22.576l-1.004 2.258zM23.793 1.793a4.536 4.536 0 1 1 6.414 6.414L10.773 27.641c-.13.13-.284.236-.452.31l-7.727 3.435a1.5 1.5 0 0 1-1.98-1.98l3.434-7.727a1.5 1.5 0 0 1 .31-.452L23.793 1.793z"/>

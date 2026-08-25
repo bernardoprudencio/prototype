@@ -46,6 +46,11 @@ export const CAL_COLORS = {
   // Used by the service editor's "Overbooked" chip (not a tile state).
   overbooked: palette.red[500],
   overbookedBg: palette.red[100],
+
+  // The editor's per-service occupancy dot (ServiceRow.tsx:83-85). Amber while
+  // bookings still fit the capacity, red once occupancy meets or exceeds it.
+  occupancyDot: palette.yellow[200],
+  occupancyDotFull: palette.red[200],
 }
 
 // RxN's striped background paints 15 equal-width bars at -45deg alternating

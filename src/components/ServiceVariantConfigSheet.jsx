@@ -231,6 +231,7 @@ export default function ServiceVariantConfigSheet({
     showGroomingProfileReviewBanner,    setShowGroomingProfileReviewBanner,
     groomingBannerVariant,              setGroomingBannerVariant,
     showLockedRates,                    setShowLockedRates,
+    calendarSaveFails,                  setCalendarSaveFails,
   } = useApp()
 
   useEffect(
@@ -437,6 +438,17 @@ export default function ServiceVariantConfigSheet({
         <OptionToggle
           value={boolToId(showHubFetchError)}
           onChange={(id) => setShowHubFetchError(idToBool(id))}
+          options={BOOL_OPTIONS}
+        />
+      </ConfigRow>
+
+      <ConfigRow
+        label="Calendar save failure"
+        note="Makes every availability save on /calendar fail, so the optimistic patch rolls back and the assertive announcement fires. Off by default — the prototype's save is synchronous and cannot fail on its own."
+      >
+        <OptionToggle
+          value={boolToId(calendarSaveFails)}
+          onChange={(id) => setCalendarSaveFails(idToBool(id))}
           options={BOOL_OPTIONS}
         />
       </ConfigRow>

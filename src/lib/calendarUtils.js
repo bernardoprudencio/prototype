@@ -401,3 +401,122 @@ export function getSelectionSubtitle({
   if (rangeStatus === RANGE_STATUS.UNAVAILABLE && !hideUnavailable) return SELECTION.notAvailable
   return bookedLabel
 }
+
+// ── Availability patches ────────────────────────────────────────────────────
+// The POC's optimistic-update machinery, minus React Query. Its
+// `useNewCalendarData` keeps a ref-held `Map<'YYYY-MM', CalendarUpdate[]>` of
+// patches and re-applies them over every fetched month on each merge pass
+// (`useNewCalendarData.ts:130-137, 309-333`). Here the "fetch" is
+// `buildCalendarData`, which is synchronous and re-derived per visible month,
+// so the same overlay applies at exactly the same point in the pipeline.
+//
+// One divergence, and it is a reduction: the POC stores a *list* of updates per
+// month and replays it in order, so a date edited twice holds two entries. We
+// collapse to `{ [date]: { [calendarId]: spacesAvailable } }`, which is the same
+// final state — last write wins either way — without the list growing for the
+// life of the session.
+
+/** `monthPrefix` (NewCalendarContainer.tsx:90-92). */
+export function monthKeyOf(iso) {
+  return iso.slice(0, 7)
+}
+
+/**
+ * Fold a `CalendarUpdate[]` into the month-keyed patch store.
+ * `store` is `{ [monthKey]: { [date]: { [calendarId]: spacesAvailable } } }`.
+ */
+export function mergeAvailabilityPatches(store, updates) {
+  const next = { ...store }
+  updates.forEach((u) => {
+    const mk = monthKeyOf(u.date)
+    const month = { ...(next[mk] ?? {}) }
+    const day = { ...(month[u.date] ?? {}) }
+    u.calendars.forEach((c) => { day[c.calendarId] = c.spacesAvailable })
+    month[u.date] = day
+    next[mk] = month
+  })
+  return next
+}
+
+/**
+ * `applyPatchesToAvailability` (useNewCalendarData.ts:93-124). Overwrites
+ * `spacesAvailable` on the slots the patch names and leaves the rest alone.
+ * A patched date the base array doesn't carry is appended rather than dropped,
+ * so a range edit that reaches past the built month still shows.
+ */
+export function applyAvailabilityPatches(availability, patchesByDate) {
+  if (!patchesByDate || Object.keys(patchesByDate).length === 0) return availability
+  const byDate = new Map(availability.map((day) => [day.date, day]))
+  Object.entries(patchesByDate).forEach(([date, cals]) => {
+    const existing = byDate.get(date)
+    if (!existing) {
+      byDate.set(date, {
+        date,
+        calendars: Object.entries(cals).map(([calendarId, spacesAvailable]) => ({
+          calendarId: Number(calendarId),
+          spacesAvailable,
+          spacesOccupied: 0,
+          manualAvailability: false,
+          manualSpacesAvailable: null,
+        })),
+      })
+      return
+    }
+    byDate.set(date, {
+      ...existing,
+      calendars: existing.calendars.map((slot) => (
+        cals[slot.calendarId] === undefined
+          ? slot
+          : { ...slot, spacesAvailable: cals[slot.calendarId] }
+      )),
+    })
+  })
+  return Array.from(byDate.values())
+}
+
+/**
+ * `undoFor` (NewCalendarContainer.tsx:224-239) — the inverse patch, built from
+ * the pre-mutation snapshot. A slot the snapshot didn't carry falls back to the
+ * optimistic value, which makes the undo a no-op there rather than clobbering
+ * it with 0.
+ */
+export function buildUndoUpdates(updates, snapshot) {
+  return updates.map((u) => {
+    const priorDay = snapshot.find((d) => d.date === u.date)
+    return {
+      date: u.date,
+      calendars: u.calendars.map((c) => {
+        const priorSlot = priorDay?.calendars.find((s) => s.calendarId === c.calendarId)
+        return {
+          calendarId: c.calendarId,
+          spacesAvailable: priorSlot?.spacesAvailable ?? c.spacesAvailable,
+        }
+      }),
+    }
+  })
+}
+
+/**
+ * `runOptimisticMutation` (useOptimisticMutation.ts:37-71) — apply, save, and
+ * either announce success or roll back and announce failure. Returns whether
+ * the save succeeded; the caller closes the editor only on `true`.
+ */
+export async function runOptimisticMutation({
+  optimisticPatch, undoPatch, save, successMessage, errorMessage, announce, onSuccess,
+}) {
+  optimisticPatch()
+  let success = false
+  try {
+    success = await save()
+  } catch {
+    success = false
+  }
+  if (success) {
+    announce(successMessage, 'polite')
+    onSuccess?.()
+    return true
+  }
+  undoPatch()
+  announce(errorMessage, 'assertive')
+  return false
+}

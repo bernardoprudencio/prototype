@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react'
 import { DEFAULT_FAMILY_IN_GEO, DEFAULT_SERVICE_STATES } from '../data/sitterServices'
+import { mergeAvailabilityPatches } from '../lib/calendarUtils'
 
 const AppContext = createContext(null)
 
@@ -48,6 +49,7 @@ const SHOW_GROOMING_PROFILE_REVIEW_KEY          = 'showGroomingProfileReviewBann
 //   'not_findable' — "Pet parents can't find your grooming services yet."
 const GROOMING_BANNER_VARIANT_KEY               = 'groomingBannerVariant'
 const SHOW_LOCKED_RATES_KEY                     = 'showLockedRates'
+const CALENDAR_SAVE_FAILS_KEY                   = 'calendarSaveFails'
 
 const readInitialEnum = (key, fallback) => {
   if (typeof window === 'undefined') return fallback
@@ -84,6 +86,7 @@ const readInitialShowTrainingCredentialsUpload   = () => readInitialBool(SHOW_TR
 const readInitialShowGroomingProfileReview       = () => readInitialBool(SHOW_GROOMING_PROFILE_REVIEW_KEY,      false)
 const readInitialGroomingBannerVariant           = () => readInitialEnum(GROOMING_BANNER_VARIANT_KEY, 'review')
 const readInitialShowLockedRates                 = () => readInitialBool(SHOW_LOCKED_RATES_KEY,                 true)
+const readInitialCalendarSaveFails               = () => readInitialBool(CALENDAR_SAVE_FAILS_KEY,               false)
 
 export function AppProvider({ children }) {
   // ── Shared ────────────────────────────────────────────────────────────────
@@ -172,6 +175,12 @@ export function AppProvider({ children }) {
   const [showGroomingProfileReviewBanner,     setShowGroomingProfileReviewBannerRaw]     = useState(readInitialShowGroomingProfileReview)
   const [groomingBannerVariant,               setGroomingBannerVariantRaw]               = useState(readInitialGroomingBannerVariant)
   const [showLockedRates,                     setShowLockedRatesRaw]                     = useState(readInitialShowLockedRates)
+  // Calendar availability saves are synchronous here, so they can only fail on
+  // purpose. This flag is the switch that makes the POC's rollback path
+  // reachable — `runOptimisticMutation` restores the pre-edit snapshot and
+  // announces the failure assertively. Off by default so user testing never
+  // hits an invented error.
+  const [calendarSaveFails,                   setCalendarSaveFailsRaw]                   = useState(readInitialCalendarSaveFails)
 
   // Locked-rates state per (owner x service). Production keys LockedServiceAddOn
   // rows on (service, requester, add_on_type), but the API write is full-set
@@ -180,6 +189,20 @@ export function AppProvider({ children }) {
   // Undefined means "not yet touched this session": read the seed from
   // client.lockedServices instead (see isRatesLocked below).
   const [lockedRatesByOwner, setLockedRatesByOwner] = useState({})  // { [`${ownerId}:${serviceKey}`]: bool }
+
+  // Calendar availability edits, overlaying the derived fixtures in
+  // `calendarData.js`. Month-keyed like the POC's optimistic patch map
+  // (`useNewCalendarData.ts:133-137`); session-only, following `ownerUnits`
+  // rather than the persisted dev flags, because these are the sitter's own
+  // edits and not a variant to demo.
+  const [calendarAvailability, setCalendarAvailability] = useState({})  // { 'YYYY-MM': { [iso]: { [calendarId]: spacesAvailable } } }
+
+  // `patchAvailability` (useNewCalendarData.ts:337-352) — fold a CalendarUpdate[]
+  // into the store. Used for both the optimistic apply and its inverse.
+  const patchCalendarAvailability = (updates) => {
+    if (!updates || updates.length === 0) return
+    setCalendarAvailability(prev => mergeAvailabilityPatches(prev, updates))
+  }
 
   const persistEnum = (key, next, raw) => {
     raw(next)
@@ -213,6 +236,7 @@ export function AppProvider({ children }) {
   const setShowGroomingProfileReviewBanner    = (next) => persistJson(SHOW_GROOMING_PROFILE_REVIEW_KEY,         next, setShowGroomingProfileReviewBannerRaw)
   const setGroomingBannerVariant              = (next) => persistEnum(GROOMING_BANNER_VARIANT_KEY,              next, setGroomingBannerVariantRaw)
   const setShowLockedRates                    = (next) => persistJson(SHOW_LOCKED_RATES_KEY,                    next, setShowLockedRatesRaw)
+  const setCalendarSaveFails                  = (next) => persistJson(CALENDAR_SAVE_FAILS_KEY,                  next, setCalendarSaveFailsRaw)
 
   // Keyed on (client x service), as production keys LockedServiceAddOn rows.
   // Falls back to the client's declared seed list until the sitter toggles it.
@@ -266,6 +290,9 @@ export function AppProvider({ children }) {
       groomingBannerVariant,              setGroomingBannerVariant,
       showLockedRates,                    setShowLockedRates,
       isRatesLocked,                      setRatesLocked,
+      // calendar
+      calendarAvailability, patchCalendarAvailability,
+      calendarSaveFails,   setCalendarSaveFails,
     }}>
       {children}
     </AppContext.Provider>

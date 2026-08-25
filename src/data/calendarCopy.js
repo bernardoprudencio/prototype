@@ -201,6 +201,10 @@ export const ANNOUNCE = {
   saved: 'Availability saved.',                         // NewCalendarContainer.tsx:447
   daysUpdated: (n) => (n === 1 ? '1 day updated' : `${n} days updated`), // :448
   saveFailed: 'Could not save availability. Your changes were reverted.', // :450
+  // NewCalendarContainer.tsx:451-456 — the range form of the same failure.
+  saveFailedDays: (n) => (n === 1
+    ? 'Could not update availability. 1 day reverted.'
+    : `Could not update availability. ${n} days reverted.`),
   weekOf: (label) => `Week of ${label}`,                // CompactWeekStrip.tsx:108
 }
 
