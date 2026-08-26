@@ -4,7 +4,8 @@ import { colors, typography, radius, shadows } from '../tokens'
 import { DropdownSmallIcon } from '../assets/icons'
 import { Chip, Button, TabBar } from '../components'
 import { useIsWide } from '../lib/useMediaQuery'
-import { CLIENTS, SITTERS, SORT_OPTIONS, sortClients } from '../data/contacts'
+import { useApp } from '../context/AppContext'
+import { CLIENTS, SITTERS, sortClients, sortOptionsFor, withAltMonetization } from '../data/contacts'
 import RebookUserCard from './RebookUserCard'
 import { TAB_PATHS } from '../lib/tabPaths'
 
@@ -22,7 +23,7 @@ const RadioMark = ({ selected }) => (
   </div>
 )
 
-function SortSheet({ visible, value, onPick, onClose }) {
+function SortSheet({ visible, value, options, onPick, onClose }) {
   const [draft, setDraft] = useState(value)
 
   if (!visible) return null
@@ -56,7 +57,7 @@ function SortSheet({ visible, value, onPick, onClose }) {
         </h2>
 
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {SORT_OPTIONS.map(opt => {
+          {options.map(opt => {
             const selected = draft === opt.value
             return (
               <div
@@ -96,12 +97,29 @@ export default function RebookScreen() {
 
   const isWide = useIsWide()
 
+  const { altMonetizationRollout } = useApp()
+
   const [section, setSection] = useState('clients')
-  const [sortOrder, setSortOrder] = useState('alphabetical')
+  const [storedSortOrder, setSortOrder] = useState('alphabetical')
   const [sortSheetOpen, setSortSheetOpen] = useState(false)
 
-  const sortedClients = useMemo(() => sortClients(CLIENTS, sortOrder), [sortOrder])
-  const currentSortLabel = SORT_OPTIONS.find(o => o.value === sortOrder)?.label
+  // The GBV/tier sort only exists while the alt-monetization rollout is on
+  // (production gates the whole graduated-take-rate surface on
+  // `is_rollout_alt_monetisation`, views.py:1011-1013). `storedSortOrder` can
+  // still be holding `gbv_progress` from before the flag was turned off, so
+  // fall back rather than showing the sheet a selected option it does not list.
+  const sortOptions = sortOptionsFor(altMonetizationRollout)
+  const sortOrder = sortOptions.some(o => o.value === storedSortOrder)
+    ? storedSortOrder
+    : 'alphabetical'
+
+  // Off-rollout the cards must not show tier names or GBV progress either, so
+  // every client is projected through the same gate.
+  const sortedClients = useMemo(
+    () => sortClients(CLIENTS, sortOrder).map(c => withAltMonetization(c, altMonetizationRollout)),
+    [sortOrder, altMonetizationRollout],
+  )
+  const currentSortLabel = sortOptions.find(o => o.value === sortOrder)?.label
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
@@ -189,6 +207,7 @@ export default function RebookScreen() {
       <SortSheet
         visible={sortSheetOpen}
         value={sortOrder}
+        options={sortOptions}
         onPick={setSortOrder}
         onClose={() => setSortSheetOpen(false)}
       />

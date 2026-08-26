@@ -7,9 +7,9 @@ import {
   LockRatesToggleRow,
 } from '../components'
 import { getClient } from '../data/contacts'
-import { getRelationshipData } from '../data/relationshipData'
 import { lockableRatesFor, lockedRatesFor } from '../data/lockableRates'
 import { useLockedRates } from '../lib/useLockedRates'
+import { useRelationshipData } from '../lib/useRelationshipData'
 import { toggleLabel } from '../data/lockedRatesCopy'
 import * as copy from '../data/modifyBookingCopy'
 
@@ -195,7 +195,7 @@ export default function ModifyBookingScreen() {
   const navigate = useNavigate()
 
   const client = getClient(ownerId)
-  const rel = getRelationshipData(ownerId)
+  const rel = useRelationshipData(ownerId)
 
   // The booking this page modifies. When the route carries an opk that is the
   // whole answer — production's modify page is per-conversation, so the CTA that
