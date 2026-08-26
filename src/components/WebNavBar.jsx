@@ -124,9 +124,13 @@ export default function WebNavBar() {
   }
 
   return (
+    // `position: relative` + a zIndex above the content pane's is what keeps the
+    // avatar dropdown over the overlay routes — the pane below is its own
+    // stacking context, so its z-10/z-20 overlays can never outrank this bar.
     <div style={{
       flexShrink: 0, background: colors.white,
       borderBottom: `1px solid ${colors.border}`,
+      position: 'relative', zIndex: 1,
     }}>
       <div style={{
         maxWidth: CONTENT_WIDTH, margin: '0 auto', padding: '0 16px',
