@@ -1,4 +1,6 @@
-import { colors } from '../tokens'
+import { useEffect } from 'react'
+import { colors, radius, shadows, spacing } from '../tokens'
+import { useIsWide } from '../lib/useMediaQuery'
 
 const DRAG_HANDLE = (
   <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 8, paddingBottom: 16 }}>
@@ -26,13 +28,71 @@ const DRAG_HANDLE = (
  *                                   scrolling body drops to a 4px bottom pad
  *                                   (`paddingBottom: space['1x']`, L91).)
  *   children   ReactNode           (main content / scrollable body)
+ *   wideModal  bool                (opt-in, default false) — at >=769px
+ *                                   (`useIsWide`) present as a centred modal
+ *                                   instead of a bottom sheet: scrim behind,
+ *                                   480px cap, token radius on all four
+ *                                   corners, no drag handle, Escape closes.
+ *                                   Off by default, so every existing caller
+ *                                   renders exactly as before at every width.
  */
-export default function BottomSheet({ variant = 'simple', onDismiss, zIndex = 300, header, footer, children }) {
+export default function BottomSheet({ variant = 'simple', onDismiss, zIndex = 300, header, footer, wideModal = false, children }) {
+  const isWide = useIsWide()
+  const asModal = wideModal && isWide
+
+  // Escape is the modal's keyboard equivalent of a scrim click, so it lands on
+  // the same handler — which, for the rates flow, is the discard guard.
+  useEffect(() => {
+    if (!asModal) return undefined
+    const onKeyDown = (e) => { if (e.key === 'Escape') onDismiss?.() }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [asModal, onDismiss])
+
   const overlay = {
     position: 'fixed', inset: 0,
     background: colors.overlayBg,
     zIndex,
     display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+  }
+
+  if (asModal) {
+    return (
+      <div
+        style={{ ...overlay, alignItems: 'center', padding: spacing.xl }}
+        onClick={onDismiss}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: colors.white,
+            borderRadius: radius.primary,
+            width: '100%', maxWidth: 480, maxHeight: '90vh',
+            display: 'flex', flexDirection: 'column',
+            boxShadow: shadows.high,
+          }}
+        >
+          {header && (
+            <div style={{ flexShrink: 0, padding: `${spacing.xl}px ${spacing.xl}px 0` }}>
+              {header}
+            </div>
+          )}
+          <div style={{
+            overflowY: 'auto',
+            padding: footer ? `${spacing.xl}px ${spacing.xl}px ${spacing.xs}px` : spacing.xl,
+          }}>
+            {children}
+          </div>
+          {footer && (
+            <div style={{ flexShrink: 0, padding: spacing.xl, paddingTop: 0 }}>
+              {footer}
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   if (variant === 'full') {

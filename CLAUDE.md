@@ -13,6 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `main` | Baseline prototype | https://bernardoprudencio.github.io/prototype/ |
 | `new-modification` | Active iteration — schedule modification flow + EditTemplateScreen | https://bernardoprudencio.github.io/prototype/new-modification/ |
 | `ongoing-relationships` | Separate UX exploration — ongoing sitter–owner relationships | https://bernardoprudencio.github.io/prototype/ongoing-relationships/ |
+| `user-testing-locked-rates-management` | Locked-rates client management — the granular POC proposal, for user testing | https://bernardoprudencio.github.io/prototype/user-testing-locked-rates-management/ |
 
 Deployments trigger automatically on push via GitHub Actions (`.github/workflows/deploy.yml`). Each branch builds to its own subdirectory on the `gh-pages` branch.
 
@@ -65,7 +66,9 @@ stack over the active tab without unmounting it.
 | `ownerUnits` | `{ [ownerId]: unit[] }` | Schedule edits committed during session |
 | `ownerTemplates` / `ownerWeeks` / `ownerCurrentWeeks` | `{ [ownerId]: ... }` | Per-owner schedule edits by surface |
 | `scheduleChanges` / `templateChanges` / `currentWeekChanges` | `{ [ownerId]: ... }` | Change logs feeding the conversation event stream |
-| `lockedRatesByOwner` | map keyed `clientId:serviceKey` → bool | Locked-rates overrides. Starts `{}`; read through `isRatesLocked(client, serviceKey)`, which falls back to `client.lockedServices.includes(serviceKey)` (`AppContext.jsx:220-224`) |
+| `lockedRatesByOwner` | map keyed `clientId:serviceKey` → bool | Locked-rates overrides. Starts `{}`; read through `isRatesLocked(client, serviceKey)`, which falls back to `client.lockedServices.includes(serviceKey)` |
+| `lockedAmountsByOwner` | map keyed `clientId:serviceKey` → `{ locked, amounts, lockedAt }` | The granular proposal's state. Starts `{}`; read through `getRatesState(client, serviceKey)`, which layers it over `lockedSeedFor` in `lockableRates.js`; written by `commitRatesState` |
+| `ratesMode` | `'granular'` \| `'current'` | Which locked-rates experience renders. Defaults to `'granular'` (the proposal under test); flip in Testing mode |
 | dev variant flags | bool / enum | `scheduleMode`, `serviceStates`, `showShortNoticeRateBanner`, `showLockedRates`, … — persisted to `localStorage` via `persistJson`, edited in `ServiceVariantConfigSheet` |
 
 **Overlay zIndex ladder** (`App.jsx`): 10 — `/conversation/:ownerId/*`,

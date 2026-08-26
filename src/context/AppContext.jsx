@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from 'react'
 import { DEFAULT_FAMILY_IN_GEO, DEFAULT_SERVICE_STATES } from '../data/sitterServices'
 import { mergeAvailabilityPatches } from '../lib/calendarUtils'
+import { lockedSeedFor } from '../data/lockableRates'
 
 const AppContext = createContext(null)
 
@@ -50,6 +51,12 @@ const SHOW_GROOMING_PROFILE_REVIEW_KEY          = 'showGroomingProfileReviewBann
 const GROOMING_BANNER_VARIANT_KEY               = 'groomingBannerVariant'
 const SHOW_LOCKED_RATES_KEY                     = 'showLockedRates'
 const CALENDAR_SAVE_FAILS_KEY                   = 'calendarSaveFails'
+// Which locked-rates experience renders:
+//   'granular' — the POC proposal (per-rate amounts, one modal, review step)
+//   'current'  — today's binary lock switch + confirmation sheet
+// This branch exists to user-test the proposal, so 'granular' is the default and
+// 'current' is the comparison flip.
+const RATES_MODE_KEY                            = 'ratesMode'
 
 const readInitialEnum = (key, fallback) => {
   if (typeof window === 'undefined') return fallback
@@ -87,6 +94,7 @@ const readInitialShowGroomingProfileReview       = () => readInitialBool(SHOW_GR
 const readInitialGroomingBannerVariant           = () => readInitialEnum(GROOMING_BANNER_VARIANT_KEY, 'review')
 const readInitialShowLockedRates                 = () => readInitialBool(SHOW_LOCKED_RATES_KEY,                 true)
 const readInitialCalendarSaveFails               = () => readInitialBool(CALENDAR_SAVE_FAILS_KEY,               false)
+const readInitialRatesMode                       = () => readInitialEnum(RATES_MODE_KEY, 'granular')
 
 export function AppProvider({ children }) {
   // ── Shared ────────────────────────────────────────────────────────────────
@@ -190,6 +198,13 @@ export function AppProvider({ children }) {
   // client.lockedServices instead (see isRatesLocked below).
   const [lockedRatesByOwner, setLockedRatesByOwner] = useState({})  // { [`${ownerId}:${serviceKey}`]: bool }
 
+  const [ratesMode, setRatesModeRaw] = useState(readInitialRatesMode)
+
+  // The granular proposal's state: the same (owner x service) key, but carrying
+  // the per-rate amounts the sitter set and when the lock was taken. Undefined
+  // means untouched this session — read `lockedSeedFor` instead.
+  const [lockedAmountsByOwner, setLockedAmountsByOwner] = useState({})  // { [key]: { locked, amounts, lockedAt } }
+
   // Calendar availability edits, overlaying the derived fixtures in
   // `calendarData.js`. Month-keyed like the POC's optimistic patch map
   // (`useNewCalendarData.ts:133-137`); session-only, following `ownerUnits`
@@ -252,6 +267,7 @@ export function AppProvider({ children }) {
   const setGroomingBannerVariant              = (next) => persistEnum(GROOMING_BANNER_VARIANT_KEY,              next, setGroomingBannerVariantRaw)
   const setShowLockedRates                    = (next) => persistJson(SHOW_LOCKED_RATES_KEY,                    next, setShowLockedRatesRaw)
   const setCalendarSaveFails                  = (next) => persistJson(CALENDAR_SAVE_FAILS_KEY,                  next, setCalendarSaveFailsRaw)
+  const setRatesMode                          = (next) => persistEnum(RATES_MODE_KEY,                          next, setRatesModeRaw)
 
   // Keyed on (client x service), as production keys LockedServiceAddOn rows.
   // Falls back to the client's declared seed list until the sitter toggles it.
@@ -264,6 +280,31 @@ export function AppProvider({ children }) {
   const setRatesLocked = (client, serviceKey, locked) => {
     if (!client || !serviceKey) return
     const key = `${client.id}:${serviceKey}`
+    setLockedRatesByOwner(prev => ({ ...prev, [key]: locked }))
+  }
+
+  // ── Granular locked rates ─────────────────────────────────────────────────
+  // Session edits layered over the derived seed, so a client the sitter has not
+  // touched still reads its authored state and one that has been saved reads
+  // back exactly what was written.
+  const getRatesState = (client, serviceKey) => {
+    const seed = lockedSeedFor(client, serviceKey)
+    if (!seed) return null
+    const override = lockedAmountsByOwner[`${client.id}:${serviceKey}`]
+    if (!override) return seed
+    return { ...seed, ...override, amounts: { ...seed.amounts, ...override.amounts } }
+  }
+
+  // One save writes the whole set, as production's full-set replacement does.
+  // `lockedAt` moves to now on every lock or amount change and clears on unlock.
+  const commitRatesState = (client, serviceKey, { locked, amounts }) => {
+    if (!client || !serviceKey) return
+    const key = `${client.id}:${serviceKey}`
+    setLockedAmountsByOwner(prev => ({
+      ...prev,
+      [key]: { locked, amounts: { ...amounts }, lockedAt: locked ? new Date() : null },
+    }))
+    // Keep the binary flag in step so flipping to `current` mode is coherent.
     setLockedRatesByOwner(prev => ({ ...prev, [key]: locked }))
   }
 
@@ -305,6 +346,8 @@ export function AppProvider({ children }) {
       groomingBannerVariant,              setGroomingBannerVariant,
       showLockedRates,                    setShowLockedRates,
       isRatesLocked,                      setRatesLocked,
+      ratesMode,                          setRatesMode,
+      getRatesState,                      commitRatesState,
       // calendar
       calendarAvailability, patchCalendarAvailability,
       calendarServiceSettings, commitCalendarServiceSettings,

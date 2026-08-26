@@ -102,10 +102,10 @@ export const CLIENTS = [
       ],
       pricing: {
         pets: [
-          { petName: 'Koni',   rateType: 'Standard rate',       ratePerWalk: 20 },
-          { petName: 'Burley', rateType: 'Additional dog rate', ratePerWalk: 10 },
+          { petName: 'Koni',   rateType: 'Standard rate',       ratePerWalk: 20, slug: 'standard-rate' },
+          { petName: 'Burley', rateType: 'Additional dog rate', ratePerWalk: 10, slug: 'additional-dog' },
         ],
-        addOns: [{ label: '60-min add-on', ratePerWalk: 10 }],
+        addOns: [{ label: '60-min add-on', ratePerWalk: 10, slug: 'long-walk' }],
       },
     },
   }),
@@ -126,7 +126,7 @@ export const CLIENTS = [
         { day: 'Thursday', time: '2:00 PM' },
       ],
       pricing: {
-        pets: [{ petName: 'Archie', rateType: 'Standard rate', ratePerWalk: 20 }],
+        pets: [{ petName: 'Archie', rateType: 'Standard rate', ratePerWalk: 20, slug: 'standard-rate' }],
         addOns: [],
       },
     },
@@ -152,7 +152,7 @@ export const CLIENTS = [
         { day: 'Friday',    time: '4:00 PM' },
       ],
       pricing: {
-        pets: [{ petName: 'Milo', rateType: 'Standard rate', ratePerWalk: 20 }],
+        pets: [{ petName: 'Milo', rateType: 'Standard rate', ratePerWalk: 20, slug: 'standard-rate' }],
         addOns: [],
       },
     },

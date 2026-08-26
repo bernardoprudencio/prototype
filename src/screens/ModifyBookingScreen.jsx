@@ -8,6 +8,7 @@ import {
 } from '../components'
 import { getClient } from '../data/contacts'
 import { getRelationshipData } from '../data/relationshipData'
+import { useApp } from '../context/AppContext'
 import { lockableRatesFor, lockedRatesFor } from '../data/lockableRates'
 import { useLockedRates } from '../lib/useLockedRates'
 import { toggleLabel } from '../data/lockedRatesCopy'
@@ -280,6 +281,16 @@ export default function ModifyBookingScreen() {
   // this surface. Every other caller keeps the sheet, which is its default.
   const lr = useLockedRates(client, booking, { mode: 'immediate', snackbar: false })
 
+  // ── The `ratesMode` fork ───────────────────────────────────────────────────
+  // In the POC proposal the lock/unlock interaction is gone from the modify step
+  // ENTIRELY (01-locked-rates-client-management.md §3.3): the gesture cannot be
+  // triggered consistently across web, Android and iOS, so it does not belong on
+  // a screen all three share. The decision removed the *interaction*, not the
+  // state — production keeps `isRatesLocked` and its setters in the duck — which
+  // is why the hook above still runs and only its control is withheld below.
+  // The pet rate rows are untouched in both modes.
+  const { ratesMode } = useApp()
+
   // ── Static mock ledger ─────────────────────────────────────────────────────
   // One scenario: the modification extends the stay by a night, so the price
   // goes UP. That makes the `priceDiff > 0` branch of `getLedgerSummary`
@@ -457,8 +468,11 @@ export default function ModifyBookingScreen() {
                   (LockedRatesComponent.tsx:30), not the ledger's. Production
                   pairs it with a hover Popover, suppressed under
                   `isMobileEmbedded()` (:31); at 375 LockRatesToggleRow's
-                  BottomSheet stand-in is the mobile equivalent. */}
-              {lr.available && (
+                  BottomSheet stand-in is the mobile equivalent.
+
+                  `current` mode only — §3.3 deletes this block outright in the
+                  granular proposal, so nothing at all renders here then. */}
+              {ratesMode === 'current' && lr.available && (
                 <LockRatesToggleRow
                   label={toggleLabel(lr.ownerFirstName)}
                   ownerFirstName={lr.ownerFirstName}

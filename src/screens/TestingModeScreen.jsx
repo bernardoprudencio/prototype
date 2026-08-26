@@ -72,7 +72,7 @@ const VariantRow = ({ title, description, value, onChange, options }) => (
 
 export default function TestingModeScreen() {
   const navigate = useNavigate()
-  const { scheduleMode, setScheduleMode } = useApp()
+  const { scheduleMode, setScheduleMode, ratesMode, setRatesMode } = useApp()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
@@ -109,6 +109,17 @@ export default function TestingModeScreen() {
           options={[
             { id: 'modification', label: 'Modification' },
             { id: 'agenda',       label: 'Agenda' },
+          ]}
+        />
+
+        <VariantRow
+          title="Locked rates"
+          description="Proposal is the granular per-rate model under test; Current is today's single lock switch."
+          value={ratesMode}
+          onChange={setRatesMode}
+          options={[
+            { id: 'granular', label: 'Proposal' },
+            { id: 'current',  label: 'Current' },
           ]}
         />
       </div>

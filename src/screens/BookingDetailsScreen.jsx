@@ -5,10 +5,15 @@ import {
   BackIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon,
   InfoCircleIcon, CheckCircleIcon, CautionIcon,
 } from '../assets/icons'
-import { Button, BottomSheet, PetAvatar, LockRatesToggleRow, LockRatesSheet, Snackbar } from '../components'
+import {
+  Button, BottomSheet, PetAvatar, LockRatesToggleRow, LockRatesSheet, Snackbar,
+  RatesRow, ManageRatesSheet,
+} from '../components'
 import { getClient } from '../data/contacts'
 import { getRelationshipData } from '../data/relationshipData'
+import { useApp } from '../context/AppContext'
 import { useLockedRates } from '../lib/useLockedRates'
+import { useGranularRates } from '../lib/useGranularRates'
 import { toggleLabelLedger } from '../data/lockedRatesCopy'
 import * as copy from '../data/bookingDetailsCopy'
 
@@ -216,7 +221,20 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
   })()
 
   // Visibility is per conversation, so the resolved booking is what gates it.
+  //
+  // ── The `ratesMode` fork ──────────────────────────────────────────────────
+  // Both hooks run unconditionally (hooks cannot be called behind a branch) and
+  // each returns `available: false` outside its own mode, so exactly one of the
+  // two locked-rates surfaces below can ever render:
+  //   'current'  → the shipped binary switch + LockRatesSheet (`lr`)
+  //   'granular' → the POC proposal's three-offer RatesRow + ManageRatesSheet
+  //                (`gr`, 01-locked-rates-client-management.md §3.1)
+  // `useGranularRates` already tests `ratesMode === 'granular'` internally;
+  // `useLockedRates` predates the flag, so the current-mode gate is written out
+  // at its render sites.
+  const { ratesMode } = useApp()
   const lr = useLockedRates(client, booking)
+  const gr = useGranularRates(client, booking)
   const [earningsOpen, setEarningsOpen] = useState(false)
 
   // `_is_collapsed`: a paid, unmodified, not-fully-refunded booking opens
@@ -285,6 +303,11 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
   // (PriceLedgerAccordion.tsx renders `text` on `text && !expanded`).
   // price_ledger.py:346-353 forks the same line on recurring-ness: one week's
   // payment ("…for this week.") instead of the whole stay's.
+  // The two mutually exclusive locked-rates surfaces. `gr.available` already
+  // carries the granular-mode test (useGranularRates), so only the current one
+  // needs the flag spelled out.
+  const showCurrentLock = ratesMode === 'current' && lr.available
+
   const summaryLine = booking.isPaid
     ? (booking.isRecurring
         ? copy.paidForWeek(firstName, fmtMoney(booking.price), booking.paidOn)
@@ -429,7 +452,7 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
         {/* ─── 4. Price ledger + the locked-rates switch ───
             ConversationPriceLedger.tsx wraps both in one `pb="4x" gap="4x"`
             column, so the switch sits 16px below the ledger as a sibling. */}
-        {(booking.ledger || lr.available) && (
+        {(booking.ledger || showCurrentLock || gr.available) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg, paddingBottom: spacing.lg }}>
             {/* PriceLedgerAccordion: pt="4x" pb="0x", header row space-between
                 with a 4px gap and no horizontal padding. Only the demo booking
@@ -493,13 +516,32 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
               )}
             </div>}
 
-            {/* ─── Locked rates — a switch BELOW the ledger, not a ledger row ─── */}
-            {lr.available && (
+            {/* ─── Locked rates — a sibling BELOW the ledger, not a ledger row ───
+                Both modes render in this same slot, inside the shared 16px-gap
+                column, so the surface's position is unchanged by the flag —
+                only what occupies it. */}
+
+            {/* `current` — the shipped binary switch, untouched. */}
+            {showCurrentLock && (
               <LockRatesToggleRow
                 label={toggleLabelLedger(lr.ownerFirstName)}
                 ownerFirstName={lr.ownerFirstName}
                 checked={lr.locked}
                 onRequestChange={lr.requestChange}
+              />
+            )}
+
+            {/* `granular` — the POC's three-offer row (§3.1). It carries no
+                service name (every title interpolates the client and nothing
+                else) and it does NOT navigate: `onManage` opens the management
+                modal in place, because "lock rates based on this request" only
+                means anything where the request's rates are in scope. */}
+            {gr.available && (
+              <RatesRow
+                offer={gr.offer}
+                clientName={gr.clientName}
+                lockedAt={gr.state?.lockedAt ?? null}
+                onPress={gr.openFromRow}
               />
             )}
           </div>
@@ -601,7 +643,7 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
         </BottomSheet>
       )}
 
-      {lr.sheetMode && (
+      {ratesMode === 'current' && lr.sheetMode && (
         <LockRatesSheet
           mode={lr.sheetMode}
           ownerFirstName={lr.ownerFirstName}
@@ -612,7 +654,34 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
         />
       )}
 
-      <Snackbar message={lr.snackbar} onDone={lr.dismissSnackbar} />
+      {/* The granular modal, opened in place by the row above. `gr.sheet` names
+          the service; the SAVED state for it comes back through `stateFor`, so
+          the modal always seeds from what is committed rather than from this
+          conversation's own booking — the request only supplies `opensLocked`
+          and the prefill amounts. */}
+      {gr.sheet && (() => {
+        const saved = gr.stateFor(gr.sheet.serviceKey)
+        if (!saved) return null
+        return (
+          <ManageRatesSheet
+            serviceName={saved.serviceName}
+            clientName={gr.clientName}
+            rates={saved.rates}
+            savedLocked={saved.locked}
+            savedAmounts={saved.amounts}
+            lockedAt={saved.lockedAt}
+            opensLocked={gr.sheet.opensLocked}
+            requestAmounts={gr.sheet.requestAmounts}
+            onSave={payload => gr.save(gr.sheet.serviceKey, payload)}
+            onClose={gr.closeSheet}
+          />
+        )
+      })()}
+
+      <Snackbar
+        message={ratesMode === 'granular' ? gr.snackbar : lr.snackbar}
+        onDone={ratesMode === 'granular' ? gr.dismissSnackbar : lr.dismissSnackbar}
+      />
     </div>
   )
 }

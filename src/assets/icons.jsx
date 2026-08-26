@@ -28,7 +28,21 @@ export const BackIcon = () => (
   </svg>
 )
 export const BellIcon = (props) => <Icon name="in-bell" {...props} />
-export const LockIcon = (props) => <Icon name="in-lock" {...props} />
+// Hand-authored 24x24 padlock, replacing the `in-lock` icon-font glyph.
+// Keeps the font wrapper's { size, color, style } prop contract.
+export const LockIcon = ({ size = 24, color = c.primary, style = {} }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill={color}
+    aria-hidden="true"
+    style={{ flexShrink: 0, ...style }}
+  >
+    <path d="M4.5 12C4.08579 12 3.75 12.3358 3.75 12.75V21.75C3.75 22.1642 4.08579 22.5 4.5 22.5H19.5C19.9142 22.5 20.25 22.1642 20.25 21.75V12.75C20.25 12.3358 19.9142 12 19.5 12H4.5ZM11.25 17.0493C10.8016 16.79 10.5 16.3052 10.5 15.75C10.5 14.9216 11.1716 14.25 12 14.25C12.8284 14.25 13.5 14.9216 13.5 15.75C13.5 16.3052 13.1984 16.79 12.75 17.0493V19.5C12.75 19.9142 12.4142 20.25 12 20.25C11.5858 20.25 11.25 19.9142 11.25 19.5V17.0493ZM6 10.5V5.25C6 2.35051 8.35051 0 11.25 0H12.75C15.6495 0 18 2.35051 18 5.25V10.5H19.5C20.7426 10.5 21.75 11.5074 21.75 12.75V21.75C21.75 22.9926 20.7426 24 19.5 24H4.5C3.25736 24 2.25 22.9926 2.25 21.75V12.75C2.25 11.5074 3.25736 10.5 4.5 10.5H6ZM7.5 10.5H16.5V5.25C16.5 3.17893 14.8211 1.5 12.75 1.5H11.25C9.17893 1.5 7.5 3.17893 7.5 5.25V10.5ZM3.75 19.5H8.25V21H3.75V19.5ZM15.75 19.5H20.25V21H15.75V19.5Z" />
+  </svg>
+)
 export const InfoCircleIcon = (props) => <Icon name="in-info-circle" {...props} />
 export const ChevronUpIcon = ({ color = c.tertiary, size = 24 }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color}>

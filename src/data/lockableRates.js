@@ -202,3 +202,52 @@ export const lockedRatesFor = (client, serviceKey) => {
     })),
   }
 }
+
+// ── Granular locked rates (POC proposal) ─────────────────────────────────────
+// The proposal keeps the lock all-or-nothing per service but makes each rate's
+// *amount* something the provider sets while locking, and it surfaces when the
+// lock was taken. `lockedRatesFor` above already derives a per-rate snapshot, so
+// this only adds the timestamp and reshapes it into the map the modal edits.
+//
+// The seed date is derived, never hardcoded: three weeks before module load, so
+// "Locked on <date>" always reads as a past event whenever the prototype runs.
+const SEED_LOCK_AGE_DAYS = 21
+export const SEEDED_LOCKED_AT = (() => {
+  const d = new Date()
+  d.setDate(d.getDate() - SEED_LOCK_AGE_DAYS)
+  d.setHours(0, 0, 0, 0)
+  return d
+})()
+
+/**
+ * The untouched starting point for one (client x service): what the server
+ * would return before the sitter does anything this session.
+ *
+ *   { locked, amounts: { [slug]: number }, lockedAt: Date | null, rates, serviceName }
+ *
+ * AppContext layers this session's edits on top — see `getRatesState`.
+ */
+export const lockedSeedFor = (client, serviceKey) => {
+  const config = lockedRatesFor(client, serviceKey)
+  if (!config) return null
+  const amounts = {}
+  config.rates.forEach(r => { amounts[r.slug] = r.lockedPrice })
+  return {
+    serviceKey,
+    serviceName: config.serviceName,
+    rates: config.rates,
+    locked: config.locked,
+    amounts,
+    lockedAt: config.locked ? SEEDED_LOCKED_AT : null,
+  }
+}
+
+/**
+ * Default amounts for a service — what an unlocked client is charged, and what
+ * `Use default` restores a field to.
+ */
+export const defaultAmountsFor = (serviceKey) => {
+  const out = {}
+  lockableRatesFor(serviceKey).forEach(r => { out[r.slug] = r.defaultPrice })
+  return out
+}

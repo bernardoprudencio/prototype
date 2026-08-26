@@ -65,6 +65,10 @@ const formatCAD = (amount) => new Intl.NumberFormat('en-CA', {
 
 export const formatMoney = (m) => formatCAD(parseFloat(m.amount))
 
+// A bare rate amount — the granular locked-rates surfaces hold numbers, not
+// Money objects, because the modal edits them as whole dollars.
+export const formatRateAmount = (n) => formatCAD(Number(n) || 0)
+
 const money = (amount) => ({ amount: amount.toFixed(2), currencyIso: 'CAD' })
 
 // ── Service catalog ───────────────────────────────────────────────────────────
@@ -73,7 +77,7 @@ const money = (amount) => ({ amount: amount.toFixed(2), currencyIso: 'CAD' })
 // and grooming are intentionally excluded — the production view 404s
 // relationship pages with no browsable conversations
 // (RelationshipProgressScreenView), so they're never shown here either.
-const SERVICES = {
+export const SERVICES = {
   dog_walking:    { name: 'Dog walking',    icon: 'walking',     daily: 25, span: 1, multiDay: false },
   dog_daycare:    { name: 'Daycare',        icon: 'daycare',     daily: 45, span: 1, multiDay: false },
   drop_in_visits: { name: 'Drop-in visit',  icon: 'drop-in',     daily: 30, span: 1, multiDay: false },
@@ -565,6 +569,15 @@ export const buildRecurringWeekBooking = (client, currentTier, skippedThisWeek =
   // (price_ledger.py:302-306), so this week's payment date is its Monday.
   const paidOn = fmt(weekStart)
 
+  // Per-rate amounts this week is actually booked at, keyed by add-on slug.
+  // One-off bookings carry the same figures on `modify.rateRows`; recurring
+  // weeks have no modify block, so they publish the map directly. The granular
+  // rates modal seeds from this, so the sheet opens on the ledger's numbers.
+  const rateAmounts = {}
+  ;[...petRows, ...addOnRows].forEach(r => {
+    if (r.slug) rateAmounts[r.slug] = r.ratePerWalk
+  })
+
   return {
     id: `${client.id}-recurring-week`,
     isRecurring: true,
@@ -579,6 +592,7 @@ export const buildRecurringWeekBooking = (client, currentTier, skippedThisWeek =
     serviceSummaryTitle: `${svc.name} ${WEEKLY_SUFFIX}`,
     serviceIcon: svc.icon,
     serviceKey: RECURRING_SERVICE_KEY,
+    rateAmounts,
     earnings: money(weeklyPrice * currentTier.sitterShare),
     serviceStatus: 'completed_service_deposit',
     conversationOpk: `${client.id}-conv-recurring`,
