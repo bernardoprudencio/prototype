@@ -4,6 +4,10 @@ import { colors, typography } from '../tokens'
 import { BackIcon } from '../assets/icons'
 import { useApp } from '../context/AppContext'
 
+// Boolean flags ride the option-id API of ModeToggle (ServiceVariantConfigSheet.jsx:167-168).
+const boolToId = (v) => (v ? 'on' : 'off')
+const idToBool = (id) => id === 'on'
+
 // Two-pill toggle used by each testing variant.
 const ModeToggle = ({ value, onChange, options }) => {
   // Shrink padding/font when there are 4+ options so labels don't truncate
@@ -72,7 +76,7 @@ const VariantRow = ({ title, description, value, onChange, options }) => (
 
 export default function TestingModeScreen() {
   const navigate = useNavigate()
-  const { scheduleMode, setScheduleMode } = useApp()
+  const { scheduleMode, setScheduleMode, altMonetizationRollout, setAltMonetizationRollout } = useApp()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
@@ -109,6 +113,17 @@ export default function TestingModeScreen() {
           options={[
             { id: 'modification', label: 'Modification' },
             { id: 'agenda',       label: 'Agenda' },
+          ]}
+        />
+
+        <VariantRow
+          title="Graduated take rate"
+          description="Client tiers, relationship progress and relationship-based fees."
+          value={boolToId(altMonetizationRollout)}
+          onChange={(id) => setAltMonetizationRollout(idToBool(id))}
+          options={[
+            { id: 'off', label: 'Off' },
+            { id: 'on',  label: 'On'  },
           ]}
         />
       </div>

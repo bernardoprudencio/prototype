@@ -1,11 +1,11 @@
 import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { colors, typography, radius, shadows } from '../../tokens'
-import { getRelationshipData } from '../../data/relationshipData'
 import { getClient } from '../../data/contacts'
 import { Row, LockRatesSheet, Snackbar } from '../../components'
 import { LockIcon, ChevronRightIcon } from '../../assets/icons'
 import { useLockedRates } from '../../lib/useLockedRates'
+import { useRelationshipData } from '../../lib/useRelationshipData'
 import { isLockableConversation } from '../../data/lockableRates'
 import { useIsWide } from '../../lib/useMediaQuery'
 import { RATES_SECTION_TITLE, ratesLockedSubtitle, NO_LOCKED_RATES } from '../../data/lockedRatesCopy'
@@ -17,7 +17,7 @@ export default function RelationshipPage() {
   const navigate = useNavigate()
   const { ownerId } = useParams()
   const isWide = useIsWide()
-  const data = getRelationshipData(ownerId)
+  const data = useRelationshipData(ownerId)
   const client = getClient(ownerId)
   // The relationship page is not a conversation, so it has no gate of its own.
   // It summarises across services, and its sheet needs one concrete service to
@@ -85,39 +85,54 @@ export default function RelationshipPage() {
           display: 'flex', flexDirection: 'column', gap: 16,
           padding: '16px 16px 24px',
         }}>
-        <div style={isWide
-          ? { width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }
-          : { display: 'contents' }}>
-          <RelationshipProgressTracker
-            heading={progress.heading}
-            tiers={progress.tiers}
-            callout={progress.callout}
-            earnings={progress.earnings}
-            ownerAvatarUrl={requester.photo}
-          />
-
-          {/* Rates — production's own entry point into the lock sheet
-              (relationship_progress sections_mapper `_rates_section`). */}
-          {lr.available && (
-            <div style={{
-              background: colors.white,
-              borderRadius: radius.primary,
-              boxShadow: shadows.low,
-              padding: '0 16px',
-            }}>
-              <Row
-                firstRow
-                leftItem={<LockIcon size={24} color={colors.primary} />}
-                label={RATES_SECTION_TITLE}
-                sublabel={lr.lockedServiceCount > 0
-                  ? ratesLockedSubtitle(lr.lockedServiceCount)
-                  : NO_LOCKED_RATES}
-                rightItem={<ChevronRightIcon />}
-                onClick={() => lr.requestChange(!lr.locked)}
+        {/* The wide layout's fixed 400px left column holds the tracker and the
+            Rates row. Either can be absent (tracker: rollout off; Rates:
+            `lr.available` false), so skip the column entirely when both are —
+            otherwise it reserves 400px of empty width beside the booking
+            lists. */}
+        {(progress.tiers || lr.available) && (
+          <div style={isWide
+            ? { width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }
+            : { display: 'contents' }}>
+            {/* The data gate is the single source of truth: `progress.tiers` is
+                null unless the alt-monetization rollout is on, so no component
+                here reads the flag. Production gates the same screen on
+                `is_rollout_alt_monetisation` (views.py:1011-1013). The
+                alt-monetization interstitial and the tiers doodle live inside the
+                tracker, so they go with it. */}
+            {progress.tiers && (
+              <RelationshipProgressTracker
+                heading={progress.heading}
+                tiers={progress.tiers}
+                callout={progress.callout}
+                earnings={progress.earnings}
+                ownerAvatarUrl={requester.photo}
               />
-            </div>
-          )}
-        </div>
+            )}
+
+            {/* Rates — production's own entry point into the lock sheet
+                (relationship_progress sections_mapper `_rates_section`). */}
+            {lr.available && (
+              <div style={{
+                background: colors.white,
+                borderRadius: radius.primary,
+                boxShadow: shadows.low,
+                padding: '0 16px',
+              }}>
+                <Row
+                  firstRow
+                  leftItem={<LockIcon size={24} color={colors.primary} />}
+                  label={RATES_SECTION_TITLE}
+                  sublabel={lr.lockedServiceCount > 0
+                    ? ratesLockedSubtitle(lr.lockedServiceCount)
+                    : NO_LOCKED_RATES}
+                  rightItem={<ChevronRightIcon />}
+                  onClick={() => lr.requestChange(!lr.locked)}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Rates stays in the left column with the tracker — it is
             prototype-only, and production has no rates module here to place. */}
