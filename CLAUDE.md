@@ -46,7 +46,7 @@ stack over the active tab without unmounting it.
 
 **Component Variants:** `Button.jsx` supports `default`, `primary`, `flat`, and `disabled` variants via a `variant` prop. Icons live in `src/assets/icons.jsx` as named React components (50 exports), most wrapping the Rover icon font (`src/assets/rover-icons.css`) via a private `Icon` component.
 
-**Responsive Behavior:** There is no phone frame. `.app-shell` (`global.css`) fills the viewport at every width, and each screen's root is a `height: 100%` flex column with its own inner scroll region. Screens that have a wide layout gate it on the shared breakpoints in `src/lib/useMediaQuery.js` — `useIsWide()` (≥769px) for the schedule screens, `useIsExtraWide()` (≥880px) for Service settings. Every other screen currently has a single column that stretches to fill the viewport; adding a wide layout means adding a breakpoint branch, not a frame.
+**Responsive Behavior:** There is no phone frame. `.app-shell` (`global.css`) fills the viewport at every width, and each screen's root is a `height: 100%` flex column with its own inner scroll region. Screens that have a wide layout gate it on the single shared breakpoint in `src/lib/useMediaQuery.js` — `useIsWide()` (≥769px), used by both the schedule screens and Service settings. Every other screen currently has a single column that stretches to fill the viewport; adding a wide layout means adding a breakpoint branch, not a frame.
 
 **No Backend:** All data (pet names, images, service info) is hardcoded in components or imported from `src/assets/images.js`. No API calls or state management libraries.
 
