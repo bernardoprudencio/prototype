@@ -19,8 +19,10 @@ import { DropdownIcon } from '../assets/icons'
  *   options      { value, label }[]
  *   placeholder  string     — a disabled first option, as Kibble does
  *   id           string     — required for the label association
+ *   disabled     bool       — greys the control and blocks interaction
+ *   ariaLabel    string     — for callers that render their own visible label
  */
-export default function Select({ label, value, onChange, options = [], placeholder, id = 'select' }) {
+export default function Select({ label, value, onChange, options = [], placeholder, id = 'select', disabled = false, ariaLabel }) {
   const isPlaceholder = !value
 
   return (
@@ -34,6 +36,8 @@ export default function Select({ label, value, onChange, options = [], placehold
         <select
           id={id}
           value={value}
+          disabled={disabled}
+          aria-label={ariaLabel}
           onChange={e => onChange?.(e.target.value)}
           style={{
             ...textStyles.text200,
@@ -43,8 +47,8 @@ export default function Select({ label, value, onChange, options = [], placehold
             border: `2px solid ${colors.borderInteractive}`,
             borderRadius: radius.secondary,
             background: colors.white,
-            color: isPlaceholder ? colors.disabledText : colors.primary,
-            cursor: 'pointer',
+            color: (isPlaceholder || disabled) ? colors.disabledText : colors.primary,
+            cursor: disabled ? 'not-allowed' : 'pointer',
           }}
         >
           {placeholder && <option value="" disabled>{placeholder}</option>}

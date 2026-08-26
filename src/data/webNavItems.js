@@ -76,7 +76,7 @@ export const SITTER_MENU_ITEMS = [
   { key: 'inbox',           label: 'Inbox',            to: '/inbox',            href: '/account/inbox/' },
   { key: 'contacts',        label: 'Contacts',         to: '/contacts',         href: '/account/contacts/' },
   // `/account/calendar` has no trailing slash in production (`DesktopMenu.tsx`).
-  { key: 'calendar',        label: 'Calendar',         to: '/calendar',         href: '/account/calendar',          stub: true },
+  { key: 'calendar',        label: 'Calendar',         to: '/calendar',         href: '/account/calendar' },
   { key: 'insights',        label: 'Insights',         to: '/insights',         href: '/account/insights/',         stub: true, badge: 'New' },
   { key: 'payments',        label: 'Payments',         to: '/payments',         href: '/account/payments/',         stub: true },
   { key: 'settings',        label: 'Settings',         to: '/settings',         href: '/account/profile/settings/', stub: true },
@@ -101,7 +101,6 @@ export const LOG_OUT_LABEL = 'Log Out'
 // One entry per `stub: true` item above, keyed by route. `title` is the
 // production page's own heading rather than the nav label where they differ.
 export const WEB_STUB_PAGES = [
-  { path: '/calendar',  title: 'Calendar' },
   { path: '/insights',  title: 'Insights' },
   { path: '/payments',  title: 'Payments' },
   { path: '/settings',  title: 'Settings' },

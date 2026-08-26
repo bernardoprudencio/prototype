@@ -30,19 +30,40 @@ export const BackIcon = () => (
 export const BellIcon = (props) => <Icon name="in-bell" {...props} />
 export const LockIcon = (props) => <Icon name="in-lock" {...props} />
 export const InfoCircleIcon = (props) => <Icon name="in-info-circle" {...props} />
-export const ChevronUpIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32" fill={c.tertiary}>
+export const ChevronUpIcon = ({ color = c.tertiary, size = 24 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color}>
     <path d="M22.35 19.6L16 14.159l-6.35 5.443a1 1 0 1 1-1.3-1.519l6.674-5.72a1.5 1.5 0 0 1 1.952 0l6.675 5.72a1 1 0 0 1-1.302 1.519z"/>
   </svg>
 )
-export const ChevronDownIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32" fill={c.tertiary}>
+export const ChevronDownIcon = ({ color = c.tertiary, size = 24 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color}>
     <path d="M22.35 12.24a1 1 0 1 1 1.3 1.52l-6.674 5.72a1.5 1.5 0 0 1-1.952 0l-6.675-5.72a1 1 0 0 1 1.302-1.52L16 17.684l6.35-5.442z"/>
   </svg>
 )
-export const ChevronRightIcon = ({ color = c.tertiary }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32" fill={color}>
+export const ChevronRightIcon = ({ color = c.tertiary, size = 24 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color}>
     <path d="M12.32 22.27l5.442-6.35-5.442-6.348a1 1 0 1 1 1.518-1.302l5.722 6.675a1.5 1.5 0 0 1 0 1.952l-5.721 6.675a1 1 0 1 1-1.519-1.302z"/>
+  </svg>
+)
+// The mirror of ChevronRightIcon, added for the calendar's month/week paging.
+// `BackIcon` above is the same mirrored path but hardcodes its fill and size,
+// so it cannot serve as a paging control next to a right chevron.
+export const ChevronLeftIcon = ({ color = c.tertiary, size = 24 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color}>
+    <path d="M12.32 22.27l5.442-6.35-5.442-6.348a1 1 0 1 1 1.518-1.302l5.722 6.675a1.5 1.5 0 0 1 0 1.952l-5.721 6.675a1 1 0 1 1-1.519-1.302z"
+      transform="scale(-1,1) translate(-32,0)"/>
+  </svg>
+)
+// `@rover/icons` plus.svg / minus.svg, verbatim paths. Added for the capacity
+// Stepper, which is the codebase's first +/- control.
+export const PlusIcon = ({ size = 24, color = c.secondary }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color} aria-hidden="true">
+    <path d="M17 15h12a1 1 0 1 1 0 2H17v12a1 1 0 1 1-2 0V17H3a1 1 0 1 1 0-2h12V3a1 1 0 1 1 2 0v12z"/>
+  </svg>
+)
+export const MinusIcon = ({ size = 24, color = c.secondary }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 32 32" fill={color} aria-hidden="true">
+    <path d="M3 15h26a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2z"/>
   </svg>
 )
 export const EditIcon = ({ size = 24, color = c.primary }) => (

@@ -21,7 +21,9 @@ export default function CalendarWidget() {
           </span>
         </div>
         <p style={{ ...textStyles.paragraph100, color: colors.secondary, margin: 0 }}>{c.prompt}</p>
-        <Button variant="primary" fullWidth onClick={() => navigate('/service-settings/availability')}>
+        {/* `/service-settings/availability` is not a declared route — this CTA
+            was dead. The calendar is the surface it wanted. */}
+        <Button variant="primary" fullWidth onClick={() => navigate('/calendar')}>
           {c.ctaLabel}
         </Button>
       </div>

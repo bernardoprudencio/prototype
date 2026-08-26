@@ -4,7 +4,7 @@ import { typography } from './tokens'
 import { useLoadTime } from './hooks/useLoadTime'
 import { formatActionTimestamp } from './hooks/useDate'
 import { ActionSheet, ReviewSheet, SlideOverlay, WebNavBar } from './components'
-import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, ServiceSettingsLayout, BusinessPane, AboutYouPane, OtherServicesPane, BoardingSettingsScreen, FamilyServicesScreen, FamilyProfileScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen, StubScreen, DashboardScreen } from './screens'
+import { HomeScreen, ConversationScreen, BookingDetailsScreen, ScheduleScreen, EditTemplateScreen, CurrentWeekScreen, ModifyBookingScreen, RebookScreen, MoreScreen, RelationshipPage, InboxScreen, ScheduleOverlay, TestingModeScreen, ServiceSettingsScreen, ServiceSettingsLayout, BusinessPane, AboutYouPane, OtherServicesPane, BoardingSettingsScreen, FamilyServicesScreen, FamilyProfileScreen, PresentationsScreen, DeckScreen, MgmtHubDeckScreen, StubScreen, DashboardScreen, CalendarScreen } from './screens'
 import { petImages } from './assets/images'
 import { useApp } from './context/AppContext'
 import { useIsWide } from './lib/useMediaQuery'
@@ -94,6 +94,9 @@ export default function App() {
         <Route path="/home" element={home} />
         <Route path="/dashboard" element={<DashboardScreen />} />
         <Route path="/contacts" element={<RebookScreen />} />
+        {/* Sitter-wide calendar. A base-layer tab route, not an overlay, so it
+            leaves the zIndex ladder alone. */}
+        <Route path="/calendar" element={<CalendarScreen />} />
         <Route path="/more" element={<MoreScreen />} />
         {/* The active filter is a URL segment, matching production
             (useWebState.ts:10-20). Optional, so a bare /inbox still resolves to
