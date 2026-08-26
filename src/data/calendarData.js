@@ -243,7 +243,7 @@ export const SETTINGS_DAY_KEYS = DAY_KEYS
 // backend here, so the shape is reproduced with a stand-in token — the built
 // URLs are real enough to read and copy, and will not resolve.
 export const CALENDAR_ICAL_URL =
-  `//www.rover.com/ical/${SITTER_FIRST_NAME.toLowerCase()}-p/as-provider/prototype/`
+  `//www.rover.com/ical/${SITTER_FIRST_NAME.toLowerCase().replace(/\s+/g, '-')}-p/as-provider/prototype/`
 
 const PREF_BY_CALENDAR_ID = Object.fromEntries(
   CALENDAR_PREFERENCES.map((p) => [p.calendarId, p])

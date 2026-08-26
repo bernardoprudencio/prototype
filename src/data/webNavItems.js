@@ -27,7 +27,7 @@
  */
 
 import {
-  SearchIcon, MegaphoneIcon, CartIcon, BellIcon, ChatInboxIcon, HelpBubbleIcon,
+  SearchIcon, MegaphoneIcon, BellIcon, ChatInboxIcon, HelpBubbleIcon,
 } from '../assets/icons'
 
 // ─── Left group ──────────────────────────────────────────────────────────────
@@ -44,16 +44,16 @@ export const WEB_NAV_LEFT = [
 ]
 
 // ─── Right group ─────────────────────────────────────────────────────────────
-// `NavBarRight.tsx:30-105`, in render order. The avatar dropdown sits between
-// `contactList` and `notifications` and is a component, not a row, so it is not
-// listed here. Omitted: the language selector (single-locale prototype) and the
-// mobile hamburger (below 769px the app's TabBar is the nav).
+// `NavBarRight.tsx:30-105`, in render order. The avatar dropdown leads the group
+// and is a component, not a row, so it is not listed here. Omitted: the contact
+// list (an owner-side shortlist a sitter never sees), the language selector
+// (single-locale prototype), and the mobile hamburger (below 769px the app's
+// TabBar is the nav).
 //
 // Note the Inbox item's *visible* label is literally the count in parens —
 // production renders `({unreadMessageCount})` next to the icon, with the word
 // "Inbox" living only in the aria-label (`NavBarRight.tsx:41-48`).
 export const WEB_NAV_RIGHT = [
-  { key: 'contactList',   kind: 'button', Icon: CartIcon,       ariaLabel: (n) => `Contact list (${n} contacts)` },
   { key: 'notifications', kind: 'button', Icon: BellIcon,       ariaLabel: () => 'Notifications' },
   { key: 'inbox',         kind: 'count',  Icon: ChatInboxIcon,  ariaLabel: (n) => `Inbox (${n})`, to: '/inbox' },
   { key: 'help',          kind: 'link',   Icon: HelpBubbleIcon, label: 'Help', href: '/help/' },

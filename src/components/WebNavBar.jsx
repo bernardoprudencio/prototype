@@ -29,11 +29,6 @@ export const BAR_HEIGHT = 60
 const CONTENT_WIDTH = 1140
 const ICON_SIZE     = 16
 
-// Contact-list count. Production reads the real shortlist; the prototype has no
-// shortlist data, so this is the fixed placeholder the badge needs to exist.
-// PROTOTYPE-ONLY.
-const CONTACT_LIST_COUNT = 3
-
 const itemBase = {
   display: 'flex', alignItems: 'center', gap: 8, padding: 0,
   border: 'none', background: 'none', cursor: 'pointer',
@@ -65,20 +60,6 @@ function NavItem({ Icon, label, ariaLabel, onClick }) {
   )
 }
 
-/**
- * The shortlist count badge (`_headers.scss:287-306` /
- * `ContactList.tsx:37-49`) — a round yellow pill, weight 700.
- */
-function CountBadge({ count }) {
-  return (
-    <span style={{
-      marginLeft: 4, padding: '1px 5px', borderRadius: '100%',
-      background: '#f8b816', color: colors.primary,
-      fontSize: 12, fontWeight: 700, lineHeight: 1.25,
-    }}>{count}</span>
-  )
-}
-
 export default function WebNavBar() {
   const navigate = useNavigate()
 
@@ -92,13 +73,6 @@ export default function WebNavBar() {
 
   const renderRight = (item) => {
     switch (item.key) {
-      case 'contactList':
-        return (
-          <div key={item.key} style={{ display: 'flex', alignItems: 'center' }}>
-            <NavItem Icon={item.Icon} ariaLabel={item.ariaLabel(CONTACT_LIST_COUNT)} />
-            <CountBadge count={CONTACT_LIST_COUNT} />
-          </div>
-        )
       case 'inbox':
         // The visible label really is just the count in parens; "Inbox" lives
         // only in the aria-label (`NavBarRight.tsx:41-48`).
@@ -155,11 +129,10 @@ export default function WebNavBar() {
           ))}
         </div>
 
-        {/* ── Right: contact list, avatar menu, bell, inbox, help ── */}
+        {/* ── Right: avatar menu, bell, inbox, help ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
-          {renderRight(WEB_NAV_RIGHT[0])}
           <WebNavMenu />
-          {WEB_NAV_RIGHT.slice(1).map(renderRight)}
+          {WEB_NAV_RIGHT.map(renderRight)}
         </div>
       </div>
     </div>
