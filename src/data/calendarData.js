@@ -403,6 +403,44 @@ export function buildAvailability(year, month, bookings = []) {
       })),
     })
   }
+  return blockSampleDays(days, occupiedByDate)
+}
+
+// PROTOTYPE-ONLY, and a fixture concern rather than a behavioural one.
+//
+// `getDayState` (calendarUtils.js:41-50) has four outcomes, and two of them —
+// NOT_AVAILABLE and FULLY_BOOKED — require every service on a day to be at
+// `spacesAvailable: 0`. Nothing in the projected data ever does that, because
+// occupancy is counted off bookings while availability comes from the service
+// defaults, so a fresh load could only ever show the plain and the amber fill.
+// The legend explains four fills; two of them were unreachable.
+//
+// The POC did not have this problem: its availability fixture was
+// hand-authored, so a zeroed day was simply a row someone wrote. The prototype
+// derives availability instead, so the equivalent has to be stated as a rule.
+// It uses the POC's own override pair for "the sitter blocked this day"
+// (`manualAvailability` + `manualSpacesAvailable`), and it is expressed
+// relative to today rather than to any date: in each rendered month, the first
+// two blockable future days are blocked — the first one that has bookings,
+// giving the striped-red FULLY_BOOKED, and the first one that has none, giving
+// the striped-neutral NOT_AVAILABLE. Both stay editable; the availability
+// editor overlays AppContext values on top of these exactly as it does the
+// defaults.
+function blockSampleDays(days, occupiedByDate) {
+  const today = dateKey(startOfDay(PROTO_TODAY))
+  const hasBookings = (iso) => Object.keys(occupiedByDate[iso] ?? {}).length > 0
+
+  const booked = days.find((d) => d.date > today && hasBookings(d.date))
+  const empty = days.find((d) => d.date > today && !hasBookings(d.date))
+
+  const block = (day) => {
+    if (!day) return
+    day.calendars = day.calendars.map((c) => ({
+      ...c, spacesAvailable: 0, manualAvailability: true, manualSpacesAvailable: 0,
+    }))
+  }
+  block(booked)
+  block(empty)
   return days
 }
 
