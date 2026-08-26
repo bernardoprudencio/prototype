@@ -1,6 +1,7 @@
 import React from 'react'
 import Button from './Button'
 import { colors, textStyles, spacing } from '../tokens'
+import { useIsWide } from '../lib/useMediaQuery'
 import { formatRateAmount } from '../data/relationshipData'
 import {
   REVIEW_HEADING, reviewIntentLine, unitAsSentence, wasAmount, CONFIRM, GO_BACK,
@@ -81,16 +82,26 @@ function ReviewRateRow({ row }) {
  * it takes rows as data rather than the rates and the drafts. `onGoBack` must
  * not reach the discard confirm: nothing has been discarded.
  *
+ * Its three regions are handed back to the caller when `children` is a
+ * function, so the sheet can *place* them: at >=769px the heading goes in
+ * `BottomSheet`'s header slot and the buttons in its footer, leaving only the
+ * rows in the scroller, which is what keeps `Confirm` on screen with nine of
+ * them. Called any other way it renders the same three in the same order it
+ * always has, which is what the narrow sheet still wants.
+ *
  * Props:
  *   intent      'locking' | 'unlocking' | 'updating'
  *   clientName  string
  *   rows        [{ slug, label, unit, newAmount, previousAmount, hasChanged }]
  *   onConfirm   () => void
  *   onGoBack    () => void
+ *   children    (({ header, body, actions }) => ReactNode) | undefined
  */
-export default function ReviewRatesStep({ intent, clientName, rows = [], onConfirm, onGoBack }) {
-  return (
-    <div>
+export default function ReviewRatesStep({ intent, clientName, rows = [], onConfirm, onGoBack, children }) {
+  const isWide = useIsWide()
+
+  const header = (
+    <>
       <h2 style={{ ...textStyles.heading300, color: colors.primary, margin: 0, paddingTop: spacing.sm }}>
         {REVIEW_HEADING}
       </h2>
@@ -103,14 +114,30 @@ export default function ReviewRatesStep({ intent, clientName, rows = [], onConfi
       }}>
         {reviewIntentLine(intent, clientName)}
       </p>
+    </>
+  )
 
-      <div style={{ paddingTop: spacing.lg, paddingBottom: spacing.lg }}>
-        {rows.map(row => <ReviewRateRow key={row.slug} row={row} />)}
-      </div>
+  const body = (
+    <div
+      className="hide-scrollbar"
+      style={{
+        paddingTop: spacing.lg,
+        paddingBottom: spacing.lg,
+        // Narrow only, and for the same reason the rate list carries one: the
+        // `simple` variant has no height of its own, so with nine rows the top
+        // of the sheet runs off the screen and `Confirm` off the bottom.
+        ...(isWide ? null : { maxHeight: '38vh', overflowY: 'auto' }),
+      }}
+    >
+      {rows.map(row => <ReviewRateRow key={row.slug} row={row} />)}
+    </div>
+  )
 
-      {/* The step brings its own primary and secondary — a `Save rates` under a
-          `Confirm` would read as saving twice (POC ManageRatesModal.tsx, the
-          `isReviewing` branch, which leaves the modal footer empty). */}
+  // The step brings its own primary and secondary — a `Save rates` under a
+  // `Confirm` would read as saving twice (POC ManageRatesModal.tsx, the
+  // `isReviewing` branch, which leaves the modal footer empty).
+  const actions = (
+    <>
       <Button variant="primary" size="default" fullWidth onClick={onConfirm}>
         {CONFIRM}
       </Button>
@@ -123,6 +150,16 @@ export default function ReviewRatesStep({ intent, clientName, rows = [], onConfi
       >
         {GO_BACK}
       </Button>
+    </>
+  )
+
+  if (typeof children === 'function') return children({ header, body, actions })
+
+  return (
+    <div>
+      {header}
+      {body}
+      {actions}
     </div>
   )
 }

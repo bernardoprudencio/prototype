@@ -91,6 +91,12 @@ export const lockToggleAnnouncement = (isOn, clientName, serviceName, isEditable
 export const defaultRateHelper = (amount) => `Default rate is ${amount}`
 // RateEditor.tsx:212-213 — replaces the helper line on a failed save attempt.
 export const AMOUNT_REQUIRED = 'Enter an amount for this rate.'
+// RateEditor.tsx:216-219 — the other half of the same switch. Bounds are per
+// rate (`minPrice` / `maxPrice`), and the caller passes them already formatted,
+// as `defaultRateHelper` does, so the money formatting stays in one place.
+export const amountOutOfRange = (min, max) => `Enter an amount between ${min} and ${max}.`
+// ManageRatesModal.tsx:359 — announced when Save is pressed with a bad amount.
+export const SOME_AMOUNTS_INVALID = 'Some amounts can’t be saved. Check the highlighted rates.'
 export const USE_DEFAULT = 'Use default'
 
 export const COL_DEFAULT_RATE = 'Default rate'
@@ -123,6 +129,10 @@ export const KEEP_EDITING  = 'Keep editing'
 export const DISCARD       = 'Discard changes'
 
 // ── Save reports (rateCopy.ts) ───────────────────────────────────────────────
+// Retained as `rateCopy.ts` provenance only — no live caller. The granular save
+// closes its sheet without a snackbar, since the row it returns to already
+// states the new locked state. (`ratesMode === 'current'` keeps its own toast
+// copy in lockedRatesCopy.js, which is a different, still-live set.)
 export const savedLockedReport = (clientName, serviceName) => serviceName
   ? `Saved. ${clientName}’s ${serviceName} rates are locked.`
   : `Saved. ${clientName}’s rates are locked.`

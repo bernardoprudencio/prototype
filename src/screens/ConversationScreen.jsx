@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { colors, typography, shadows, textStyles } from '../tokens'
+import { colors, typography, shadows, textStyles, radius } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
 import { peopleImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble, WEB_NAV_BAR_HEIGHT } from '../components'
@@ -92,6 +92,9 @@ export default function ConversationScreen() {
   const messagesEndRef = useRef(null)
   const [text, setText] = useState('')
   const [sentMessages, setSentMessages] = useState([])
+  const [headerHovered, setHeaderHovered] = useState(false)
+  const [headerPressed, setHeaderPressed] = useState(false)
+  const goToRelationship = () => navigate(`/contacts/${ownerId}`)
 
   const sendMessage = () => {
     const trimmed = text.trim()
@@ -230,17 +233,35 @@ export default function ConversationScreen() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', minHeight: 62, padding: '8px 0' }}>
           {/* No back affordance at desktop — ConversationHeader.tsx:86-98 drops it. */}
-          <div
-            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: isDesktop ? 'default' : 'pointer', flexShrink: 0 }}
-            onClick={isDesktop ? undefined : onBack}
+          {!isDesktop && (
+            <div
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 44, minHeight: 44, marginLeft: -12, cursor: 'pointer', flexShrink: 0 }}
+              onClick={onBack}
+            >
+              <BackIcon />
+            </div>
+          )}
+          <button
+            type="button"
+            aria-label={`View ${clientName}'s client page`}
+            onClick={goToRelationship}
+            onMouseEnter={() => setHeaderHovered(true)}
+            onMouseLeave={() => { setHeaderHovered(false); setHeaderPressed(false) }}
+            onMouseDown={() => setHeaderPressed(true)}
+            onMouseUp={() => setHeaderPressed(false)}
+            style={{
+              background: headerPressed ? colors.bgTertiary : headerHovered ? colors.bgSecondary : 'none',
+              border: 0, padding: 0, font: 'inherit', textAlign: 'left',
+              flex: 1, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+              minWidth: 0, borderRadius: radius.primary,
+            }}
           >
-            {!isDesktop && <BackIcon />}
             <PetAvatar size={48} images={[clientImg]} />
-          </div>
-          <div style={{ flex: 1, marginLeft: 8, minWidth: 0 }}>
-            <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 16, lineHeight: 1.5, color: colors.primary, margin: 0 }}>{clientName}</p>
-            <p style={{ ...textStyles.text100, color: statusDisplay.color, margin: 0 }}>{statusDisplay.label}</p>
-          </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 16, lineHeight: 1.5, color: colors.primary, margin: 0, textDecoration: headerHovered ? 'underline' : 'none' }}>{clientName}</p>
+              <p style={{ ...textStyles.text100, color: statusDisplay.color, margin: 0 }}>{statusDisplay.label}</p>
+            </div>
+          </button>
           <div style={{ cursor: 'pointer', flexShrink: 0 }}><MoreIcon /></div>
         </div>
         {!isDesktop && ctaStrip}

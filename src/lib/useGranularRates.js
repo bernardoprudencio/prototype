@@ -1,10 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { isLockableConversation, defaultAmountsFor, lockedSeedFor } from '../data/lockableRates'
-import { SERVICES } from '../data/relationshipData'
-import {
-  savedLockedReport, savedUnlockedReport, savedUpdatedReport,
-} from '../data/granularRatesCopy'
 
 /**
  * useGranularRates — shared wiring for the POC proposal's locked-rates surfaces:
@@ -33,7 +29,6 @@ import {
 export function useGranularRates(client, booking = null) {
   const { showLockedRates, ratesMode, getRatesState, commitRatesState } = useApp()
   const [sheet, setSheet] = useState(null)      // { serviceKey, opensLocked, requestAmounts }
-  const [snackbar, setSnackbar] = useState(null)
 
   const clientName = client?.displayName?.split(' ')[0] ?? ''
   const enabled = Boolean(showLockedRates && ratesMode === 'granular' && client)
@@ -42,7 +37,11 @@ export function useGranularRates(client, booking = null) {
 
   // ── This conversation's service ────────────────────────────────────────────
   const serviceKey = booking?.serviceKey ?? null
-  const passesGate = enabled && isLockableConversation(booking)
+  // The proposal does not offer locking on recurring weeks — one-time bookings
+  // only. Production's `_get_lock_rates_toggle()` has no such check (the
+  // recurring exclusion lives on the retiring legacy stay page), so this is a
+  // deliberate divergence, scoped to the granular flow.
+  const passesGate = enabled && isLockableConversation(booking) && !booking?.isRecurring
   const state = passesGate ? stateFor(serviceKey) : null
   const available = Boolean(state)
 
@@ -89,18 +88,11 @@ export function useGranularRates(client, booking = null) {
 
   const closeSheet = () => setSheet(null)
 
-  // One save writes the whole set. The report line forks on what actually
-  // changed, not on the switch alone (rateCopy.ts).
+  // One save writes the whole set. No confirmation toast: the sheet closes and
+  // the row underneath already states the new locked state, so a snackbar only
+  // repeats what the screen shows. `ratesMode === 'current'` keeps its own.
   const save = (key, { locked, amounts }) => {
-    const before = getRatesState(client, key)
     commitRatesState(client, key, { locked, amounts })
-    const serviceName = SERVICES[key]?.name?.toLowerCase() ?? null
-    const report = !locked
-      ? savedUnlockedReport(clientName, serviceName)
-      : before?.locked
-        ? savedUpdatedReport(clientName, serviceName)
-        : savedLockedReport(clientName, serviceName)
-    setSnackbar(report)
     setSheet(null)
   }
 
@@ -110,6 +102,5 @@ export function useGranularRates(client, booking = null) {
     stateFor, seedFor: (key) => lockedSeedFor(client, key),
     sheet, openSheet, openFromRow, closeSheet,
     save,
-    snackbar, dismissSnackbar: () => setSnackbar(null),
   }
 }

@@ -678,10 +678,8 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
         )
       })()}
 
-      <Snackbar
-        message={ratesMode === 'granular' ? gr.snackbar : lr.snackbar}
-        onDone={ratesMode === 'granular' ? gr.dismissSnackbar : lr.dismissSnackbar}
-      />
+      {/* Only `ratesMode === 'current'` toasts; the granular save is silent. */}
+      <Snackbar message={lr.snackbar} onDone={lr.dismissSnackbar} />
     </div>
   )
 }

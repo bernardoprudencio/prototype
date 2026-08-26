@@ -66,17 +66,49 @@ const isLockable = (rate) =>
   !NON_LOCKABLE_SLUGS.has(rate.slug) &&
   (rate.defaultPrice > 0 || ZERO_PRICE_LOCKABLE_SLUGS.has(rate.slug))
 
+// ── Rate bounds ──────────────────────────────────────────────────────────────
+// Production reads these from *country config*, not from the sitter's profile:
+// `get_addon_type_min_price` (services/utils.py:774-781) and
+// `get_addon_type_max_price` (:784-798) look up
+// `minimum_service_add_on_prices` / `maximum_service_add_on_prices` on
+// `CountryConfigurationAbstractNA` (i18n/configuration.py:1612, :1665-1717).
+// `CountryConfigurationCA` (:1948) inherits both and overrides only currency and
+// legal amounts, so the NA numbers apply to this prototype's CAD figures too.
+//
+// Anything absent from the map falls to ALT_MINIMUM_ADD_ON_PRICE = 0
+// (services/constants.py:1633). `maximum_service_add_on_prices` carries entries
+// only for grooming and dog training, so every browsable service takes the
+// blanket `max_add_on_price` (i18n/configuration.py:1732).
+const MAX_ADD_ON_PRICE = 250
+
+// Keys are this file's slugs. Production keys the holiday minimum on
+// `holiday-rate` and the cat minimum on `cat-care`; boarding's profile data uses
+// `holiday` and `additional-cat`, so both spellings are listed.
+const MIN_ADD_ON_PRICE = {
+  // "boarding & traveling" in the config — house sitting is the traveling one.
+  boarding:       { 'standard-rate': 15, holiday: 15, 'holiday-rate': 15, 'extended-stay': 15, puppy: 15, 'additional-cat': 10, 'cat-care': 10 },
+  house_sitting:  { 'standard-rate': 15, holiday: 15, 'holiday-rate': 15, 'extended-stay': 15, puppy: 15, 'additional-cat': 10, 'cat-care': 10 },
+  drop_in_visits: { 'standard-rate': 10, holiday: 10, 'holiday-rate': 10, 'extended-stay': 10, puppy: 10, 'additional-cat': 7,  'cat-care': 7  },
+  dog_daycare:    { 'standard-rate': 15, holiday: 15, 'holiday-rate': 15, 'extended-stay': 15, puppy: 15 },
+  dog_walking:    { 'standard-rate': 10, holiday: 10, 'holiday-rate': 10, 'extended-stay': 10, puppy: 10 },
+}
+
+const minPriceFor = (serviceKey, slug) => MIN_ADD_ON_PRICE[serviceKey]?.[slug] ?? 0
+
 // ── Boarding: derived, so the numbers stay single-sourced ────────────────────
 // The base rate is add-on type `standard-rate`; the rest come straight from
-// BOARDING_SETTINGS.additionalRates. `holiday`, `bath`, `short-notice` and
-// `pickup-dropoff` are `active: false` there, so production's `active=True`
-// filter drops them — which is why the boarding sheet shows three rows.
+// BOARDING_SETTINGS.additionalRates, which now carries all eight of boarding's
+// production add-ons as `active: true` — nine rows with the base rate. The
+// `active` and price filters below still run, so deactivating a rate in the
+// sitter's profile still removes it from the lock sheet.
 const boardingRates = () => [
   {
     slug: 'standard-rate',
     label: 'Standard rate',
     defaultPrice: BOARDING_SETTINGS.baseRate,
     unit: BOARDING_SETTINGS.baseRateUnit,
+    minPrice: minPriceFor('boarding', 'standard-rate'),
+    maxPrice: MAX_ADD_ON_PRICE,
     active: true,
   },
   ...BOARDING_SETTINGS.additionalRates.map(r => ({
@@ -87,6 +119,9 @@ const boardingRates = () => [
     label: RATE_LABEL[r.slug] ?? r.label,
     defaultPrice: r.isFree ? 0 : r.price,
     unit: r.unit,
+    // Bounds come from country config, never from the sitter's own profile.
+    minPrice: minPriceFor('boarding', r.slug),
+    maxPrice: MAX_ADD_ON_PRICE,
     active: r.active,
   })),
 ]
@@ -94,40 +129,102 @@ const boardingRates = () => [
 // Add-on type names, sentence-cased. Keys are the slugs used in
 // sitterProfile.js; values follow ADD_ON_TYPE_SLUGS (services/constants.py:457).
 const RATE_LABEL = {
-  'standard-rate':  'Standard rate',
-  'additional-dog': 'Additional dog rate',
-  'additional-cat': 'Additional cat rate',
-  puppy:            'Puppy rate',
-  holiday:          'Holiday rate',
-  'holiday-rate':   'Holiday rate',
-  'long-walk':      '60 minute rate',
-  'long-drop-in':   '60 minute rate',
+  'standard-rate':          'Standard rate',
+  'additional-dog':         'Additional dog rate',
+  'additional-cat':         'Additional cat rate',
+  puppy:                    'Puppy rate',
+  holiday:                  'Holiday rate',
+  'holiday-rate':           'Holiday rate',
+  'long-walk':              '60 minute rate',
+  'long-drop-in':           '60 minute rate',
+  'extended-stay':          'Extended stay rate',
+  'bathing-grooming':       'Bathing / grooming',
+  'pick-up-drop-off':       'Pick-up / drop-off',
+  'daily-pick-up-drop-off': 'Daily pick-up / drop-off',
+  'short-notice':           'Short notice rate',
 }
 
 // ── The sitter's lockable rates, per browsable service ───────────────────────
 // Only rows surviving `_get_lockable_add_ons()` are listed for the four
 // hand-authored services, so no `active: false` entries appear here.
+//
+// The set per service is `ALLOWED_ADDITIONAL_RATES_FOR_SERVICE_TYPE`
+// (services/constants.py:812-866) plus the base `standard-rate`; the `unit` is
+// `SERVICE_TYPE_PRICE_UNITS` (:321-329). Prices are the prototype's own,
+// anchored on the daily figures in relationshipData.js SERVICES, and every
+// default sits at or above its own `minPrice` — a default below its floor could
+// not be saved. The two flat-fee add-ons (bathing / grooming, pick-up /
+// drop-off) keep unit 'service' rather than the service's own unit, matching how
+// BOARDING_SETTINGS already prices them; daycare's pick-up / drop-off is the
+// `daily-` variant and so is priced per day.
+//
+// ── NOT ESTABLISHED — four open questions on this table ─────────────────────
+// The rows below are read off production source, but four things about them are
+// unconfirmed. Confirm before treating the table as production-accurate:
+//
+// 1. `ALLOWED_ADDITIONAL_RATES_FOR_SERVICE_TYPE` is explicitly scoped "for
+//    sitters in the SSU (pet-care-modes) experience". Whether every
+//    locked-rates sitter is in that experience is unconfirmed.
+// 2. `bathing-grooming` is in FREE_ADD_ON_SLUGS and *not* in
+//    ZERO_PRICE_LOCKABLE_ADD_ON_TYPE_SLUGS, so at $0 `_get_lockable_add_ons()`
+//    drops it. Does the boarding sheet in production show 9 rows or 8? This
+//    prototype prices it non-zero, so it shows 9.
+// 3. `short-notice` appears only when `should_show_short_notice(person)` is
+//    true. Unconfirmed for the demo persona; assumed true here.
+// 4. The POC's `RateEditor` comment says "Eleven of these stack in one column",
+//    but the largest set derivable from the source is 9. Unexplained, and
+//    deliberately not rounded up to eleven.
 const RATE_TABLE = {
+  // 9 rows: standard-rate, holiday-rate, additional-dog, puppy, additional-cat,
+  // extended-stay, bathing-grooming, pick-up-drop-off, short-notice.
   boarding: boardingRates(),
+
+  // 7 rows. No bathing-grooming and no pick-up-drop-off: the sitter travels to
+  // the pet, so there is nothing to collect and nowhere to bathe.
   house_sitting: [
-    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 60, unit: 'night' },
-    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 30, unit: 'night' },
-    { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 10, unit: 'night' },
+    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 65, unit: 'night', minPrice: minPriceFor('house_sitting', 'standard-rate'),  maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',   label: RATE_LABEL['holiday-rate'],   defaultPrice: 20, unit: 'night', minPrice: minPriceFor('house_sitting', 'holiday-rate'),   maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 30, unit: 'night', minPrice: minPriceFor('house_sitting', 'additional-dog'), maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 15, unit: 'night', minPrice: minPriceFor('house_sitting', 'puppy'),          maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-cat', label: RATE_LABEL['additional-cat'], defaultPrice: 25, unit: 'night', minPrice: minPriceFor('house_sitting', 'additional-cat'), maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'extended-stay',  label: RATE_LABEL['extended-stay'],  defaultPrice: 55, unit: 'night', minPrice: minPriceFor('house_sitting', 'extended-stay'),  maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'short-notice',   label: RATE_LABEL['short-notice'],   defaultPrice: 10, unit: 'night', minPrice: minPriceFor('house_sitting', 'short-notice'),   maxPrice: MAX_ADD_ON_PRICE },
   ],
+
+  // 7 rows. Daycare's collection add-on is the daily variant, and there is no
+  // additional-cat or extended-stay in its allowed set.
   dog_daycare: [
-    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 45, unit: 'day' },
-    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 25, unit: 'day' },
-    { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 10, unit: 'day' },
+    { slug: 'standard-rate',          label: RATE_LABEL['standard-rate'],          defaultPrice: 45, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'standard-rate'),          maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',           label: RATE_LABEL['holiday-rate'],           defaultPrice: 15, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'holiday-rate'),           maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-dog',         label: RATE_LABEL['additional-dog'],         defaultPrice: 25, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'additional-dog'),         maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'puppy',                  label: RATE_LABEL.puppy,                     defaultPrice: 15, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'puppy'),                  maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'bathing-grooming',       label: RATE_LABEL['bathing-grooming'],       defaultPrice: 20, unit: 'service', minPrice: minPriceFor('dog_daycare', 'bathing-grooming'),       maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'daily-pick-up-drop-off', label: RATE_LABEL['daily-pick-up-drop-off'], defaultPrice: 15, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'daily-pick-up-drop-off'), maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'short-notice',           label: RATE_LABEL['short-notice'],           defaultPrice: 10, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'short-notice'),           maxPrice: MAX_ADD_ON_PRICE },
   ],
+
+  // 9 rows — the longest list alongside boarding. `long-drop-in` is the
+  // 60-minute variant of the visit.
   drop_in_visits: [
-    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 30, unit: 'visit' },
-    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 15, unit: 'visit' },
-    { slug: 'long-drop-in',   label: RATE_LABEL['long-drop-in'],   defaultPrice: 15, unit: 'visit' },
+    { slug: 'standard-rate',    label: RATE_LABEL['standard-rate'],    defaultPrice: 30, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'standard-rate'),    maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'long-drop-in',     label: RATE_LABEL['long-drop-in'],     defaultPrice: 15, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'long-drop-in'),     maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',     label: RATE_LABEL['holiday-rate'],     defaultPrice: 12, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'holiday-rate'),     maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-dog',   label: RATE_LABEL['additional-dog'],   defaultPrice: 15, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'additional-dog'),   maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'puppy',            label: RATE_LABEL.puppy,               defaultPrice: 10, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'puppy'),            maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-cat',   label: RATE_LABEL['additional-cat'],   defaultPrice: 12, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'additional-cat'),   maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'extended-stay',    label: RATE_LABEL['extended-stay'],    defaultPrice: 15, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'extended-stay'),    maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'bathing-grooming', label: RATE_LABEL['bathing-grooming'], defaultPrice: 20, unit: 'service', minPrice: minPriceFor('drop_in_visits', 'bathing-grooming'), maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'short-notice',     label: RATE_LABEL['short-notice'],     defaultPrice: 10, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'short-notice'),     maxPrice: MAX_ADD_ON_PRICE },
   ],
+
+  // 6 rows — the shortest list. No cat, extended-stay or grooming add-on.
   dog_walking: [
-    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 25, unit: 'walk' },
-    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 12, unit: 'walk' },
-    { slug: 'long-walk',      label: RATE_LABEL['long-walk'],      defaultPrice: 12, unit: 'walk' },
+    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 25, unit: 'walk', minPrice: minPriceFor('dog_walking', 'standard-rate'),  maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'long-walk',      label: RATE_LABEL['long-walk'],      defaultPrice: 12, unit: 'walk', minPrice: minPriceFor('dog_walking', 'long-walk'),      maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',   label: RATE_LABEL['holiday-rate'],   defaultPrice: 12, unit: 'walk', minPrice: minPriceFor('dog_walking', 'holiday-rate'),   maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 12, unit: 'walk', minPrice: minPriceFor('dog_walking', 'additional-dog'), maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 10, unit: 'walk', minPrice: minPriceFor('dog_walking', 'puppy'),          maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'short-notice',   label: RATE_LABEL['short-notice'],   defaultPrice: 8,  unit: 'walk', minPrice: minPriceFor('dog_walking', 'short-notice'),   maxPrice: MAX_ADD_ON_PRICE },
   ],
 }
 
@@ -199,6 +296,10 @@ export const lockedRatesFor = (client, serviceKey) => {
       lockedPrice: lockedPriceFor(client.id, serviceKey, r),
       defaultPrice: r.defaultPrice,
       unit: r.unit,
+      // The allowed band travels with the rate: the manage sheet validates
+      // against it, and it is picked here explicitly like every other field.
+      minPrice: r.minPrice,
+      maxPrice: r.maxPrice,
     })),
   }
 }

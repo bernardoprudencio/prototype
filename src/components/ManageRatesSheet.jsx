@@ -8,7 +8,7 @@ import { colors, textStyles, spacing, radius } from '../tokens'
 import { useIsWide } from '../lib/useMediaQuery'
 import { formatRateAmount } from '../data/relationshipData'
 import {
-  AMOUNT_REQUIRED,
+  AMOUNT_REQUIRED, amountOutOfRange,
   modalTitle, lockStatusLine, lockToggleLabel, lockToggleNote,
   defaultRateHelper, USE_DEFAULT, COL_DEFAULT_RATE, unitAsSentence,
   SAVE, CANCEL,
@@ -38,6 +38,27 @@ const resolveAmount = (input) => {
 }
 
 /**
+ * What is wrong with one rate's draft, or `null` while nothing is
+ * (POC `RateEditor.tsx`'s `validateRateDraft` / `RateDraftError`).
+ *
+ * Emptiness is the first rule and the band is the second: a rate priced outside
+ * what the country config allows is as unsaveable as one left blank, and the two
+ * are separate kinds because they get separate sentences. The bounds are per
+ * rate — `get_addon_type_min_price` / `get_addon_type_max_price` — never per
+ * service and never global, so they are read off the rate itself. A rate that
+ * arrives without them cannot fail the band.
+ */
+const validateRateDraft = (rate, input) => {
+  const amount = resolveAmount(input)
+  if (amount === null) return 'missing_amount'
+  const min = Number(rate.minPrice)
+  const max = Number(rate.maxPrice)
+  if (Number.isFinite(min) && amount < min) return 'out_of_range'
+  if (Number.isFinite(max) && amount > max) return 'out_of_range'
+  return null
+}
+
+/**
  * One editable rate: the amount, its `Use default` way back to the provider's
  * own price, and the default itself for reference.
  *
@@ -47,8 +68,18 @@ const resolveAmount = (input) => {
  * revert, because the lock is not a per-rate property — unpinning stays one
  * gesture for the whole service (POC `RateEditor.tsx`).
  */
-function RateAmountField({ rate, value, isInvalid, onChange }) {
+function RateAmountField({ rate, value, error, onChange }) {
   const isDefaultAmount = resolveAmount(value) === Number(rate.defaultPrice)
+  const isInvalid = !!error
+
+  // One slot, three things it can say — the POC's `helperMessage` /
+  // `validationMessage` pair, whose switch has these exact two cases
+  // (RateEditor.tsx:207, 209-220). At rest the helper holds the line.
+  const feedback = error === 'missing_amount'
+    ? AMOUNT_REQUIRED
+    : error === 'out_of_range'
+      ? amountOutOfRange(formatRateAmount(rate.minPrice), formatRateAmount(rate.maxPrice))
+      : defaultRateHelper(formatRateAmount(rate.defaultPrice))
 
   return (
     <div style={{ marginBottom: spacing.lg }}>
@@ -110,7 +141,7 @@ function RateAmountField({ rate, value, isInvalid, onChange }) {
         )}
       </div>
 
-      {/* One line, two jobs — the POC's `helperMessage` / `errorMessage` pair
+      {/* One line, three jobs — the POC's `helperMessage` / `errorMessage` pair
           share this slot (RateEditor.tsx:207-216). At rest it says the one thing
           a provider prices against, their own default; a failed save swaps in
           the error sentence and recolours the field's border with it. */}
@@ -120,7 +151,7 @@ function RateAmountField({ rate, value, isInvalid, onChange }) {
         margin: 0,
         marginTop: spacing.xs,
       }}>
-        {isInvalid ? AMOUNT_REQUIRED : defaultRateHelper(formatRateAmount(rate.defaultPrice))}
+        {feedback}
       </p>
     </div>
   )
@@ -287,9 +318,20 @@ export default function ManageRatesSheet({
   // Over every rate a save would write, not just the edited ones: a seeded
   // amount is untouched by construction, and a rate that is in the write is in
   // the validation (doc 02, "What a seeded draft does to the new validation gate").
-  const invalidSlugs = useMemo(() => (
-    isLockOn ? rates.filter(rate => resolveAmount(amounts[rate.slug]) === null).map(r => r.slug) : []
-  ), [isLockOn, rates, amounts])
+  //
+  // A map rather than a list, because the two failures say different things and
+  // the field needs to know which one it is.
+  const rateErrors = useMemo(() => {
+    const out = {}
+    if (!isLockOn) return out
+    rates.forEach(rate => {
+      const error = validateRateDraft(rate, amounts[rate.slug])
+      if (error) out[rate.slug] = error
+    })
+    return out
+  }, [isLockOn, rates, amounts])
+
+  const hasInvalidDraft = Object.keys(rateErrors).length > 0
 
   // A bad amount does not disable Save — pressing it is what raises the
   // per-field errors, so the button has to stay pressable while one is wrong.
@@ -336,7 +378,7 @@ export default function ManageRatesSheet({
    */
   const handleSubmit = () => {
     if (isSaveDisabled) return
-    if (invalidSlugs.length > 0) {
+    if (hasInvalidDraft) {
       setHasAttemptedSave(true)
       return
     }
@@ -387,20 +429,54 @@ export default function ManageRatesSheet({
   if (isReviewing) {
     const goBack = () => setIsReviewing(false)
     return (
-      <BottomSheet variant="simple" wideModal onDismiss={goBack}>
-        <ReviewRatesStep
-          intent={review.intent}
-          clientName={clientName}
-          rows={review.rows}
-          onConfirm={handleConfirm}
-          onGoBack={goBack}
-        />
-      </BottomSheet>
+      <ReviewRatesStep
+        intent={review.intent}
+        clientName={clientName}
+        rows={review.rows}
+        onConfirm={handleConfirm}
+        onGoBack={goBack}
+      >
+        {/* Placed the way the rates step is placed, and for the same reason:
+            at >=769px the modal's `children` are its only scroller, so nine
+            review rows pushed `Confirm` below the fold. The step hands its
+            three regions back rather than stacking them itself, so the heading
+            and the buttons can sit in the slots either side of the scroller.
+            Below 769px the `simple` variant ignores both slots, so the three go
+            back in their original order. */}
+        {({ header, body, actions }) => (
+          <BottomSheet
+            variant="simple"
+            wideModal
+            onDismiss={goBack}
+            header={isWide ? header : null}
+            footer={isWide ? actions : null}
+          >
+            {!isWide && header}
+            {body}
+            {!isWide && actions}
+          </BottomSheet>
+        )}
+      </ReviewRatesStep>
     )
   }
 
-  return (
-    <BottomSheet variant="simple" wideModal onDismiss={handleClose}>
+  /**
+   * The sheet's three regions, assembled here so they can be *placed*
+   * differently at the two widths.
+   *
+   * At >=769px `BottomSheet` presents as a centred modal capped at `90vh` whose
+   * `children` are the single scroller (`BottomSheet.jsx:77-92`). Passing all
+   * three as children put the buttons inside that scroller, so with a nine-rate
+   * service — boarding, drop-in visits — Save sat below the fold. Header and
+   * footer are `flexShrink: 0` siblings of the scroller, so the title and the
+   * buttons stay put and only the rates move.
+   *
+   * Below 769px the `simple` variant renders `children` alone and ignores both
+   * slots, so there the three are passed as children in the same order they have
+   * always been in, and the rate list carries its own cap instead.
+   */
+  const sheetHeader = (
+    <>
       {/* The title block, `RatesModalTitleRow`'s pairing: the service, and under
           it the line saying whose rates these are and since when. Not the shared
           `Row`, whose label is a bold 16 rather than the heading this needs. The
@@ -427,41 +503,54 @@ export default function ManageRatesSheet({
         checked={isLockOn}
         onChange={handleToggle}
       />
+    </>
+  )
 
-      <div
-        className="hide-scrollbar"
-        style={{
-          paddingTop: spacing.lg, paddingBottom: spacing.lg,
-          ...(isWide ? null : { maxHeight: '46vh', overflowY: 'auto' }),
-        }}
-      >
-        {/* Only the off state has a column to head: with the switch on every
-            amount is a field the provider is setting, and each one labels
-            itself. */}
-        {!isLockOn && (
-          <div style={{
-            display: 'flex', justifyContent: 'flex-end',
-            paddingTop: spacing.sm, paddingBottom: spacing.sm,
-          }}>
-            <span style={{ ...textStyles.text100, color: colors.tertiary, textAlign: 'right' }}>
-              {COL_DEFAULT_RATE}
-            </span>
-          </div>
-        )}
+  const rateList = (
+    <div
+      className="hide-scrollbar"
+      style={{
+        paddingTop: spacing.lg, paddingBottom: spacing.lg,
+        // Narrow only: the `simple` variant has no `maxHeight` of its own and
+        // sits flush to the bottom of the viewport, so anything the sheet cannot
+        // fit runs off the top of the screen where there is no way to scroll to
+        // it. Capping the list is what bounds the sheet. 38vh rather than the
+        // old 46vh because the list is now up to nine rates: on a 375x667 phone
+        // with the switch on, 38vh leaves title + switch + note + two buttons
+        // inside the viewport with room to spare, and the list scrolls.
+        ...(isWide ? null : { maxHeight: '38vh', overflowY: 'auto' }),
+      }}
+    >
+      {/* Only the off state has a column to head: with the switch on every
+          amount is a field the provider is setting, and each one labels
+          itself. */}
+      {!isLockOn && (
+        <div style={{
+          display: 'flex', justifyContent: 'flex-end',
+          paddingTop: spacing.sm, paddingBottom: spacing.sm,
+        }}>
+          <span style={{ ...textStyles.text100, color: colors.tertiary, textAlign: 'right' }}>
+            {COL_DEFAULT_RATE}
+          </span>
+        </div>
+      )}
 
-        {rates.map(rate => (isLockOn ? (
-          <RateAmountField
-            key={rate.slug}
-            rate={rate}
-            value={amounts[rate.slug] ?? ''}
-            isInvalid={hasAttemptedSave && invalidSlugs.includes(rate.slug)}
-            onChange={next => setAmount(rate.slug, next)}
-          />
-        ) : (
-          <RateAmountRow key={rate.slug} rate={rate} />
-        )))}
-      </div>
+      {rates.map(rate => (isLockOn ? (
+        <RateAmountField
+          key={rate.slug}
+          rate={rate}
+          value={amounts[rate.slug] ?? ''}
+          error={hasAttemptedSave ? (rateErrors[rate.slug] ?? null) : null}
+          onChange={next => setAmount(rate.slug, next)}
+        />
+      ) : (
+        <RateAmountRow key={rate.slug} rate={rate} />
+      )))}
+    </div>
+  )
 
+  const sheetActions = (
+    <>
       <Button
         variant="primary"
         size="default"
@@ -480,6 +569,20 @@ export default function ManageRatesSheet({
       >
         {CANCEL}
       </Button>
+    </>
+  )
+
+  return (
+    <BottomSheet
+      variant="simple"
+      wideModal
+      onDismiss={handleClose}
+      header={isWide ? sheetHeader : null}
+      footer={isWide ? sheetActions : null}
+    >
+      {!isWide && sheetHeader}
+      {rateList}
+      {!isWide && sheetActions}
     </BottomSheet>
   )
 }

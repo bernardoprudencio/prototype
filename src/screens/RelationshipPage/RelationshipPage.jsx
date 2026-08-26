@@ -286,7 +286,6 @@ export default function RelationshipPage() {
       )}
 
       <Snackbar message={lr.snackbar} onDone={lr.dismissSnackbar} />
-      <Snackbar message={gr.snackbar} onDone={gr.dismissSnackbar} />
     </div>
   )
 }

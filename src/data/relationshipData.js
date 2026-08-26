@@ -573,6 +573,8 @@ export const buildRecurringWeekBooking = (client, currentTier, skippedThisWeek =
   // One-off bookings carry the same figures on `modify.rateRows`; recurring
   // weeks have no modify block, so they publish the map directly. The granular
   // rates modal seeds from this, so the sheet opens on the ledger's numbers.
+  // Currently unread: `passesGate` in useGranularRates.js closes recurring weeks
+  // out of the granular flow. Retained deliberately, in case that gate reopens.
   const rateAmounts = {}
   ;[...petRows, ...addOnRows].forEach(r => {
     if (r.slug) rateAmounts[r.slug] = r.ratePerWalk
