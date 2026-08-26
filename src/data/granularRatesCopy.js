@@ -67,10 +67,14 @@ export const lockStatusLine = (isCustom, lockedAt, locale) => {
 export const INACTIVE_SERVICE = 'Inactive service'
 
 // ── The modal (ManageRatesModal.tsx + RatesModalTitleRow.tsx) ────────────────
-export const modalTitle = (serviceName) => `${serviceName} rates`
+// The heading carries both the service and the client, so the sheet says whose
+// rates it is editing without the switch below having to repeat the name.
+export const modalTitle = (serviceName, clientName) =>
+  clientName ? `${serviceName} rates for ${clientName}` : `${serviceName} rates`
 
-export const lockToggleLabel = (clientName) =>
-  clientName ? `Lock ${clientName}’s rates` : 'Lock this client’s rates'
+// Deliberately nameless: the heading above already names the client, and the
+// note under the switch names them again in the sentence that matters.
+export const LOCK_TOGGLE_LABEL = 'Lock rates'
 
 export const lockToggleNote = (isOn, clientName) => {
   const payer = clientName || 'This client'

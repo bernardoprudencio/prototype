@@ -9,7 +9,7 @@ import { useIsWide } from '../lib/useMediaQuery'
 import { formatRateAmount } from '../data/relationshipData'
 import {
   AMOUNT_REQUIRED, amountOutOfRange,
-  modalTitle, lockStatusLine, lockToggleLabel, lockToggleNote,
+  modalTitle, lockStatusLine, LOCK_TOGGLE_LABEL, lockToggleNote,
   defaultRateHelper, USE_DEFAULT, COL_DEFAULT_RATE, unitAsSentence,
   SAVE, CANCEL,
 } from '../data/granularRatesCopy'
@@ -210,7 +210,7 @@ function RateAmountRow({ rate }) {
  *     `Lock these rates for Sam` (doc 02, "What opening dirty forces").
  *
  * Props:
- *   serviceName     string          — "Boarding"; the heading is `{serviceName} rates`
+ *   serviceName     string          — "Boarding"; heading is `{serviceName} rates for {clientName}`
  *   clientName      string          — first name
  *   rates           [{ slug, label, defaultPrice, unit }]
  *   savedLocked     bool            — the SAVED lock state (drives the status line)
@@ -480,11 +480,11 @@ export default function ManageRatesSheet({
       {/* The title block, `RatesModalTitleRow`'s pairing: the service, and under
           it the line saying whose rates these are and since when. Not the shared
           `Row`, whose label is a bold 16 rather than the heading this needs. The
-          heading names the service only — the client is named on the switch row
-          below, so it no longer carries both. */}
+          heading names the service and the client; the switch below is nameless
+          because of it, and only the note under the switch repeats the name. */}
       <div style={{ paddingBottom: spacing.sm }}>
         <h2 style={{ ...textStyles.heading300, color: colors.primary, margin: 0 }}>
-          {modalTitle(serviceName)}
+          {modalTitle(serviceName, clientName)}
         </h2>
         <p style={{
           ...textStyles.paragraph100, color: colors.tertiary, margin: 0, marginTop: spacing.xs,
@@ -496,7 +496,7 @@ export default function ManageRatesSheet({
       {/* It stages, it does not write. A control whose effect is deferred has to
           say so, which is what the note is for. */}
       <SwitchField
-        primaryLabel={lockToggleLabel(clientName)}
+        primaryLabel={LOCK_TOGGLE_LABEL}
         primaryLabelSize={200}
         useBoldPrimaryLabel
         secondaryLabel={lockToggleNote(isLockOn, clientName)}
