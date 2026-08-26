@@ -49,6 +49,21 @@ export const SERVICE_DISPLAY_NAME = {
 // BROWSABLE_SERVICE_TYPES (services/constants.py:96-102, 117-119). Gate 4 of
 // `_get_lock_rates_toggle` is membership in this set; training and grooming are
 // out, which is also why they never appear in relationshipData.js SERVICES.
+// Two service-key namespaces exist in this prototype and they do not fully
+// overlap (see CLAUDE.md, "Two service-key namespaces"): the booking/rates side
+// says `dog_daycare` / `drop_in_visits`, the schedule and service-settings side
+// says `doggy_daycare` / `drop_in` (sitterServices.js SITTER_SERVICES ids, which
+// is what AppContext's `serviceStates` is keyed on). This map is the one place
+// that crossing is spelled out, so a rates key can be looked up in `serviceStates`
+// without either side guessing at the other's spelling.
+export const SERVICE_STATE_KEY = {
+  boarding:       'boarding',
+  house_sitting:  'house_sitting',
+  dog_walking:    'dog_walking',
+  drop_in_visits: 'drop_in',
+  dog_daycare:    'doggy_daycare',
+}
+
 export const BROWSABLE_SERVICE_KEYS = Object.keys(SERVICE_DISPLAY_NAME)
 
 // NON_LOCKABLE_ADD_ON_TYPE_SLUGS (services/constants.py:709-714).

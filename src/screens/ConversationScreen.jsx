@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { colors, typography, shadows, textStyles, radius } from '../tokens'
+import { colors, typography, shadows, textStyles, radius, layout } from '../tokens'
 import { BackIcon, MoreIcon, ImageIcon, SendIcon } from '../assets/icons'
 import { peopleImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble, WEB_NAV_BAR_HEIGHT } from '../components'
@@ -392,7 +392,7 @@ export default function ConversationScreen() {
     return (
       <div className="hide-scrollbar" style={{ height: '100%', overflowY: 'auto', background: colors.white }}>
         <div style={{
-          maxWidth: 1140, margin: '0 auto', padding: GUTTER,
+          maxWidth: layout.contentWidth, margin: '0 auto', padding: GUTTER,
           display: 'flex', alignItems: 'flex-start', gap: GUTTER,
         }}>
           <div style={{

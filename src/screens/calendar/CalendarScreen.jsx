@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { colors } from '../../tokens'
+import { colors, layout } from '../../tokens'
 import { useIsWide } from '../../lib/useMediaQuery'
 import { ANNOUNCE, successBannerMessage } from '../../data/calendarCopy'
 import { buildCalendarData, CALENDAR_GCA } from '../../data/calendarData'
@@ -24,8 +24,6 @@ import MonthLayout from './MonthLayout'
 import SyncCalendarPanel from './SyncCalendarPanel'
 import ThreeDayLayout from './ThreeDayLayout'
 import ViewSwitcher from './ViewSwitcher'
-
-const CONTENT_WIDTH = 1140
 
 // `A11yHiddenBox` (useCalendarAnnouncements.tsx:69) — the visually-hidden
 // wrapper the live regions render inside.
@@ -381,7 +379,7 @@ export default function CalendarScreen() {
           {/* `NewCalendarPage` pads 40px at desktop (`padding="10x"`); the page
               caps at the prototype's shared 1140px content width. */}
           <div style={{
-            maxWidth: CONTENT_WIDTH, margin: '0 auto',
+            maxWidth: layout.contentWidth, margin: '0 auto',
             padding: `${CAL_DIMS.pagePadY}px ${CAL_DIMS.pagePadX}px`,
           }}>
             <CalendarHeader

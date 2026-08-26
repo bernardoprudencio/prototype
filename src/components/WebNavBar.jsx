@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { colors, typography } from '../tokens'
+import { colors, layout, typography } from '../tokens'
 import { RoverLogoIcon } from '../assets/icons'
 import WebNavMenu from './WebNavMenu'
 import { WEB_NAV_LEFT, WEB_NAV_RIGHT } from '../data/webNavItems'
@@ -26,7 +26,6 @@ import { getInboxThreads } from '../data/threads'
 // Exported so surfaces that need viewport math below the bar (the two-pane
 // conversation's sticky thread column) don't re-derive it.
 export const BAR_HEIGHT = 60
-const CONTENT_WIDTH = 1140
 const ICON_SIZE     = 16
 
 const itemBase = {
@@ -107,7 +106,7 @@ export default function WebNavBar() {
       position: 'relative', zIndex: 1,
     }}>
       <div style={{
-        maxWidth: CONTENT_WIDTH, margin: '0 auto', padding: '0 16px',
+        maxWidth: layout.contentWidth, margin: '0 auto', padding: '0 16px',
         minHeight: BAR_HEIGHT, display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', gap: 40,
       }}>

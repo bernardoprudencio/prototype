@@ -3,7 +3,11 @@ import { colors, typography } from '../tokens'
 import { LockIcon, ChevronRightIcon } from '../assets/icons'
 import { lockStatusLine, INACTIVE_SERVICE } from '../data/granularRatesCopy'
 
+// Trailing padlock / chevron.
 const ICON_SIZE = 16
+// Leading service icon — the POC's `ServiceLogo` size, deliberately not the
+// trailing one.
+const LEADING_ICON_SIZE = 24
 
 /**
  * ServiceRateRow — one service in the relationship page's read-only rate sheet.
@@ -16,8 +20,9 @@ const ICON_SIZE = 16
  *     can be read.
  *   - The row is pressable whatever the state — opening an inactive service is
  *     the only way to unlock it.
- * The POC's `ServiceLogo` has no prototype equivalent, so the row leads with the
- * name rather than an icon.
+ * The POC's `ServiceLogo` maps onto this prototype's own service icons in
+ * `src/assets/icons.jsx`; the row takes one through the optional `icon` prop and
+ * leads with it. Omit it and the row leads with the name, as it always has.
  *
  * Row.jsx is not reused directly: it only styles a string label at the default
  * colour, and an inactive service needs a greyed one (the same reason the POC
@@ -28,10 +33,11 @@ const ICON_SIZE = 16
  *   isLocked    bool
  *   lockedAt    Date | null
  *   isInactive  bool     — "Inactive service" wins over the lock status line
+ *   icon        node     — optional leading service icon; no slot without it
  *   onPress     () => void
  */
 export default function ServiceRateRow({
-  serviceName, isLocked = false, lockedAt = null, isInactive = false, onPress,
+  serviceName, isLocked = false, lockedAt = null, isInactive = false, icon = null, onPress,
 }) {
   // `undefined` locale = the browser's, as calendarUtils.js already does.
   const status = isInactive ? INACTIVE_SERVICE : lockStatusLine(isLocked, lockedAt, undefined)
@@ -54,6 +60,16 @@ export default function ServiceRateRow({
         boxSizing: 'border-box',
       }}
     >
+      {icon && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: LEADING_ICON_SIZE, height: LEADING_ICON_SIZE,
+          flexShrink: 0, marginRight: 12,
+        }}>
+          {icon}
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
         <p style={{
           fontFamily: typography.fontFamily, fontWeight: 700, fontSize: 16,

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { colors } from '../tokens'
+import { colors, layout } from '../tokens'
 import {
   FAMILY_LABEL,
   FAMILY_PROFILE_REVIEW_ROW,
@@ -63,7 +63,7 @@ export default function FamilyProfileScreen() {
           paddingRight: isWide ? 0 : 16,
         }}
       >
-        <div style={{ maxWidth: 1140, width: '100%', margin: '0 auto', paddingTop: 8, paddingBottom: isWide ? 0 : 40 }}>
+        <div style={{ maxWidth: layout.contentWidth, width: '100%', margin: '0 auto', paddingTop: 8, paddingBottom: isWide ? 0 : 40 }}>
           {rows.map((row) => (
             <SettingsRow
               key={row.id}

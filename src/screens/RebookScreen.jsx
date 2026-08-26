@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { colors, typography, radius, shadows } from '../tokens'
+import { colors, typography, radius, shadows, layout } from '../tokens'
 import { DropdownSmallIcon } from '../assets/icons'
 import { Chip, Button, TabBar } from '../components'
 import { useIsWide } from '../lib/useMediaQuery'
@@ -130,7 +130,7 @@ export default function RebookScreen() {
       }}>
         {/* The rule stays full-bleed; the title moves onto the same left edge as
             the card grid below it. */}
-        <div style={isWide ? { maxWidth: 1140, margin: '0 auto', padding: '0 16px' } : undefined}>
+        <div style={isWide ? { maxWidth: layout.contentWidth, margin: '0 auto', padding: '0 16px' } : undefined}>
           <h1 style={{
             fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26,
             lineHeight: 1.25, color: colors.primary, margin: 0,
@@ -144,7 +144,7 @@ export default function RebookScreen() {
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
         {/* At wide width everything under the header shares one 1140 column, so
             the chips and the sort row line up with the card grid. */}
-        <div style={isWide ? { maxWidth: 1140, margin: '0 auto' } : undefined}>
+        <div style={isWide ? { maxWidth: layout.contentWidth, margin: '0 auto' } : undefined}>
         {/* Section chips */}
         <div style={{ display: 'flex', gap: 8, padding: '16px 16px 0' }}>
           <Chip

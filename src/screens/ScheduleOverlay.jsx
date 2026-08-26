@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { colors, shadows, textStyles } from '../tokens'
+import { colors, shadows, textStyles, layout } from '../tokens'
 import { BackIcon } from '../assets/icons'
 import { Button } from '../components'
 import RelationshipManagement from './relationship/RelationshipManagement'
 import { useAppContext } from '../context/AppContext'
+import { useIsWide } from '../lib/useMediaQuery'
 import { formatActionTimestamp } from '../hooks/useDate'
 
 const UNIT_LABELS = {
@@ -20,6 +21,7 @@ export default function ScheduleOverlay() {
   const navigate = useNavigate()
   const { state: ctx } = useLocation()
   const { ownerUnits, setOwnerUnits, resolvedCards, setResolvedCards, addLiveEvent } = useAppContext()
+  const isWide = useIsWide()
   const scheduleRef = useRef(null)
   const [showToast, setShowToast] = useState(false)
   const toastTimerRef = useRef(null)
@@ -35,21 +37,45 @@ export default function ScheduleOverlay() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white, position: 'relative' }}>
-      <div style={{ borderBottom: `1px solid ${colors.border}`, boxShadow: shadows.headerShadow, padding: '12px 16px 0', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', minHeight: 62, padding: '8px 0' }}>
-          <div onClick={() => navigate(-1)} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flexShrink: 0 }}>
-            <BackIcon />
-          </div>
-          <div style={{ flex: 1, marginLeft: 8, minWidth: 0 }}>
-            <p style={{ ...textStyles.text200Semibold, color: colors.primary, margin: 0 }}>Manage schedule</p>
-            <p style={{ ...textStyles.text100, color: colors.primary, margin: 0 }}>{ctx?.ownerName}</p>
+      {/* Header. Below 769px this is app chrome — a bordered bar carrying the
+          only back affordance. At and above it the web navbar is the navigation,
+          so the bar chrome and the back arrow go: the title becomes a page
+          heading and the two actions sit under it, both inside the shared
+          content column the navbar establishes. */}
+      <div style={isWide ? {
+        maxWidth: layout.contentWidth, margin: '0 auto', width: '100%',
+        padding: '24px 16px 0', boxSizing: 'border-box', flexShrink: 0,
+      } : {
+        borderBottom: `1px solid ${colors.border}`, boxShadow: shadows.headerShadow,
+        padding: '12px 16px 0', flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', minHeight: isWide ? 0 : 62, padding: isWide ? 0 : '8px 0' }}>
+          {!isWide && (
+            <div onClick={() => navigate(-1)} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flexShrink: 0 }}>
+              <BackIcon />
+            </div>
+          )}
+          <div style={{ flex: 1, marginLeft: isWide ? 0 : 8, minWidth: 0 }}>
+            {isWide ? (
+              <h1 style={{ ...textStyles.display400, color: colors.primary, margin: 0 }}>Manage schedule</h1>
+            ) : (
+              <p style={{ ...textStyles.text200Semibold, color: colors.primary, margin: 0 }}>Manage schedule</p>
+            )}
+            <p style={{ ...textStyles.text100, color: colors.primary, margin: isWide ? '4px 0 0' : 0 }}>{ctx?.ownerName}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, paddingTop: 12, paddingBottom: 14 }}>
+        <div style={{ display: 'flex', gap: 8, paddingTop: isWide ? 16 : 12, paddingBottom: 14 }}>
           <Button variant="primary" style={{ flexShrink: 0 }} onClick={() => scheduleRef.current?.openAdd()}>Add a {unitLabel}</Button>
           <Button variant="default" style={{ flexShrink: 0 }} onClick={() => scheduleRef.current?.openManage()}>Manage rules</Button>
         </div>
       </div>
+
+      {/* The agenda body has no wide layout of its own, so at wide width it
+          shares the navbar's column rather than stretching to the viewport. */}
+      <div style={isWide ? {
+        flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
+        maxWidth: layout.contentWidth, width: '100%', margin: '0 auto',
+      } : { display: 'contents' }}>
       <RelationshipManagement
         ref={scheduleRef}
         initialPets={ctx?.pets}
@@ -72,6 +98,8 @@ export default function ScheduleOverlay() {
           addLiveEvent(ownerId, { id: Date.now(), type: 'resolution', resolution, timestamp: ts, card })
         }}
       />
+      </div>
+
       {showToast && (
         <div style={{
           position: 'absolute', bottom: 24, left: 16, right: 16, zIndex: 50,

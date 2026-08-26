@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { colors, typography, radius, shadows } from '../tokens'
-import { Button, PetAvatar } from '../components'
+import { colors, typography, radius, shadows, layout } from '../tokens'
+import { Button, PetAvatar, WEB_NAV_BAR_HEIGHT } from '../components'
 import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../assets/icons'
 import Chip from '../components/Chip'
 import { useApp } from '../context/AppContext'
@@ -669,23 +669,27 @@ export default function EditTemplateScreen() {
     <>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.bgSecondary }}>
 
-      {/* ── Nav header ── */}
-      <div style={{
-        background: colors.white, borderBottom: `1px solid ${colors.border}`,
-        boxShadow: shadows.headerShadow, padding: '0 16px',
-        display: 'flex', alignItems: 'center', gap: 8, height: 56, flexShrink: 0, zIndex: 3,
-      }}>
-        <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={onBack}>
-          <BackIcon />
+      {/* ── Nav header — app chrome, and so narrow-only. At the wide breakpoint
+          the web navbar is the navigation, so the bar and its back arrow go;
+          the form panel's own header already carries the page title there. ── */}
+      {!isDesktop && (
+        <div style={{
+          background: colors.white, borderBottom: `1px solid ${colors.border}`,
+          boxShadow: shadows.headerShadow, padding: '0 16px',
+          display: 'flex', alignItems: 'center', gap: 8, height: 56, flexShrink: 0, zIndex: 3,
+        }}>
+          <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={onBack}>
+            <BackIcon />
+          </div>
+          <p style={{ ...tx(16, 700, colors.primary), margin: 0 }}>Edit schedule template</p>
         </div>
-        <p style={{ ...tx(16, 700, colors.primary), margin: 0 }}>Edit schedule template</p>
-      </div>
+      )}
 
       {isDesktop ? (
         // ── Desktop: sidebar + form panel ────────────────────────────────
         <div className="hide-scrollbar" style={{
           flex: 1, overflowY: 'auto', display: 'flex', alignItems: 'flex-start',
-          maxWidth: 1140, margin: '0 auto', width: '100%',
+          maxWidth: layout.contentWidth, margin: '0 auto', width: '100%',
           gap: 24, padding: '24px 24px 0', boxSizing: 'border-box',
         }}>
           {/* Sidebar — scrolls with outer container */}
@@ -699,7 +703,7 @@ export default function EditTemplateScreen() {
             flex: 1, minWidth: 0, background: colors.white,
             borderRadius: radius.primary,
             position: 'sticky', top: 0,
-            height: 'calc(100vh - 56px)',
+            height: `calc(100vh - ${WEB_NAV_BAR_HEIGHT}px)`,
             overflow: 'hidden', display: 'flex', flexDirection: 'column',
           }}>
             {/* Panel header */}

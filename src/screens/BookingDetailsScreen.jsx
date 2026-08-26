@@ -12,6 +12,8 @@ import {
 import { getClient } from '../data/contacts'
 import { useApp } from '../context/AppContext'
 import { useLockedRates } from '../lib/useLockedRates'
+import { useIsWide } from '../lib/useMediaQuery'
+import { webColumn } from '../lib/webColumn'
 import { useGranularRates } from '../lib/useGranularRates'
 import { useRelationshipData } from '../lib/useRelationshipData'
 import { toggleLabelLedger } from '../data/lockedRatesCopy'
@@ -200,6 +202,10 @@ const FlatRow = ({ leftItem, label, lines = [] }) => (
  * DetailsActions after DetailsWarnings), which is where it renders below.
  */
 function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
+  // Only the standalone page (`chrome`) has a viewport to overrun; the rail
+  // variant is already inside a column its parent page sized.
+  const isWide = useIsWide()
+  const column = webColumn(chrome && isWide)
   const navigate = useNavigate()
   const { ownerId, conversationOpk: opkFromUrl } = useParams()
   const conversationOpk = opkProp ?? opkFromUrl
@@ -328,10 +334,16 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
           `flexDirection="row" gap="3x" px="4x"`: a back control with an
           underlined "Back" link, the React-Native-only centred title, and
           `details_buttons` at the right end. */}
+      {/* The bar is app chrome and stays as-is: the `chrome` variant is
+          mobile-only by route (App.jsx early-returns null at wide, mirroring
+          ConversationDetailsPage.tsx:24), so there is no wide presentation of
+          this header to design. */}
       <div style={{
         background: colors.white, boxShadow: shadows.headerShadow, padding: '0 16px',
-        display: 'flex', alignItems: 'center', gap: spacing.md, height: 56, flexShrink: 0, zIndex: 3,
+        height: 56, flexShrink: 0, zIndex: 3,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md, height: '100%', width: '100%', ...column }}>
         <div role="button" tabIndex={0} onClick={onBack} aria-label={copy.BACK_TEXT}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: spacing.xs, flexShrink: 0 }}>
           <BackIcon />
@@ -357,6 +369,7 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
           {copy.MODIFY_REQUEST}
         </Button>
       </div>
+      </div>
       </>}
 
       {/* At wide width the page owns the scroll and the rail's own container
@@ -364,6 +377,7 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
       <div className="hide-scrollbar" style={chrome
         ? { flex: 1, overflowY: 'auto', padding: '0 16px' }
         : { height: 'auto', overflowY: 'visible' }}>
+      <div style={column}>
 
         {/* ─── 1. Booking status — pt="6x" pb="2x", column gap="2x" ─── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm, paddingTop: spacing.xl, paddingBottom: spacing.sm }}>
@@ -631,6 +645,7 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* ─── Modals ─── */}

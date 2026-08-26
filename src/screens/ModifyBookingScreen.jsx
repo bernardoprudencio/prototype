@@ -10,6 +10,8 @@ import { getClient } from '../data/contacts'
 import { useApp } from '../context/AppContext'
 import { lockableRatesFor, lockedRatesFor } from '../data/lockableRates'
 import { useLockedRates } from '../lib/useLockedRates'
+import { useIsWide } from '../lib/useMediaQuery'
+import { webColumn } from '../lib/webColumn'
 import { useRelationshipData } from '../lib/useRelationshipData'
 import { toggleLabel } from '../data/lockedRatesCopy'
 import * as copy from '../data/modifyBookingCopy'
@@ -192,6 +194,7 @@ const ADJUSTMENTS = [
 ]
 
 export default function ModifyBookingScreen() {
+  const isWide = useIsWide()
   const { ownerId, conversationOpk } = useParams()
   const navigate = useNavigate()
 
@@ -343,9 +346,26 @@ export default function ModifyBookingScreen() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
       {/* ─── 1. Header ─── */}
+      {/* Below 769px this is the app's bar: shadowed chrome, the "Back" control
+          and an optically centred title. At and above it the web navbar is the
+          navigation, so the bar chrome and the back control go and the title
+          becomes a left-aligned page heading in the navbar's column. */}
       <div style={{
-        background: colors.white, boxShadow: shadows.headerShadow, padding: `0 ${spacing.lg}px`,
-        display: 'flex', alignItems: 'center', gap: spacing.md, height: 56, flexShrink: 0, zIndex: 3,
+        background: colors.white, padding: `0 ${spacing.lg}px`,
+        boxShadow: isWide ? 'none' : shadows.headerShadow,
+        height: isWide ? 'auto' : 56, flexShrink: 0, zIndex: 3,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+      {isWide ? (
+        <div style={{ padding: `${spacing.xl}px 0 0`, ...webColumn(isWide) }}>
+          <h1 style={{ ...textStyles.display400, color: colors.primary, margin: 0 }}>
+            {copy.HEADER_MODIFY_BOOKING}
+          </h1>
+        </div>
+      ) : (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: spacing.md,
+        height: '100%', width: '100%',
       }}>
         <div role="button" tabIndex={0} onClick={onBack} aria-label={BACK_TEXT}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: spacing.xs, flexShrink: 0 }}>
@@ -358,11 +378,14 @@ export default function ModifyBookingScreen() {
         {/* Balances the back control so the title stays optically centred. */}
         <div style={{ width: 56, flexShrink: 0 }} />
       </div>
+      )}
+      </div>
 
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
         <div style={{
           padding: `${spacing.xl}px ${spacing.lg}px ${spacing.xxl}px`,
           display: 'flex', flexDirection: 'column', gap: spacing.xl,
+          boxSizing: 'border-box', ...webColumn(isWide),
         }}>
           {/* ─── 2. Reason ─── */}
           <Select

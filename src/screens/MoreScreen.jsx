@@ -5,6 +5,8 @@ import { ChevronRightIcon, SettingsIcon, ChartIcon } from '../assets/icons'
 import { TabBar } from '../components'
 import { SITTER_MORE_MENU, SITTER_MORE_MENU_BANNER } from '../data/moreMenu'
 import { TAB_PATHS } from '../lib/tabPaths'
+import { useIsWide } from '../lib/useMediaQuery'
+import { webColumn } from '../lib/webColumn'
 
 
 // Mirrors roverdotcom/web .../components/buttons/MenuRow:
@@ -99,6 +101,7 @@ const PromoBanner = ({ banner }) => (
 
 export default function MoreScreen() {
   const navigate = useNavigate()
+  const isWide = useIsWide()
   const onTabSelect = (id) => {
     const path = TAB_PATHS[id]
     if (path) navigate(path)
@@ -106,14 +109,19 @@ export default function MoreScreen() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
+      {/* The header rule stays full-bleed at every width — only what sits on it
+          moves into the navbar's content column. */}
       <div style={{ borderBottom: `1px solid ${colors.border}`, padding: '24px 20px 16px', flexShrink: 0 }}>
-        <h1 style={{
-          fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26,
-          lineHeight: 1.25, color: colors.primary, margin: 0,
-        }}>More</h1>
+        <div style={webColumn(isWide)}>
+          <h1 style={{
+            fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26,
+            lineHeight: 1.25, color: colors.primary, margin: 0,
+          }}>More</h1>
+        </div>
       </div>
 
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
+        <div style={webColumn(isWide)}>
         <PromoBanner banner={SITTER_MORE_MENU_BANNER} />
 
         {SITTER_MORE_MENU.map((section, sIdx) => (
@@ -145,6 +153,7 @@ export default function MoreScreen() {
           subtitle="Leadership review decks"
           onPress={() => navigate('/presentations')}
         />
+        </div>
       </div>
 
       <TabBar activeTab="more" onTabSelect={onTabSelect} />

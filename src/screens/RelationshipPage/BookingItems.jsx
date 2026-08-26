@@ -83,7 +83,9 @@ const SeeMoreModal = ({ open, onClose, type, bookings, earningsAmount, currencyI
   )
 }
 
-export default function BookingItems({ type, bookings, earningsAmount, currencyIso, onCardClick }) {
+// `bare` drops the card chrome so the list can sit inside a section card that
+// already paints one — no white box nested in a white box.
+export default function BookingItems({ type, bookings, earningsAmount, currencyIso, onCardClick, bare = false }) {
   const [modalOpen, setModalOpen] = useState(false)
 
   if (!bookings || bookings.length === 0) return null
@@ -93,8 +95,7 @@ export default function BookingItems({ type, bookings, earningsAmount, currencyI
 
   return (
     <div style={{
-      background: colors.white,
-      borderRadius: radius.primary,
+      ...(bare ? null : { background: colors.white, borderRadius: radius.primary }),
       padding: '16px 0 8px',
       display: 'flex', flexDirection: 'column',
     }}>

@@ -1,7 +1,7 @@
 import React from 'react'
-import { colors, typography } from '../tokens'
+import { colors, typography, palette, radius } from '../tokens'
 
-export default function Row({ label, sublabel, leftItem, rightItem, onClick, firstRow = false }) {
+export default function Row({ label, sublabel, leftItem, rightItem, onClick, firstRow = false, selected = false }) {
   return (
     <div
       onClick={onClick}
@@ -15,6 +15,9 @@ export default function Row({ label, sublabel, leftItem, rightItem, onClick, fir
         width: '100%',
         cursor: onClick ? 'pointer' : 'default',
         boxSizing: 'border-box',
+        // Selected state paints on the existing box — geometry is untouched, so a
+        // selected row still lines up with its unselected siblings.
+        ...(selected && { background: palette.blue[100], borderRadius: radius.primary }),
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, gap: leftItem ? 8 : 0 }}>

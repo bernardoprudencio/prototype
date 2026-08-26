@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { colors } from '../tokens'
+import { colors, layout } from '../tokens'
 import {
   GridPlusIcon,
   GroomingIcon,
@@ -438,7 +438,7 @@ export default function ServiceSettingsLayout() {
         />
 
         {showHubFetchError ? (
-          <div style={{ maxWidth: 1140, margin: '0 auto', padding: '40px 16px' }}>
+          <div style={{ maxWidth: layout.contentWidth, margin: '0 auto', padding: '40px 16px' }}>
             <HubBanner
               severity="error"
               title={HUB_COPY.hubFetchError.title}
@@ -460,7 +460,7 @@ export default function ServiceSettingsLayout() {
               // Grows to the viewport so the rule between the panes runs full
               // height even when the pane is short.
               flex: 1,
-              maxWidth: 1140,
+              maxWidth: layout.contentWidth,
               width: '100%',
               margin: '0 auto',
               paddingTop: 24,
