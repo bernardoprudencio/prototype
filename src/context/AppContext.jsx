@@ -204,6 +204,21 @@ export function AppProvider({ children }) {
     setCalendarAvailability(prev => mergeAvailabilityPatches(prev, updates))
   }
 
+  // Sitter-wide availability settings edits — the committed state behind
+  // `AvailabilitySettingsPanel`, keyed by production's `serviceSlug` and holding
+  // only the keys that actually changed, exactly as the POC's per-service PATCH
+  // body does (`diffFromServer`, AvailabilitySettingsPanel.tsx:101-111). Session
+  // -only, like `calendarAvailability` above.
+  const [calendarServiceSettings, setCalendarServiceSettings] = useState({})  // { [serviceSlug]: partial }
+
+  // The POC splices each PATCH response into its react-query list cache
+  // (`:589-601`); here that cache is this map, and one call commits one
+  // service's diff.
+  const commitCalendarServiceSettings = (slug, patch) => {
+    if (!slug || !patch || Object.keys(patch).length === 0) return
+    setCalendarServiceSettings(prev => ({ ...prev, [slug]: { ...prev[slug], ...patch } }))
+  }
+
   const persistEnum = (key, next, raw) => {
     raw(next)
     if (typeof window !== 'undefined') {
@@ -292,6 +307,7 @@ export function AppProvider({ children }) {
       isRatesLocked,                      setRatesLocked,
       // calendar
       calendarAvailability, patchCalendarAvailability,
+      calendarServiceSettings, commitCalendarServiceSettings,
       calendarSaveFails,   setCalendarSaveFails,
     }}>
       {children}

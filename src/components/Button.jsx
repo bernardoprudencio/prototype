@@ -17,14 +17,31 @@ const VARIANTS = {
   destructive: { background: colors.destructive, borderColor: 'transparent',            color: colors.white,     boxShadow: shadows.medium },
 }
 
-export default function Button({ children, variant = 'default', size = 'small', disabled = false, fullWidth = false, onClick, icon, style = {} }) {
+/**
+ * `ariaLabel` exists for icon-only buttons, which have no text node to name
+ * them. `href` / `hrefTarget` / `rel` mirror Kibble's Button, which renders an
+ * anchor under the hood when given an `href` (Button.tsx destructures both off
+ * `webProps`) — the calendar's sync panel needs that for its `webcal:` and
+ * Google add-by-URL links, which must be real navigations.
+ */
+export default function Button({
+  children, variant = 'default', size = 'small', disabled = false,
+  fullWidth = false, onClick, icon, style = {}, ariaLabel,
+  href, hrefTarget, rel,
+}) {
   const v = disabled ? VARIANTS.disabled : VARIANTS[variant]
   const s = SIZES[size]
   const isIconOnly = icon && !children
 
+  const Tag = href ? 'a' : 'button'
+
   return (
-    <button
+    <Tag
       onClick={disabled ? undefined : onClick}
+      aria-label={ariaLabel}
+      href={href}
+      target={href ? hrefTarget : undefined}
+      rel={href ? rel : undefined}
       style={{
         fontFamily: typography.fontFamily,
         fontWeight: 700,
@@ -36,6 +53,7 @@ export default function Button({ children, variant = 'default', size = 'small', 
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
+        textDecoration: 'none',
         paddingTop:    isIconOnly ? s.paddingTop    : s.paddingTop,
         paddingBottom: isIconOnly ? s.paddingBottom : s.paddingBottom,
         paddingLeft:   isIconOnly ? s.paddingTop    : s.paddingLeft,
@@ -52,6 +70,6 @@ export default function Button({ children, variant = 'default', size = 'small', 
     >
       {icon}
       {children && <span>{children}</span>}
-    </button>
+    </Tag>
   )
 }

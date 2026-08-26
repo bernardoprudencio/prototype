@@ -50,6 +50,7 @@ export default function CompactLayout({
   data, selectedDate, rangeStart, rangeEnd, gca,
   isConfirmingAvailability, onConfirmAvailability,
   onPrevMonth, onNextMonth, onDayClick, onOpenSheet, onOpenConversation,
+  onOpenHelp, onOpenSync, onOpenSettings,
 }) {
   const { year, month, bookings, availability } = data
   const [calendarCollapsed, setCalendarCollapsed] = useState(false)
@@ -75,6 +76,9 @@ export default function CompactLayout({
               year={year}
               calendarCollapsed={calendarCollapsed}
               onToggleCollapsed={() => setCalendarCollapsed((prev) => !prev)}
+              onOpenHelp={onOpenHelp}
+              onOpenSync={onOpenSync}
+              onOpenSettings={onOpenSettings}
             />
             {calendarCollapsed ? (
               <CompactWeekStrip

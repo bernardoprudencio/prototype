@@ -15,10 +15,13 @@ import { LAYOUT_VARIANT, useCalendarLayout } from '../../lib/useCalendarLayout'
 import { TAB_PATHS } from '../../lib/tabPaths'
 import Snackbar from '../../components/Snackbar'
 import TabBar from '../../components/TabBar'
+import AvailabilitySettingsPanel from './AvailabilitySettingsPanel'
 import AvailabilitySheet from './AvailabilitySheet'
 import CalendarHeader from './CalendarHeader'
 import CompactLayout from './CompactLayout'
+import HelpSheet from './HelpSheet'
 import MonthLayout from './MonthLayout'
+import SyncCalendarPanel from './SyncCalendarPanel'
 import ThreeDayLayout from './ThreeDayLayout'
 import ViewSwitcher from './ViewSwitcher'
 
@@ -122,6 +125,13 @@ export default function CalendarScreen() {
   const [isSaving, setIsSaving] = useState(false)
   const [isConfirmingAvailability, setIsConfirmingAvailability] = useState(false)
   const [gcaConfirmed, setGcaConfirmed] = useState(false)
+
+  // The three header panels. `NewCalendarPage` holds one `useState` per panel
+  // rather than a single mode, because nothing about them is mutually exclusive
+  // in the state — only in the UI, where each is modal.
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [syncOpen, setSyncOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // `inFlightRef` (`:210-213`) — a synchronous mirror of `isSaving`, because the
   // state update lands a tick too late to gate a click in the same frame.
@@ -344,6 +354,15 @@ export default function CalendarScreen() {
     onOpenConversation: openConversation,
   }
 
+  // The header lives in `MonthLayout`'s sibling position at wide width and
+  // inside `CompactLayout` at compact, so the panel openers are passed the same
+  // way `NewCalendarPage` passes them: down to whichever header is rendered.
+  const panelHandlers = {
+    onOpenHelp: () => setHelpOpen(true),
+    onOpenSync: () => setSyncOpen(true),
+    onOpenSettings: () => setSettingsOpen(true),
+  }
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
@@ -368,6 +387,7 @@ export default function CalendarScreen() {
             <CalendarHeader
               year={viewYear}
               actions={<ViewSwitcher variant={variant} onChange={setVariant} />}
+              {...panelHandlers}
             />
             {variant === LAYOUT_VARIANT.THREE_DAY ? (
               <ThreeDayLayout
@@ -385,7 +405,7 @@ export default function CalendarScreen() {
         // The compact layout owns its own header (the month/year `<h1>` plus the
         // collapse toggle), its own scroller, and the fixed selection bar, so it
         // takes the flex slot whole rather than sitting inside a shared one.
-        <CompactLayout {...layoutProps} />
+        <CompactLayout {...layoutProps} {...panelHandlers} />
       )}
 
       <AvailabilitySheet
@@ -400,6 +420,10 @@ export default function CalendarScreen() {
         onSaveAll={handleSaveServiceList}
         onClose={handleCloseSheet}
       />
+
+      <HelpSheet isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
+      <SyncCalendarPanel isOpen={syncOpen} onClose={() => setSyncOpen(false)} />
+      <AvailabilitySettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <Snackbar message={snackbar} onDone={() => setSnackbar('')} />
 

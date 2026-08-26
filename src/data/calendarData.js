@@ -36,6 +36,7 @@ import { getRelationshipData } from './relationshipData'
 import { buildAgenda } from '../lib/scheduleHelpers'
 import { dateKey, parseDate, addDays } from '../lib/dateUtils'
 import { SERVICES as SITTER_SERVICES, DEFAULT_SERVICE_STATES, SERVICE_STATE } from './sitterServices'
+import { SITTER_FIRST_NAME, SITTER_PROFILE } from './sitterProfile'
 
 // ── Calendar IDs ────────────────────────────────────────────────────────────
 // Production's `Calendar` primary keys, read off the POC's own fixtures and
@@ -136,6 +137,114 @@ const to12h = (hhmm) => {
 // `relationshipData.js` (booking side) says "Dog walking", and the calendar
 // mixes rows from both — so every row takes its label from the preference it
 // counts against, which is also the label the availability editor shows.
+// ── Sitter-wide availability settings ───────────────────────────────────────
+// The `CalendarSettingsService[]` the POC's `AvailabilitySettingsPanel` reads
+// from `/api/person/<opk>/calendar-settings/`. Nothing in the prototype models
+// per-service defaults at this granularity — `sitterServices.js` has state and
+// `sitterProfile.js` has `acceptingNew`, and neither has lead time, weekday
+// defaults, or a recurring-clients capability — so the two fields with no
+// prototype source are authored here and marked.
+//
+// `serviceSlug` uses production's own slugs rather than either of the
+// prototype's two service-key namespaces (CLAUDE.md), because the panel's
+// overnight lead-time spread is keyed off them (`OVERNIGHT_SLUGS`,
+// AvailabilitySettingsPanel.tsx:83).
+const SETTINGS_SLUG = {
+  boarding: 'overnight-boarding',
+  house_sitting: 'overnight-traveling',
+  drop_in: 'drop-in',
+  doggy_daycare: 'doggy-day-care',
+  dog_walking: 'dog-walking',
+}
+
+// PROTOTYPE-ONLY, both of these. Production serves `spacesAvailableText` as
+// the stepper's own sublabel and `canUpdateAcceptingRecurringClients` as a
+// per-service capability flag; the prototype has neither. The text is supplied
+// only for the services whose capacity is above one, which is the same gate the
+// per-day editor uses (`maximumSpacesAvailable > 1`), so the stepper appears in
+// exactly the places it already appears there. The capability is true for the
+// three daytime services, which are the ones the recurring clients actually
+// book weekly in `contacts.js`.
+const SPACES_TEXT = {
+  boarding: 'Dogs you can host at once',
+  house_sitting: 'Homes you can sit at once',
+  drop_in: 'Visits you can take in a day',
+  doggy_daycare: 'Dogs you can watch at once',
+  dog_walking: 'Walks you can take in a day',
+}
+
+const CAN_UPDATE_RECURRING = {
+  boarding: false,
+  house_sitting: false,
+  drop_in: true,
+  doggy_daycare: true,
+  dog_walking: true,
+}
+
+// Lead time in days, and the weekday defaults. Both are fixtures: the spread
+// exists so the panel's two option sets (overnight up to 14 days, daytime up to
+// 7) are both exercised, and dog walking drops Sunday so at least one service
+// arrives with a day already unchecked.
+const LEAD_TIME_DAYS = {
+  boarding: 7,
+  house_sitting: 3,
+  drop_in: 1,
+  doggy_daycare: 1,
+  dog_walking: 0,
+}
+
+const DAY_KEYS = [
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+]
+
+const OFF_DAYS = { dog_walking: ['sunday'] }
+
+export const CALENDAR_SETTINGS_SERVICES = CALENDAR_SERVICE_IDS.map((id) => {
+  const pref = CALENDAR_PREFERENCES.find((p) => p.serviceId === id)
+  const off = OFF_DAYS[id] ?? []
+  const days = Object.fromEntries(DAY_KEYS.map((d) => [d, !off.includes(d)]))
+  return {
+    serviceSlug: SETTINGS_SLUG[id],
+    serviceId: id,
+    serviceTitle: pref.name,
+    isAway: pref.isAway,
+    // `sitterProfile.js`'s own per-service flag, so the panel opens agreeing
+    // with what the service-settings hub says.
+    isAcceptingNewCustomers:
+      SITTER_PROFILE.services.find((s) => s.id === id)?.acceptingNew ?? true,
+    isAcceptingNewRecurringClients: true,
+    canUpdateAcceptingRecurringClients: CAN_UPDATE_RECURRING[id],
+    spacesAvailable: pref.spacesAvailable,
+    spacesAvailableText: pref.maximumSpacesAvailable > 1 ? SPACES_TEXT[id] : '',
+    leadTimeDays: LEAD_TIME_DAYS[id],
+    ...days,
+  }
+})
+
+// The keys a settings override may carry — `OVERRIDE_KEYS`
+// (AvailabilitySettingsPanel.tsx:73-80), which is also what `diffFromServer`
+// walks. `spacesAvailableText`, `serviceTitle` and the capability flag are
+// read-only, so they are deliberately absent.
+export const SETTINGS_OVERRIDE_KEYS = [
+  'isAway',
+  'isAcceptingNewCustomers',
+  'isAcceptingNewRecurringClients',
+  'spacesAvailable',
+  'leadTimeDays',
+  ...DAY_KEYS,
+]
+
+export const SETTINGS_DAY_KEYS = DAY_KEYS
+
+// PROTOTYPE-ONLY. Production hands the sync panel a scheme-less signed iCal
+// URL through `Rover.pages.newCalendar.iCalUrl`
+// (SyncCalendarPanel.tsx:36-38), e.g.
+// `//rover.local:8001/ical/<username>/as-provider/<token>/`. There is no
+// backend here, so the shape is reproduced with a stand-in token — the built
+// URLs are real enough to read and copy, and will not resolve.
+export const CALENDAR_ICAL_URL =
+  `//www.rover.com/ical/${SITTER_FIRST_NAME.toLowerCase()}-p/as-provider/prototype/`
+
 const PREF_BY_CALENDAR_ID = Object.fromEntries(
   CALENDAR_PREFERENCES.map((p) => [p.calendarId, p])
 )

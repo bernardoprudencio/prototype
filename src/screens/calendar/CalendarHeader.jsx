@@ -1,7 +1,10 @@
 import React from 'react'
 import { colors, textStyles } from '../../tokens'
 import { HEADER } from '../../data/calendarCopy'
-import { ChevronDownIcon, ChevronUpIcon } from '../../assets/icons'
+import {
+  ChevronDownIcon, ChevronUpIcon, HelpBubbleIcon, RebookIcon, SettingsIcon,
+} from '../../assets/icons'
+import Button from '../../components/Button'
 import Pill from '../../components/Pill'
 import NavButton from './NavButton'
 
@@ -23,13 +26,14 @@ import NavButton from './NavButton'
  * `CollapseSmall`; the prototype's equivalents are `ChevronDownIcon` /
  * `ChevronUpIcon`.
  *
- * `actions` is the right-hand slot. In the POC it holds the view switcher plus
- * the Help / "Sync your calendar" / "Availability settings" buttons; each of
- * those opens a panel this port has not built, and the POC itself only renders
- * the sync button when `onOpenSync` is passed (`:118-124`), so an empty slot is
- * its own behaviour for absent handlers rather than a stripped-down header. The
- * compact branch's `flexWrap` is why the slot can safely hold the switcher at
- * ~375px once commit 7 fills it.
+ * `actions` is the right-hand slot, and it holds the view switcher. The three
+ * panel buttons are the header's own, positioned as the POC positions them: the
+ * Help button is icon-only and sits in the **left** cluster beside the Beta
+ * badge in both variants (`:87/:199`), while Sync and Settings close the right
+ * cluster after the switcher. Each renders only when its handler is passed,
+ * which is the POC's own rule for the sync button (`:118-124`) generalised to
+ * all three. Labels show at wide and drop to icon-only at compact (`:211/:221`),
+ * where `flexWrap` lets the cluster fall to a second row rather than overflow.
  *
  * One divergence. The POC wraps the year in a `<span>` that a
  * `@media (max-width: XXS_MAX)` rule hides, so the heading collapses to just
@@ -40,9 +44,28 @@ import NavButton from './NavButton'
  */
 export default function CalendarHeader({
   variant = 'wide', year, month, calendarCollapsed = false, onToggleCollapsed,
-  actions = null,
+  actions = null, onOpenHelp, onOpenSync, onOpenSettings,
 }) {
   const isCompact = variant === 'compact'
+
+  // At compact width the label is dropped and `ariaLabel` carries the name.
+  const panelButton = (label, iconNode, onClick) => (
+    <Button
+      variant="flat"
+      size="small"
+      onClick={onClick}
+      icon={iconNode}
+      ariaLabel={label}
+    >
+      {isCompact ? null : label}
+    </Button>
+  )
+
+  const rightCluster = [
+    actions,
+    onOpenSync && panelButton(HEADER.syncCalendar, <RebookIcon color={colors.link} />, onOpenSync),
+    onOpenSettings && panelButton(HEADER.availabilitySettings, <SettingsIcon size={20} color={colors.link} />, onOpenSettings),
+  ].filter(Boolean)
 
   return (
     <div style={{
@@ -67,9 +90,20 @@ export default function CalendarHeader({
           </NavButton>
         )}
         <Pill bg={colors.link}>{HEADER.beta}</Pill>
+        {onOpenHelp && (
+          <Button
+            variant="flat"
+            size="small"
+            onClick={onOpenHelp}
+            icon={<HelpBubbleIcon size={20} color={colors.link} />}
+            ariaLabel={HEADER.help}
+          />
+        )}
       </div>
-      {actions && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{actions}</div>
+      {rightCluster.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {rightCluster.map((node, i) => <React.Fragment key={i}>{node}</React.Fragment>)}
+        </div>
       )}
     </div>
   )

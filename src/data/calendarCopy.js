@@ -119,12 +119,20 @@ export const LEGEND = {
 // ── Help sheet — NewCalendarHelpSheet.tsx ──────────────────────────────────
 export const HELP = {
   title: 'How to manage your new calendar',   // NewCalendarHelpSheet.tsx:42
+  betaBody:
+    'You’re using a beta version of the calendar. We’re still improving and may ask for your feedback to help make it better.', // :52-55
   whatsNew: 'What’s new',                // NewCalendarHelpSheet.tsx:58
   bullets: [
     'Switch between 3-day and month views.',        // :63
     'Manage availability with finer controls.',     // :68
     'See your schedule at a glance',                // :73 (no period, as shipped)
   ],
+  // :79-83 — one sentence with an inline mailto in the middle, so it ports as
+  // lead + link + tail rather than a single string.
+  feedbackLead:
+    'This is a limited beta and we’re learning from your feedback as we go. Tell us what’s working, what isn’t, and how we can improve at ',
+  feedbackEmail: 'product-feedback@rover.com',
+  feedbackTail: '.',
   dismiss: 'Got it',                          // NewCalendarHelpSheet.tsx:95,97
 }
 
@@ -145,48 +153,71 @@ export const EDITOR = {
 // A separate surface from the per-day editor above: sitter-wide defaults,
 // reached from the header action.
 export const SETTINGS = {
-  title: 'Availability settings',
-  away: 'Away',
-  awayBody: 'Pause requests while you take a break.',
-  oneTime: 'One-time care for new customers',
-  weekly: 'Weekly care for new customers',
-  newCustomers: 'New customers',
-  spacesAvailable: 'Spaces available',
-  dailyAvailability: 'Daily availability',
-  dailyPrompt: 'Which days are you typically available?',
-  dailyError: 'Please select at least one day.',
-  leadTime: 'Lead time for requests',
-  leadTimePlaceholder: 'Select lead time',
-  leadTimeSameDay: 'Same day',
-  leadTimeOneDay: '1 day',
-  leadTimeOneWeek: '1 week',
-  leadTimeTwoWeeks: '2 weeks',
-  leadTimeDays: (days) => `${days} days`,
-  saveError: 'Could not save all changes. Please try again.',
-  save: 'Save',
-  close: 'Close',
-  loading: 'Loading…',
-  loadError: 'Could not load availability settings.',
-  noServices: 'No services to manage.',
+  title: 'Availability settings',             // AvailabilitySettingsPanel.tsx:722
+  away: 'Away',                               // :197
+  awayBody: 'Pause requests while you take a break.',  // :200
+  oneTime: 'One-time care for new customers', // :217
+  weekly: 'Weekly care for new customers',    // :231
+  newCustomers: 'New customers',              // :247
+  newCustomersBody:
+    'Receive requests from pet parents you haven’t booked with before.', // :250
+  spacesAvailable: 'Spaces available',        // :267
+  dailyAvailability: 'Daily availability',    // :292
+  dailyPrompt: 'Which days are you typically available?',  // :295
+  dailyError: 'Please select at least one day.',           // :306
+  leadTime: 'Lead time for requests',         // :323
+  leadTimePlaceholder: 'Select lead time',    // :359
+  leadTimeSameDay: 'Same day',                // :116
+  leadTimeOneDay: '1 day',                    // :117
+  leadTimeOneWeek: '1 week',                  // :118
+  leadTimeTwoWeeks: '2 weeks',                // :119
+  leadTimeDays: (days) => `${days} days`,     // :120
+  saveError: 'Could not save all changes. Please try again.',  // :624
+  save: 'Save',                               // :653
+  close: 'Close',                             // :662
+  loading: 'Loading…',                        // :675
+  loadError: 'Could not load availability settings.', // :681
+  noServices: 'No services to manage.',       // :694
+
+  // Per-control accessible names. Each switch and the lead-time select are
+  // visually labelled once per card and repeated per service, so the POC gives
+  // every control a service-qualified name of its own.
+  awayFor: (name) => `Away for ${name}`,                              // :208
+  acceptOneTimeFor: (name) => `Accept one-time care for ${name}`,     // :225
+  acceptWeeklyFor: (name) => `Accept weekly care for ${name}`,        // :239
+  acceptNewCustomersFor: (name) => `Accept new customers for ${name}`, // :258
+  leadTimeFor: (name) => `Lead time for requests for ${name}`,        // :331
+  saveAria: 'Save availability changes',      // :651
+  discardAria: 'Discard changes',             // :660
+
+  // :146-179 — single letters so all seven chips stay on one row, Monday-first.
+  // The POC carries a translator `context` per letter to disambiguate the two
+  // Ts and two Ss; there is no i18n layer here, so the day key does that job.
+  dayLetters: {
+    monday: 'M', tuesday: 'T', wednesday: 'W', thursday: 'T',
+    friday: 'F', saturday: 'S', sunday: 'S',
+  },
 }
 
 // ── Sync panel — SyncCalendarPanel.tsx ─────────────────────────────────────
 export const SYNC = {
-  title: 'Sync your calendar',
-  close: 'Close',
-  includeHeading: 'Include',
-  requests: 'Requests',
-  bookings: 'Bookings',
-  meetAndGreets: 'Meet & Greets',
-  displayHeading: 'Calendar display',
-  showFullDuration: 'Show entire booking duration',
-  showPickupDropoff: 'Show pick-up & drop-off dates',
-  addToICal: 'Add to iCal',
-  addToGoogle: 'Add to Google Calendar',
-  copyPrompt: 'Or copy & paste the URL below:',
-  copy: 'Copy',
-  copied: 'Copied!',
-  copiedAnnouncement: 'URL copied to clipboard.',
+  title: 'Sync your calendar',                // SyncCalendarPanel.tsx:111
+  close: 'Close',                             // :112
+  includeHeading: 'Include',                  // :183
+  requests: 'Requests',                       // :132
+  bookings: 'Bookings',                       // :133
+  meetAndGreets: 'Meet & Greets',             // :136
+  displayHeading: 'Calendar display',         // :193
+  showFullDuration: 'Show entire booking duration',   // :146
+  showPickupDropoff: 'Show pick-up & drop-off dates', // :151
+  addToICal: 'Add to iCal',                   // :215
+  addToGoogle: 'Add to Google Calendar',      // :228
+  copyPrompt: 'Or copy & paste the URL below:',       // :234
+  copy: 'Copy',                               // :275
+  copied: 'Copied!',                          // :275
+  copiedAnnouncement: 'URL copied to clipboard.',     // :284
+  copyFailed:
+    'Could not copy automatically. Please select the URL and copy it manually.', // :289-291
 }
 
 // ── Screen-reader announcements — NewCalendarContainer.tsx / utils.ts ───────
