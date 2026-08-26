@@ -6,11 +6,12 @@ import { ANNOUNCE, successBannerMessage } from '../../data/calendarCopy'
 import { buildCalendarData, CALENDAR_GCA } from '../../data/calendarData'
 import { CAL_DIMS } from './calendarTheme'
 import {
-  applyAvailabilityPatches, buildUndoUpdates, formatAnnouncementDate,
+  addISODays, applyAvailabilityPatches, buildUndoUpdates, formatAnnouncementDate,
   formatLongDateWithYear, formatShortDateWithYear, isPastDate,
   runOptimisticMutation, SHEET_MODE, toISODate,
 } from '../../lib/calendarUtils'
 import { useApp } from '../../context/AppContext'
+import { LAYOUT_VARIANT, useCalendarLayout } from '../../lib/useCalendarLayout'
 import { TAB_PATHS } from '../../lib/tabPaths'
 import Snackbar from '../../components/Snackbar'
 import TabBar from '../../components/TabBar'
@@ -18,6 +19,8 @@ import AvailabilitySheet from './AvailabilitySheet'
 import CalendarHeader from './CalendarHeader'
 import CompactLayout from './CompactLayout'
 import MonthLayout from './MonthLayout'
+import ThreeDayLayout from './ThreeDayLayout'
+import ViewSwitcher from './ViewSwitcher'
 
 const CONTENT_WIDTH = 1140
 
@@ -72,11 +75,19 @@ function isValidIsoDate(value) {
  * renders the `TabBar` — `/calendar` is the third tab, and it is this commit
  * that makes tapping it do anything.
  *
- * Deferred: the 3-day layout and the view switcher are commit 7.
+ * At wide width the layout is additionally forked by `useCalendarLayout` —
+ * `?view=threeDay` swaps `MonthLayout` for `ThreeDayLayout`, and the switcher
+ * chips live in the header's `actions` slot. There is no compact equivalent:
+ * the POC's compact header renders no chip group, because compact has only the
+ * one layout.
  */
 export default function CalendarScreen() {
   const navigate = useNavigate()
   const isWide = useIsWide()
+  // `?view=` → localStorage → 'month'. The switcher is wide-only, as in the
+  // POC: its compact header renders no chip group, because there is only one
+  // compact layout to switch to.
+  const { variant, setVariant } = useCalendarLayout()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const today = toISODate(new Date())
@@ -94,6 +105,12 @@ export default function CalendarScreen() {
   const seed = new Date(`${selectedDate}T00:00:00`)
   const [viewYear, setViewYear] = useState(seed.getFullYear())
   const [viewMonth, setViewMonth] = useState(seed.getMonth() + 1)
+
+  // `viewAnchorDate` (`:125-132`) — the 3-day window's leftmost column, the
+  // day-level analog of the `viewYear`/`viewMonth` pair. Seeded from the
+  // selection, then driven independently by the window chevrons, so paging the
+  // window never moves what is selected.
+  const [viewAnchorDate, setViewAnchorDate] = useState(selectedDate)
 
   // Two live regions, polite and assertive, as
   // `useCalendarAnnouncements.tsx:49-86` renders them. The nonce makes React
@@ -144,10 +161,14 @@ export default function CalendarScreen() {
   // `syncViewToDate` (:302-316) — bring the clicked day's month into view. When
   // a range was just formed, the anchor backs off two days so a 3-day window
   // ends on the range end; only the month half of that matters here.
-  const syncViewToDate = (date) => {
+  const syncViewToDate = (date, rangeEndForAnchor) => {
     const d = new Date(`${date}T00:00:00`)
     setViewYear(d.getFullYear())
     setViewMonth(d.getMonth() + 1)
+    // The anchor snaps back on every new selection. When a range was just
+    // formed the anchor backs off two days, so the range's last day lands in
+    // the rightmost column and the selection reads left-to-right.
+    setViewAnchorDate(rangeEndForAnchor ? addISODays(rangeEndForAnchor, -2) : date)
   }
 
   /**
@@ -188,7 +209,7 @@ export default function CalendarScreen() {
     setRangeStart(selectedDate)
     setRangeEnd(date)
     commitSelectedDate(date)
-    syncViewToDate(date)
+    syncViewToDate(date, date)
     announce(ANNOUNCE.rangeSelected(
       formatAnnouncementDate(selectedDate), formatAnnouncementDate(date),
     ))
@@ -199,6 +220,17 @@ export default function CalendarScreen() {
     setViewYear(next.getFullYear())
     setViewMonth(next.getMonth() + 1)
   }
+
+  // `handlePrevThreeDay` / `handleNextThreeDay` (`:288-300`). View state only —
+  // `selectedDate` survives paging. Prev refuses when the window it would land
+  // on is entirely past: the rightmost column after a prev step is `anchor - 1`,
+  // so an all-past window is inert and there is nothing to show in it.
+  const handlePrevThreeDay = () => {
+    const next = addISODays(viewAnchorDate, -3)
+    if (isPastDate(addISODays(next, 2))) return
+    setViewAnchorDate(next)
+  }
+  const handleNextThreeDay = () => setViewAnchorDate(addISODays(viewAnchorDate, 3))
 
   // `handleConfirmAvailability` (:187-193). The prototype has no request to
   // await, so the two announcements land back to back and the blurb drops out
@@ -333,8 +365,20 @@ export default function CalendarScreen() {
             maxWidth: CONTENT_WIDTH, margin: '0 auto',
             padding: `${CAL_DIMS.pagePadY}px ${CAL_DIMS.pagePadX}px`,
           }}>
-            <CalendarHeader year={viewYear} />
-            <MonthLayout {...layoutProps} />
+            <CalendarHeader
+              year={viewYear}
+              actions={<ViewSwitcher variant={variant} onChange={setVariant} />}
+            />
+            {variant === LAYOUT_VARIANT.THREE_DAY ? (
+              <ThreeDayLayout
+                {...layoutProps}
+                viewAnchorDate={viewAnchorDate}
+                onPrevThreeDay={handlePrevThreeDay}
+                onNextThreeDay={handleNextThreeDay}
+              />
+            ) : (
+              <MonthLayout {...layoutProps} />
+            )}
           </div>
         </div>
       ) : (
