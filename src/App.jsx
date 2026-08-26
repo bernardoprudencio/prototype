@@ -82,7 +82,7 @@ export default function App() {
            over the navbar. `minHeight: 0` is load-bearing: every screen root is
            `height: 100%` with its own inner scroller, and without it this flex
            child refuses to shrink and those scrollers never engage. */}
-      <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden', zIndex: 0 }}>
       {/* ── Tab routes (base layer) ── */}
       <Routes>
         {/* The landing page is chosen by width. Production has two distinct
