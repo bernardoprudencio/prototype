@@ -57,6 +57,9 @@ const CALENDAR_SAVE_FAILS_KEY                   = 'calendarSaveFails'
 // This branch exists to user-test the proposal, so 'granular' is the default and
 // 'current' is the comparison flip.
 const RATES_MODE_KEY                            = 'ratesMode'
+// Named after production's gate `is_rollout_alt_monetisation`
+// (roverdotcom/web :: RelationshipProgressScreenView, views.py:1011-1013).
+const ALT_MONETIZATION_ROLLOUT_KEY              = 'altMonetizationRollout'
 
 const readInitialEnum = (key, fallback) => {
   if (typeof window === 'undefined') return fallback
@@ -95,6 +98,7 @@ const readInitialGroomingBannerVariant           = () => readInitialEnum(GROOMIN
 const readInitialShowLockedRates                 = () => readInitialBool(SHOW_LOCKED_RATES_KEY,                 true)
 const readInitialCalendarSaveFails               = () => readInitialBool(CALENDAR_SAVE_FAILS_KEY,               false)
 const readInitialRatesMode                       = () => readInitialEnum(RATES_MODE_KEY, 'granular')
+const readInitialAltMonetizationRollout          = () => readInitialBool(ALT_MONETIZATION_ROLLOUT_KEY,          false)
 
 export function AppProvider({ children }) {
   // ── Shared ────────────────────────────────────────────────────────────────
@@ -189,6 +193,12 @@ export function AppProvider({ children }) {
   // announces the failure assertively. Off by default so user testing never
   // hits an invented error.
   const [calendarSaveFails,                   setCalendarSaveFailsRaw]                   = useState(readInitialCalendarSaveFails)
+  // Gates the graduated take rate / relationship-based-fees experiment: tier
+  // pills, the tier progress tracker, the alt-monetization dashboard widget and
+  // the tier-derived earnings shares. Off by default because the baseline
+  // non-rollout experience is now the prototype's default — testers opt into
+  // the variant.
+  const [altMonetizationRollout,              setAltMonetizationRolloutRaw]              = useState(readInitialAltMonetizationRollout)
 
   // Locked-rates state per (owner x service). Production keys LockedServiceAddOn
   // rows on (service, requester, add_on_type), but the API write is full-set
@@ -268,6 +278,7 @@ export function AppProvider({ children }) {
   const setShowLockedRates                    = (next) => persistJson(SHOW_LOCKED_RATES_KEY,                    next, setShowLockedRatesRaw)
   const setCalendarSaveFails                  = (next) => persistJson(CALENDAR_SAVE_FAILS_KEY,                  next, setCalendarSaveFailsRaw)
   const setRatesMode                          = (next) => persistEnum(RATES_MODE_KEY,                          next, setRatesModeRaw)
+  const setAltMonetizationRollout             = (next) => persistJson(ALT_MONETIZATION_ROLLOUT_KEY,             next, setAltMonetizationRolloutRaw)
 
   // Keyed on (client x service), as production keys LockedServiceAddOn rows.
   // Falls back to the client's declared seed list until the sitter toggles it.
@@ -348,6 +359,7 @@ export function AppProvider({ children }) {
       isRatesLocked,                      setRatesLocked,
       ratesMode,                          setRatesMode,
       getRatesState,                      commitRatesState,
+      altMonetizationRollout,             setAltMonetizationRollout,
       // calendar
       calendarAvailability, patchCalendarAvailability,
       calendarServiceSettings, commitCalendarServiceSettings,

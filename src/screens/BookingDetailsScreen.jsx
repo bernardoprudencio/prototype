@@ -10,10 +10,10 @@ import {
   RatesRow, ManageRatesSheet,
 } from '../components'
 import { getClient } from '../data/contacts'
-import { getRelationshipData } from '../data/relationshipData'
 import { useApp } from '../context/AppContext'
 import { useLockedRates } from '../lib/useLockedRates'
 import { useGranularRates } from '../lib/useGranularRates'
+import { useRelationshipData } from '../lib/useRelationshipData'
 import { toggleLabelLedger } from '../data/lockedRatesCopy'
 import * as copy from '../data/bookingDetailsCopy'
 
@@ -206,8 +206,13 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
   const onBack = () => navigate(-1)
 
   const client = getClient(ownerId)
+  // Hooks cannot run inside the IIFE below, so the relationship data is read at
+  // the top level. `useRelationshipData` folds in the alt-monetization rollout
+  // flag so this ledger's earnings figures never disagree with the relationship
+  // page's (production gates on `is_rollout_alt_monetisation`,
+  // views.py:1011-1013).
+  const rel = useRelationshipData(ownerId)
   const booking = (() => {
-    const rel = getRelationshipData(ownerId)
     if (!rel) return null
     const { upcoming, past, archived } = rel.bookings
     // Every conversation resolves to exactly one booking, recurring included:

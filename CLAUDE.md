@@ -47,7 +47,7 @@ stack over the active tab without unmounting it.
 
 **Component Variants:** `Button.jsx` supports `default`, `primary`, `flat`, and `disabled` variants via a `variant` prop. Icons live in `src/assets/icons.jsx` as named React components (50 exports), most wrapping the Rover icon font (`src/assets/rover-icons.css`) via a private `Icon` component.
 
-**Responsive Behavior:** There is no phone frame. `.app-shell` (`global.css`) fills the viewport at every width, and each screen's root is a `height: 100%` flex column with its own inner scroll region. Screens that have a wide layout gate it on the shared breakpoints in `src/lib/useMediaQuery.js` — `useIsWide()` (≥769px) for the schedule screens, `useIsExtraWide()` (≥880px) for Service settings. Every other screen currently has a single column that stretches to fill the viewport; adding a wide layout means adding a breakpoint branch, not a frame.
+**Responsive Behavior:** There is no phone frame. `.app-shell` (`global.css`) fills the viewport at every width, and each screen's root is a `height: 100%` flex column with its own inner scroll region. Screens that have a wide layout gate it on the single shared breakpoint in `src/lib/useMediaQuery.js` — `useIsWide()` (≥769px), used by both the schedule screens and Service settings. Every other screen currently has a single column that stretches to fill the viewport; adding a wide layout means adding a breakpoint branch, not a frame.
 
 **No Backend:** All data (pet names, images, service info) is hardcoded in components or imported from `src/assets/images.js`. No API calls or state management libraries.
 
@@ -66,10 +66,10 @@ stack over the active tab without unmounting it.
 | `ownerUnits` | `{ [ownerId]: unit[] }` | Schedule edits committed during session |
 | `ownerTemplates` / `ownerWeeks` / `ownerCurrentWeeks` | `{ [ownerId]: ... }` | Per-owner schedule edits by surface |
 | `scheduleChanges` / `templateChanges` / `currentWeekChanges` | `{ [ownerId]: ... }` | Change logs feeding the conversation event stream |
-| `lockedRatesByOwner` | map keyed `clientId:serviceKey` → bool | Locked-rates overrides. Starts `{}`; read through `isRatesLocked(client, serviceKey)`, which falls back to `client.lockedServices.includes(serviceKey)` |
+| `lockedRatesByOwner` | map keyed `clientId:serviceKey` → bool | Locked-rates overrides. Starts `{}`; read through `isRatesLocked(client, serviceKey)`, which falls back to `client.lockedServices.includes(serviceKey)` (`AppContext.jsx:220-224`) |
 | `lockedAmountsByOwner` | map keyed `clientId:serviceKey` → `{ locked, amounts, lockedAt }` | The granular proposal's state. Starts `{}`; read through `getRatesState(client, serviceKey)`, which layers it over `lockedSeedFor` in `lockableRates.js`; written by `commitRatesState` |
 | `ratesMode` | `'granular'` \| `'current'` | Which locked-rates experience renders. Defaults to `'granular'` (the proposal under test); flip in Testing mode |
-| dev variant flags | bool / enum | `scheduleMode`, `serviceStates`, `showShortNoticeRateBanner`, `showLockedRates`, … — persisted to `localStorage` via `persistJson`, edited in `ServiceVariantConfigSheet` |
+| dev variant flags | bool / enum | `scheduleMode`, `altMonetizationRollout`, `serviceStates`, `showShortNoticeRateBanner`, `showLockedRates`, … — persisted to `localStorage` via `persistJson`, edited in `ServiceVariantConfigSheet` (service-settings-scoped flags) or `TestingModeScreen` (app-wide ones) |
 
 **Overlay zIndex ladder** (`App.jsx`): 10 — `/conversation/:ownerId/*`,
 `/conversation/:ownerId/thread/:conversationOpk/*`, `/contacts/:ownerId`; 15 —
@@ -119,7 +119,7 @@ stack over the active tab without unmounting it.
 | `CurrentWeekScreen.jsx` | Current-week modification screen; contains `PricingLedger` |
 | `EditTemplateScreen.jsx` | Recurring template editor |
 | `RebookScreen.jsx` / `RebookUserCard.jsx` | Contacts tab: client list and its per-client card |
-| `RelationshipPage/` | Relationship page: header, tier progress tracker, Rates row, booking lists, alt-monetization interstitial |
+| `RelationshipPage/` | Relationship page: header, tier progress tracker, Rates row, booking lists, alt-monetization interstitial. The tracker (and with it the interstitial) renders only while `progress.tiers` is non-null — see "Graduated take rate" below |
 | `relationship/RelationshipManagement.jsx` | Full recurring schedule UI: agenda view, add/manage/edit sheets, billing confirmations |
 | `ScheduleScreen.jsx` / `ScheduleOverlay.jsx` | Schedule route wrappers over `RelationshipManagement` |
 | `ServiceSettingsLayout.jsx` | The `/service-settings` layout route: every dev-flag read, all the sheets/modals, `bannersFor`, the nav model, and the ≥769px sidebar shell. Panes get the shared state via `<Outlet context>` |
@@ -262,6 +262,37 @@ mirroring `booking_status.py:400-404`), and a weekly ledger section. It is prepe
 `threads.js` skips `isRecurring` bookings in its upcoming loop to avoid emitting a second
 inbox thread for an opk it already emits directly.
 
+**Graduated take rate** — the relationship-based-fees experiment, switchable end to end.
+
+Production gates the whole surface on `is_rollout_alt_monetisation`
+(`RelationshipProgressScreenView`, `views.py:1011-1013`), and outside the rollout
+`tierName` and `cumulativeGrossValue` both come back null — they always travel together.
+So the off-state is a **data** gate, not a UI-level hide.
+
+The prototype's switch is the `altMonetizationRollout` dev flag (`AppContext.jsx`,
+**default off**, toggled in `TestingModeScreen` next to `scheduleMode`). Every screen
+reads relationship data through `src/lib/useRelationshipData.js`, which folds the flag
+into `getRelationshipData(ownerId, { altMonetization })` — the same one-derived-value
+convention as `useLockedRates`. All four call sites must go through it: the flag changes
+the *money*, so a screen that skipped it would show 90% earnings while the relationship
+page showed 80% for the same booking.
+
+What the flag moves:
+- `progress.heading` / `progress.tiers` / `progress.callout` become `null`, which is the
+  render gate for `RelationshipProgressTracker` (ladder, progress bar, callout, "Learn
+  More" → `AlternativeMonetizationInterstitial`). `progress.earnings` stays populated in
+  both states — it is gross booking value, not a tier artifact, and the booking-list
+  section headers read it.
+- Earnings fall back to `BASELINE_SHARE = 0.80` (the standard Rover take rate) in place of
+  the tier's `sitterShare` (0.70 / 0.85 / 0.90). Builders take a share number or a
+  `shareFor(gbv)` resolver, never a tier object.
+- The contacts list drops the tier `Pill` and the "· $X complete" clause
+  (`withAltMonetization`) and loses the "Progress (high to low)" sort (`sortOptionsFor`).
+- The dashboard drops `AltMonetizationWidget`.
+
+The relationship page itself **stays reachable** with the flag off: header, booking lists
+and the Rates row all remain, only the tracker goes.
+
 **Locked rates** — a sitter freezes the rates one client pays for one service.
 Mirrors production (`roverdotcom/web`): keyed per (owner × service), the lock is a
 single boolean because production's write is full-set replacement.
@@ -310,9 +341,9 @@ ledger surfaces. Both live in `lockedRatesCopy.js`.
 - `scheduleData.js` — `getOwnerRelUnit()` (owner → schedule `unit`), `getIncompleteCards()`, plus its own copies of `getTodayWalks()` / `getOwnerCurrentWeek()` / `getOwnerUpcomingWeeks()`. Note `getIncompleteCards` and `getOwnerRelUnit` live **here**, not in `owners.js`. `getOwnerRelUnit` dereferences `owner.template[0].time` unguarded (`:51`), so it throws for a client with no `recurringSchedule.template`
 - `services.js` — 5 service types; `DURATION_SHORT` / `DURATION_DAYCARE` option arrays; `FREQ` / `WEEKDAYS` constants
 - `threads.js` — Inbox thread metadata + `getChatHistory(conversationOpk)`: last message, service label, status, alert, unread flag
-- `contacts.js` — The full client roster (10 clients, recurring and non-recurring). Per-client fields include `recurringSchedule` (with its own nested `pricing`), `lockedServices`, `pets`, `gbv` / `tierName`, `cancelledBookings`. There is **no** top-level `pricing` and no `lockedRates` block
+- `contacts.js` — The full client roster (10 clients, recurring and non-recurring). Per-client fields include `recurringSchedule` (with its own nested `pricing`), `lockedServices`, `pets`, `gbv` / `tierName`, `cancelledBookings`. There is **no** top-level `pricing` and no `lockedRates` block. Also exports the alt-monetization selectors `withAltMonetization(client, on)` and `sortOptionsFor(on)`
 - `lockableRates.js` — The sitter's lockable rate rows per browsable service, `isLockableConversation()`, and each client's locked-price snapshot
-- `relationshipData.js` — Builds each client's relationship page: tier progress + upcoming/past/archived bookings; also the `SERVICES` catalog that supplies every booking's `serviceKey`, the client-level `isRecurringClient` derivation (which gates *building* the recurring week — not the CTA fork, see Navigation path step 2), `buildRecurringWeekBooking()`, and the `booking.modify` block (rate rows, adjustments, previous total) that `ModifyBookingScreen` consumes
+- `relationshipData.js` — Builds each client's relationship page via `getRelationshipData(ownerId, { altMonetization })`: tier progress + upcoming/past/archived bookings; also the `SERVICES` catalog that supplies every booking's `serviceKey`, the client-level `isRecurringClient` derivation (which gates *building* the recurring week — not the CTA fork, see Navigation path step 2), `buildRecurringWeekBooking()`, and the `booking.modify` block (rate rows, adjustments, previous total) that `ModifyBookingScreen` consumes
 - `sitterProfile.js` / `sitterServices.js` — The sitter's own default rates and service configuration
 - `moreMenu.js` — More-tab row definitions
 - `lockedRatesCopy.js` / `bookingDetailsCopy.js` / `modifyBookingCopy.js` / `hubCopy.js` — Verbatim production copy, single source of truth per feature. Every string carries a provenance comment naming the production file and line it was read from; `PROTOTYPE-ONLY` marks the few that have no production equivalent

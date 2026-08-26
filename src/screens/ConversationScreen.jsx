@@ -6,11 +6,11 @@ import { peopleImages } from '../assets/images'
 import { Button, PetAvatar, BannerBlock, ChatBubble, WEB_NAV_BAR_HEIGHT } from '../components'
 import { BookingDetailsPane } from './BookingDetailsScreen'
 import { useIsWide } from '../lib/useMediaQuery'
+import { useRelationshipData } from '../lib/useRelationshipData'
 import { useApp } from '../context/AppContext'
 import { OWNERS } from '../data/owners'
 import { getChatHistory, getInboxThreads } from '../data/threads'
 import { getClient } from '../data/contacts'
-import { getRelationshipData } from '../data/relationshipData'
 import { getOwnerRelUnit } from '../data/scheduleData'
 import { getConversationStatusDisplay } from '../lib/threadStatus'
 import { MODIFY_BOOKING } from '../data/bookingDetailsCopy'
@@ -133,9 +133,14 @@ export default function ConversationScreen() {
   // Drives that CTA, which navigates to BookingDetailsScreen (production's
   // /conversations/<opk>/details page).
   const client = getClient(ownerId)
+  // Hooks cannot run inside the IIFE below, so the relationship data is read at
+  // the top level. `useRelationshipData` folds in the alt-monetization rollout
+  // flag so this surface's ledger figures never disagree with the relationship
+  // page's (production gates on `is_rollout_alt_monetisation`,
+  // views.py:1011-1013).
+  const rel = useRelationshipData(ownerId)
 
   const booking = (() => {
-    const rel = getRelationshipData(ownerId)
     if (!rel) return null
     const all = [...rel.bookings.upcoming, ...rel.bookings.past, ...rel.bookings.archived]
     return all.find(b => b.conversationOpk === effectiveOpk) ?? null

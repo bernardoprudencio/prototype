@@ -160,7 +160,9 @@ export const BOARDING_SETTINGS = {
 // `user.firstName` (`DesktopMenu.tsx`); nothing in the prototype held the
 // sitter's own name before the web nav needed it — every other name in the data
 // belongs to a client.
-export const SITTER_FIRST_NAME = 'Bernardo'
+// Deliberately a placeholder rather than a real first name: the prototype is
+// user-tested, and a concrete name reads as "someone else's account".
+export const SITTER_FIRST_NAME = 'Your name'
 
 export const SITTER_PROFILE = {
   services: [

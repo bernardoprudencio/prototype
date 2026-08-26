@@ -1,12 +1,12 @@
 import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { colors, typography, radius, shadows, textStyles } from '../../tokens'
-import { getRelationshipData } from '../../data/relationshipData'
 import { getClient } from '../../data/contacts'
 import { Row, LockRatesSheet, Snackbar, ServiceRateRow, ManageRatesSheet } from '../../components'
 import { LockIcon, ChevronRightIcon } from '../../assets/icons'
 import { useLockedRates } from '../../lib/useLockedRates'
 import { useGranularRates } from '../../lib/useGranularRates'
+import { useRelationshipData } from '../../lib/useRelationshipData'
 import {
   isLockableConversation, BROWSABLE_SERVICE_KEYS, SERVICE_DISPLAY_NAME,
 } from '../../data/lockableRates'
@@ -24,7 +24,7 @@ export default function RelationshipPage() {
   const navigate = useNavigate()
   const { ownerId } = useParams()
   const isWide = useIsWide()
-  const data = getRelationshipData(ownerId)
+  const data = useRelationshipData(ownerId)
   const client = getClient(ownerId)
   // The relationship page is not a conversation, so it has no gate of its own.
   // It summarises across services, and its sheet needs one concrete service to
@@ -139,88 +139,105 @@ export default function RelationshipPage() {
           display: 'flex', flexDirection: 'column', gap: 16,
           padding: '16px 16px 24px',
         }}>
-        <div style={isWide
-          ? { width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }
-          : { display: 'contents' }}>
-          <RelationshipProgressTracker
-            heading={progress.heading}
-            tiers={progress.tiers}
-            callout={progress.callout}
-            earnings={progress.earnings}
-            ownerAvatarUrl={requester.photo}
-          />
-
-          {/* Rates — production's own entry point into the lock sheet
-              (relationship_progress sections_mapper `_rates_section`).
-              `current` mode only; the granular sheet below replaces it. */}
-          {ratesMode !== 'granular' && lr.available && (
-            <div style={{
-              background: colors.white,
-              borderRadius: radius.primary,
-              boxShadow: shadows.low,
-              padding: '0 16px',
-            }}>
-              <Row
-                firstRow
-                leftItem={<LockIcon size={24} color={colors.primary} />}
-                label={RATES_SECTION_TITLE}
-                sublabel={lr.lockedServiceCount > 0
-                  ? ratesLockedSubtitle(lr.lockedServiceCount)
-                  : NO_LOCKED_RATES}
-                rightItem={<ChevronRightIcon />}
-                onClick={() => lr.requestChange(!lr.locked)}
+        {/* The wide layout's fixed 400px left column holds the tracker and the
+            Rates section. Any of them can be absent (tracker: rollout off;
+            Rates: `lr.available` false in `current` mode, `gr.enabled` false in
+            `granular`), so skip the column entirely when all are — otherwise it
+            reserves 400px of empty width beside the booking lists. */}
+        {(progress.tiers
+          || (ratesMode !== 'granular' && lr.available)
+          || (ratesMode === 'granular' && gr.enabled)) && (
+          <div style={isWide
+            ? { width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }
+            : { display: 'contents' }}>
+            {/* The data gate is the single source of truth: `progress.tiers` is
+                null unless the alt-monetization rollout is on, so no component
+                here reads the flag. Production gates the same screen on
+                `is_rollout_alt_monetisation` (views.py:1011-1013). The
+                alt-monetization interstitial and the tiers doodle live inside the
+                tracker, so they go with it. */}
+            {progress.tiers && (
+              <RelationshipProgressTracker
+                heading={progress.heading}
+                tiers={progress.tiers}
+                callout={progress.callout}
+                earnings={progress.earnings}
+                ownerAvatarUrl={requester.photo}
               />
-            </div>
-          )}
+            )}
 
-          {/* Rates, granular — the POC's RelationshipRatesContent +
-              GroupedServiceRates as one read-only sheet: a heading, then the
-              catalogue split into booked and not-booked, each row opening the
-              shared modal. An empty group renders nothing at all rather than a
-              heading over nothing, so a client with no bookings reads as one
-              list instead of two. */}
-          {ratesMode === 'granular' && gr.enabled && (
-            <div style={{
-              background: colors.white,
-              borderRadius: radius.primary,
-              boxShadow: shadows.low,
-              padding: '16px 16px 8px',
-            }}>
-              <h2 style={{ ...textStyles.heading300, color: colors.primary, margin: '0 0 8px' }}>
-                {RATES_SECTION_HEADING}
-              </h2>
+            {/* Rates — production's own entry point into the lock sheet
+                (relationship_progress sections_mapper `_rates_section`).
+                `current` mode only; the granular sheet below replaces it. */}
+            {ratesMode !== 'granular' && lr.available && (
+              <div style={{
+                background: colors.white,
+                borderRadius: radius.primary,
+                boxShadow: shadows.low,
+                padding: '0 16px',
+              }}>
+                <Row
+                  firstRow
+                  leftItem={<LockIcon size={24} color={colors.primary} />}
+                  label={RATES_SECTION_TITLE}
+                  sublabel={lr.lockedServiceCount > 0
+                    ? ratesLockedSubtitle(lr.lockedServiceCount)
+                    : NO_LOCKED_RATES}
+                  rightItem={<ChevronRightIcon />}
+                  onClick={() => lr.requestChange(!lr.locked)}
+                />
+              </div>
+            )}
 
-              {rateServices.length === 0 ? (
-                <p style={{ ...textStyles.paragraph100, color: colors.secondary, margin: '0 0 8px' }}>
-                  {NO_SERVICES}
-                </p>
-              ) : (
-                [
-                  { heading: GROUP_BOOKED,     services: bookedServices },
-                  { heading: GROUP_NOT_BOOKED, services: notBookedServices },
-                ].map(group => group.services.length > 0 && (
-                  <div key={group.heading} style={{ paddingBottom: 8 }}>
-                    <h3 style={{ ...textStyles.heading100, color: colors.secondary, margin: '8px 0 0' }}>
-                      {group.heading}
-                    </h3>
-                    <div role="list">
-                      {group.services.map(service => (
-                        <div key={service.key} role="listitem">
-                          <ServiceRateRow
-                            serviceName={service.name}
-                            isLocked={service.locked}
-                            lockedAt={service.lockedAt}
-                            onPress={() => gr.openSheet(service.key, {})}
-                          />
-                        </div>
-                      ))}
+            {/* Rates, granular — the POC's RelationshipRatesContent +
+                GroupedServiceRates as one read-only sheet: a heading, then the
+                catalogue split into booked and not-booked, each row opening the
+                shared modal. An empty group renders nothing at all rather than a
+                heading over nothing, so a client with no bookings reads as one
+                list instead of two. */}
+            {ratesMode === 'granular' && gr.enabled && (
+              <div style={{
+                background: colors.white,
+                borderRadius: radius.primary,
+                boxShadow: shadows.low,
+                padding: '16px 16px 8px',
+              }}>
+                <h2 style={{ ...textStyles.heading300, color: colors.primary, margin: '0 0 8px' }}>
+                  {RATES_SECTION_HEADING}
+                </h2>
+
+                {rateServices.length === 0 ? (
+                  <p style={{ ...textStyles.paragraph100, color: colors.secondary, margin: '0 0 8px' }}>
+                    {NO_SERVICES}
+                  </p>
+                ) : (
+                  [
+                    { heading: GROUP_BOOKED,     services: bookedServices },
+                    { heading: GROUP_NOT_BOOKED, services: notBookedServices },
+                  ].map(group => group.services.length > 0 && (
+                    <div key={group.heading} style={{ paddingBottom: 8 }}>
+                      <h3 style={{ ...textStyles.heading100, color: colors.secondary, margin: '8px 0 0' }}>
+                        {group.heading}
+                      </h3>
+                      <div role="list">
+                        {group.services.map(service => (
+                          <div key={service.key} role="listitem">
+                            <ServiceRateRow
+                              serviceName={service.name}
+                              isLocked={service.locked}
+                              lockedAt={service.lockedAt}
+                              onPress={() => gr.openSheet(service.key, {})}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Rates stays in the left column with the tracker — it is
             prototype-only, and production has no rates module here to place. */}

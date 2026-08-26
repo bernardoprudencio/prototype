@@ -38,6 +38,10 @@ export const TIERS = [
   { tierName: 'Tier 3', threshold: Infinity, sitterShare: 0.90 },
 ]
 
+// Standard Rover take rate outside the alt-monetization rollout: the sitter
+// keeps 80% of the service subtotal. Tier shares only exist inside the test.
+const BASELINE_SHARE = 0.80
+
 const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 const fmt = (d) => `${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}`
@@ -270,7 +274,11 @@ const isoKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0
 // ── Booking generator ─────────────────────────────────────────────────────────
 // Walks dates backwards from PROTO_TODAY and produces booking objects whose
 // summed `price` values approximately reconcile to the client's gbv.
-const buildPastBookings = (client, count, targetGbv) => {
+//
+// `shareFor(gbv)` is passed in rather than a tier object: inside the rollout the
+// share varies per booking with the running GBV, outside it every booking pays
+// the flat BASELINE_SHARE — the builder never has to know which world it is in.
+const buildPastBookings = (client, count, targetGbv, shareFor) => {
   if (count === 0) return []
 
   const bookings = []
@@ -308,8 +316,7 @@ const buildPastBookings = (client, count, targetGbv) => {
 
     // Earnings: tier the booking landed in (based on cumulative gbv at that point).
     const cumulativeAfter = runningGbv
-    const tier = TIERS[tierIndexFor(cumulativeAfter)]
-    const earnings = price * tier.sitterShare
+    const earnings = price * shareFor(cumulativeAfter)
 
     bookings.push({
       id: `${client.id}-past-${i + 1}`,
@@ -336,7 +343,9 @@ const buildPastBookings = (client, count, targetGbv) => {
 }
 
 
-const buildUpcomingBookings = (client, count, currentTier) => {
+// `share` is the sitter's earnings fraction as a plain number, so this builder
+// never has to know whether tiers exist.
+const buildUpcomingBookings = (client, count, share) => {
   const out = []
 
   // Owen gets one demo "active" stay — a 4-night boarding that started 2 days
@@ -358,7 +367,7 @@ const buildUpcomingBookings = (client, count, currentTier) => {
       serviceName: svc.name,
       serviceIcon: svc.icon,
       serviceKey: 'boarding',
-      earnings: money(price * currentTier.sitterShare),
+      earnings: money(price * share),
       serviceStatus: 'completed_service_deposit',
       conversationOpk: `${client.id}-conv-up-active`,
       ...statusFields('completed_service_deposit', start, end, 'boarding', span),
@@ -411,7 +420,7 @@ const buildUpcomingBookings = (client, count, currentTier) => {
       serviceName: SERVICES.boarding.name,
       serviceIcon: SERVICES.boarding.icon,
       serviceKey: 'boarding',
-      earnings: money(price * currentTier.sitterShare),
+      earnings: money(price * share),
       serviceStatus: 'completed_service_deposit',
       conversationOpk: `${client.id}-conv-up-locked`,
 
@@ -431,7 +440,7 @@ const buildUpcomingBookings = (client, count, currentTier) => {
           { items: [{ title: SUBTOTAL, amount: money(price), style: 'bold' }] },
           { items: [{
               title: YOUR_EARNINGS,
-              amount: money(price * currentTier.sitterShare),
+              amount: money(price * share),
               style: 'bold',
               action: 'earnings',
             }] },
@@ -466,7 +475,7 @@ const buildUpcomingBookings = (client, count, currentTier) => {
       serviceName: svc.name,
       serviceIcon: svc.icon,
       serviceKey,
-      earnings: money(price * currentTier.sitterShare),
+      earnings: money(price * share),
       serviceStatus: 'pending_service_deposit',
       conversationOpk: `${client.id}-conv-up-${i + 1}`,
       ...statusFields('pending_service_deposit', start, end, serviceKey, span),
@@ -515,7 +524,7 @@ const mondayOfWeek = (from) => {
 // (booking_status.py:401-402). Nothing in the prototype flips it yet; it is a
 // parameter rather than a hardcoded false so the `skippedWeek` status can be
 // exercised without touching the derivation.
-export const buildRecurringWeekBooking = (client, currentTier, skippedThisWeek = false) => {
+export const buildRecurringWeekBooking = (client, share, skippedThisWeek = false) => {
   const tpl = client?.recurringSchedule
   if (!tpl) return null
 
@@ -595,7 +604,7 @@ export const buildRecurringWeekBooking = (client, currentTier, skippedThisWeek =
     serviceIcon: svc.icon,
     serviceKey: RECURRING_SERVICE_KEY,
     rateAmounts,
-    earnings: money(weeklyPrice * currentTier.sitterShare),
+    earnings: money(weeklyPrice * share),
     serviceStatus: 'completed_service_deposit',
     conversationOpk: `${client.id}-conv-recurring`,
     paidOn,
@@ -610,7 +619,7 @@ export const buildRecurringWeekBooking = (client, currentTier, skippedThisWeek =
         { items: [{ title: SUBTOTAL_THIS_WEEK, amount: money(weeklyPrice), style: 'bold' }] },
         { items: [{
             title: YOUR_EARNINGS_THIS_WEEK,
-            amount: money(weeklyPrice * currentTier.sitterShare),
+            amount: money(weeklyPrice * share),
             style: 'bold',
             action: 'earnings',
           }] },
@@ -893,7 +902,12 @@ const calloutFor = (client, effectiveGbv, pendingAmount) => {
 // ── Public API ────────────────────────────────────────────────────────────────
 // Returns the full data object the RelationshipPage consumes for one client,
 // derived deterministically from CLIENTS in contacts.js.
-export const getRelationshipData = (ownerId) => {
+//
+// `altMonetization` mirrors production's `is_rollout_alt_monetisation` gate on
+// RelationshipProgressScreenView (views.py:1011-1013): outside the rollout the
+// graduated take rate does not exist, so no tier mapper is put on the payload
+// and every booking earns the flat BASELINE_SHARE.
+export const getRelationshipData = (ownerId, { altMonetization = false } = {}) => {
   const client = CLIENTS.find(c => c.id === ownerId)
   if (!client) return null
 
@@ -904,7 +918,11 @@ export const getRelationshipData = (ownerId) => {
   // Either way, we render with $0 progress — no fallback fudging.
   const effectiveGbv = client.gbv ?? 0
 
-  const currentTier = TIERS[tierIndexFor(effectiveGbv)]
+  // One resolver for every builder: inside the rollout the share is the tier the
+  // cumulative amount lands in, outside it the standard 80%. No builder sees a
+  // tier object, so none of them can leak tier semantics into the non-rollout
+  // state.
+  const shareFor = (gbv) => (altMonetization ? TIERS[tierIndexFor(gbv)].sitterShare : BASELINE_SHARE)
 
   let past, upcoming, archived
   if (client.cancelledBookings) {
@@ -922,8 +940,8 @@ export const getRelationshipData = (ownerId) => {
     const archivedCount = totalBookings >= 12 ? 3 : totalBookings >= 6 ? 1 : 0
     const pastCount = Math.max(1, totalBookings - upcomingCount - archivedCount)
 
-    past = buildPastBookings(client, pastCount, effectiveGbv)
-    upcoming = buildUpcomingBookings(client, upcomingCount, currentTier)
+    past = buildPastBookings(client, pastCount, effectiveGbv, shareFor)
+    upcoming = buildUpcomingBookings(client, upcomingCount, shareFor(effectiveGbv))
     archived = buildArchivedBookings(client, archivedCount)
   }
 
@@ -932,7 +950,7 @@ export const getRelationshipData = (ownerId) => {
   // Both branches above need it: sarah is recurring *and* takes the
   // cancelledBookings branch, which leaves `upcoming` empty.
   const recurringWeek = isRecurringClient(client)
-    ? buildRecurringWeekBooking(client, currentTier)
+    ? buildRecurringWeekBooking(client, shareFor(effectiveGbv))
     : null
   if (recurringWeek) upcoming = [recurringWeek, ...upcoming]
 
@@ -949,8 +967,11 @@ export const getRelationshipData = (ownerId) => {
     .filter(b => !b.isRecurring)
     .reduce((s, b) => s + parseFloat(b.price.amount), 0)
 
-  const tiers = buildTierStates(effectiveGbv, pendingAmount)
-  const callout = calloutFor(client, effectiveGbv, pendingAmount)
+  // Tier states, heading and callout are the rollout-only half of the payload,
+  // so they are not even computed outside the test.
+  const tiers = altMonetization ? buildTierStates(effectiveGbv, pendingAmount) : null
+  const callout = altMonetization ? calloutFor(client, effectiveGbv, pendingAmount) : null
+  const heading = altMonetization ? headingFor(effectiveGbv) : null
 
   return {
     requester: {
@@ -959,14 +980,18 @@ export const getRelationshipData = (ownerId) => {
       photo: client.imageUrl ?? peopleImages.owen,
       isActive: true,
     },
+    // `earnings` stays populated in BOTH states: `completed` is gross booking
+    // value and `pending` is a sum of upcoming prices — neither is a tier
+    // artifact, and the booking-list section headers
+    // (screens/RelationshipPage/BookingItems.jsx:15-29) read them regardless.
+    // Only heading / tiers / callout go null, which mirrors production simply
+    // not putting the progress mapper on the payload; a consumer gating on
+    // `progress.tiers` therefore can never render a half-populated tracker.
     progress: {
-      heading: headingFor(effectiveGbv),
+      heading,
       tiers,
       callout,
-      earnings: {
-        completed: money(completedAmount),
-        pending: money(pendingAmount),
-      },
+      earnings: { completed: money(completedAmount), pending: money(pendingAmount) },
     },
     // `modify` is attached last so every list gets it from one place. It only
     // adds a key — no existing field is touched — so the surfaces that render

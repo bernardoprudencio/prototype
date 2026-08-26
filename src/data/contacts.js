@@ -277,3 +277,23 @@ export const sortClients = (clients, order) => {
 }
 
 export const getClient = (id) => CLIENTS.find(c => c.id === id) ?? null
+
+// ── Alt-monetization gate (roverdotcom/web :: RelationshipProgressScreenView,
+// views.py:1011-1013) ────────────────────────────────────────────────────────
+// `tierName` and `bookingInfoText` are baked at module load in the `client()`
+// factory, so they cannot read a runtime flag. This is a selector over a client
+// rather than a reshaping of CLIENTS.
+//
+// Outside the rollout production returns tierName and cumulativeGrossValue as
+// null together (see the note at the top of this file), so the contacts card
+// drops both the tier pill and the "· $X complete" clause on its own.
+export const withAltMonetization = (client, on) => (on || !client) ? client : ({
+  ...client,
+  tierName: null,
+  gbv: null,
+  bookingInfoText: formatBookingLine(client.bookingCount, null),
+})
+
+// "Progress (high to low)" only exists because of the graduated take rate test.
+export const sortOptionsFor = (on) =>
+  on ? SORT_OPTIONS : SORT_OPTIONS.filter(o => o.value !== 'gbv_progress')

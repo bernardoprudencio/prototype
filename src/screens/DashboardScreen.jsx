@@ -4,6 +4,7 @@ import { colors, spacing } from '../tokens'
 import TabBar from '../components/TabBar'
 import { useIsWide } from '../lib/useMediaQuery'
 import { TAB_PATHS } from '../lib/tabPaths'
+import { useApp } from '../context/AppContext'
 import {
   ProfileWidget, CalendarWidget, AltMonetizationWidget, WalletWidget,
   SitterResources, NewMessages, PromoteProfile,
@@ -28,12 +29,15 @@ const CONTENT_WIDTH = 1140
 export default function DashboardScreen() {
   const navigate = useNavigate()
   const isWide = useIsWide()
+  const { altMonetizationRollout } = useApp()
 
   const sidebar = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg }}>
       <ProfileWidget />
       <CalendarWidget />
-      <AltMonetizationWidget />
+      {/* Graduated take rate is experiment-gated; production gates the same
+          surface on `is_rollout_alt_monetisation` (views.py:1011-1013). */}
+      {altMonetizationRollout && <AltMonetizationWidget />}
       <WalletWidget />
       <SitterResources />
     </div>
