@@ -12,7 +12,7 @@ import {
   LEDGER_SECTION_TITLE, SUBTOTAL, YOUR_EARNINGS, rateMultiplier,
   RECURRING_SCHEDULE_TITLE, RECURRING_UNIT_SUFFIX, WEEKLY_PREFIX, WEEKLY_SUFFIX,
   SUBTOTAL_THIS_WEEK, SUBTOTAL_PER_WEEK, PAID_EACH_TUESDAY,
-  YOUR_EARNINGS_THIS_WEEK,
+  YOUR_EARNINGS_THIS_WEEK, RECURRING_ROVER_CARD_INFO,
 } from './bookingDetailsCopy'
 import { lockedRatesFor } from './lockableRates'
 
@@ -271,9 +271,207 @@ const tierIndexFor = (amount) => {
 // route any conversation's opk to that screen.
 const isoKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 
+// ── Rate rows ────────────────────────────────────────────────────────────────
+// One builder behind every ledger row and every generated price, so a booking's
+// subtotal is the CONSEQUENCE of its rate rows instead of a number invented
+// alongside them.
+//
+// Row shape is production's `_get_rate_price()` (price_ledger.py:620-663): one
+// BookingAddOn per pet, titled with the pet's name, described by the add-on
+// type, with the "$X × N nights" multiplier as a sub-line.
+//
+// Pet 0 bills at `standard-rate`, pets 1..n at `additional-dog` — looked up BY
+// SLUG, never by index. The rate list is ordered per service
+// (lockableRates.js RATE_TABLE), so position 1 is `additional-dog` for boarding
+// only: it is `holiday-rate` for house sitting, `long-walk` for dog walking and
+// `long-drop-in` for drop-in visits.
+//
+// Options:
+//   units      number  nights / walks / visits being billed
+//   unitLabel  string  overrides the rate's own price unit in the multiplier
+//   pets       array   the billed pets in order; `{ name }` or `{ petName }`
+//   perUnit    number  overrides the standard rate's price. The generators
+//                      jitter a round rate off the client's locked one and
+//                      hand it back in here.
+//   amounts    map     slug → price, overriding the locked snapshot. The
+//                      recurring week bills off its own `pricing` block.
+//   extraRows  array   already-priced rows appended after the pets:
+//                      `{ title, pricePerUnit, unit }` (the recurring add-ons)
+//
+// Returns `{ rows, assignments, perUnit, subtotal }`. `assignments` is the
+// pet → rate pairing behind the rows, which is what `buildModifyFields` needs:
+// its rate rows carry the same pairing in a different shape.
+export const buildRateRows = (client, serviceKey, {
+  units = 1, unitLabel, pets, perUnit, amounts, extraRows = [],
+} = {}) => {
+  const rates = lockedRatesFor(client, serviceKey)?.rates ?? []
+  const billed = pets ?? client?.pets ?? []
+  const standard = rates.find(r => r.slug === 'standard-rate') ?? rates[0] ?? null
+  // Fall back to the standard rate when a service has no additional-dog row at
+  // all, so extra pets bill at a rate that means something rather than at
+  // whatever happens to sit second in the list.
+  const additional = rates.find(r => r.slug === 'additional-dog') ?? standard
+
+  const priceOf = (rate, i) =>
+    (i === 0 && perUnit != null) ? perUnit : (amounts?.[rate.slug] ?? rate.lockedPrice)
+
+  const assignments = standard
+    ? billed.map((p, i) => {
+        const rate = i === 0 ? standard : additional
+        return { pet: p, rate, pricePerUnit: priceOf(rate, i) }
+      })
+    : []
+
+  const multiplier = (price, unit) =>
+    rateMultiplier(`$${price}`, units, unitLabel ?? unit, `${unitLabel ?? unit}s`)
+
+  const rows = [
+    ...assignments.map(({ pet, rate, pricePerUnit }) => ({
+      title: pet.name ?? pet.petName,
+      description: rate.label,
+      text: [multiplier(pricePerUnit, rate.unit)],
+      amount: money(pricePerUnit * units),
+    })),
+    ...extraRows.map(r => ({
+      title: r.title,
+      text: [multiplier(r.pricePerUnit, r.unit)],
+      amount: money(r.pricePerUnit * units),
+    })),
+  ]
+
+  // Summed from the same per-unit numbers the rows were priced from, so the
+  // subtotal reconciles to `rows` by construction rather than by agreement.
+  const subtotal = [
+    ...assignments.map(a => a.pricePerUnit),
+    ...extraRows.map(r => r.pricePerUnit),
+  ].reduce((s, n) => s + n * units, 0)
+
+  return { rows, assignments, perUnit: standard ? priceOf(standard, 0) : 0, subtotal }
+}
+
+// The client's locked standard rate for a service — the anchor every generated
+// price is jittered off. Falls back to the service's list day rate if the
+// service carries no lockable rows at all.
+const standardRateFor = (client, serviceKey) => {
+  const rates = lockedRatesFor(client, serviceKey)?.rates ?? []
+  const standard = rates.find(r => r.slug === 'standard-rate') ?? rates[0]
+  return standard?.lockedPrice ?? SERVICES[serviceKey].daily
+}
+
+// Rates stay whole dollars, and stay inside the add-on's country-config band —
+// `minimum_service_add_on_prices` / `max_add_on_price`, carried on each rate as
+// minPrice / maxPrice (lockableRates.js). The ceiling matters because the GBV
+// nudge below solves for whatever rate closes the remaining gap, and an
+// unreachable target would otherwise produce a $2,000 dog walk: a price the
+// sitter could not have set in the first place, on a prototype whose rate rows
+// are the thing under test. Clamping trades exact past-sum reconciliation to
+// `client.gbv` for plausibility, which costs nothing on screen — the sum of
+// past prices is never displayed (`completedAmount` reads the gbv directly, and
+// `pendingAmount` sums only upcoming bookings).
+const clampRate = (client, serviceKey, n) => {
+  const rates = lockedRatesFor(client, serviceKey)?.rates ?? []
+  const standard = rates.find(r => r.slug === 'standard-rate') ?? rates[0]
+  const floor = standard?.minPrice || 1
+  const ceiling = standard?.maxPrice ?? Infinity
+  return Math.min(ceiling, Math.max(floor, Math.round(n)))
+}
+
+// The round standard rate whose subtotal lands closest to `target`. A subtotal
+// is linear in the standard rate — `units × rate + fixed`, where `fixed` is the
+// additional pets and add-ons — so the closest round rate is a division, not a
+// search. Used by the GBV nudge and by the authored cancelled-booking prices.
+const rateForTarget = (client, serviceKey, opts, target) => {
+  const { subtotal: fixed } = buildRateRows(client, serviceKey, { ...opts, perUnit: 0 })
+  const units = opts.units || 1
+  return clampRate(client, serviceKey, (target - fixed) / units)
+}
+
+// ── The price ledger ─────────────────────────────────────────────────────────
+// `PriceLedgerMapper.map()` builds a ledger for EVERY conversation — production
+// has no "some bookings have prices" state. A sitter's ledger ends at Subtotal
+// + Your earnings: no service fee, no tax, no due-now, because
+// `_get_requester_prices()` returns [] for providers.
+//
+// `booking.rateRows` is the Services & Charges section verbatim, put on the
+// booking by whichever builder priced it, so the subtotal here is the same sum
+// that produced `booking.price`.
+export const buildLedger = (client, booking, share) => {
+  // The one early-out: `_get_price_sections()` returns [] outright when
+  // `financial_calculator.is_cancelled_with_full_refund()` (price_ledger.py:439-440).
+  //
+  // Currently UNREACHABLE, and encoded anyway so the shape stays honest if such
+  // a booking is ever added: the prototype models cancelled and archived
+  // bookings as requests that were never booked (`no_service_deposit`, no
+  // stay), and the production predicate needs a stay that was cancelled and
+  // fully refunded.
+  if (booking.hasStay && booking.isCancelled && booking.refundedInFull) return { sections: [] }
+
+  const rows = booking.rateRows ?? buildRateRows(client, booking.serviceKey, {
+    units: booking.unitCount ?? 1,
+  }).rows
+  const subtotal = rows.reduce((s, r) => s + parseFloat(r.amount.amount), 0)
+
+  // `_get_total_price_title()` (:1069-1080) and `_get_total_earnings()`
+  // (:511-514) both fork on `conv.is_recurring`.
+  const subtotalTitle = booking.isRecurring ? SUBTOTAL_THIS_WEEK : SUBTOTAL
+  const earningsTitle = booking.isRecurring ? YOUR_EARNINGS_THIS_WEEK : YOUR_EARNINGS
+
+  // The earnings row is deliberately `share × subtotal`, NOT `booking.earnings`.
+  // Archived bookings carry `earnings: $0` because they realised no GBV, but
+  // production's `_get_total_earnings()` computes off the request's price
+  // regardless of whether it was ever paid — so the ledger shows what the stay
+  // would have earned. The divergence from `booking.earnings` is intentional
+  // and production-faithful.
+  return {
+    sections: [
+      { title: LEDGER_SECTION_TITLE, items: rows },
+      { items: [{ title: subtotalTitle, amount: money(subtotal), style: 'bold' }] },
+      { items: [{
+          title: earningsTitle,
+          amount: money(share * subtotal),
+          style: 'bold',
+          action: 'earnings',
+        }] },
+    ],
+  }
+}
+
+// ── Plausible booking sizes ──────────────────────────────────────────────────
+// The ceiling on how many units one past booking may absorb. Real booking data
+// varies duration far more than it varies rate, so the GBV nudge below reaches
+// for units first and only fine-tunes the rate; these are the numbers past which
+// a sitter reading the list would blink. Two weeks is the outside for an
+// overnight stay; the daytime services run a couple of weeks of daily visits or
+// a fortnight of walks.
+const MAX_UNITS = {
+  boarding:       14,
+  house_sitting:  14,
+  dog_daycare:    10,
+  drop_in_visits: 14,
+  dog_walking:    10,
+}
+
+// How far a booking's rate may travel from the client's locked standard rate
+// while the nudge is fine-tuning it. The absolute [minPrice, maxPrice] band from
+// country config still applies on top, via clampRate.
+const RATE_BAND = 0.25
+
 // ── Booking generator ─────────────────────────────────────────────────────────
 // Walks dates backwards from PROTO_TODAY and produces booking objects whose
-// summed `price` values approximately reconcile to the client's gbv.
+// summed `price` values reconcile to the client's gbv.
+//
+// That sum is on screen: RelationshipPage renders `progress.earnings.completed`
+// (which is `client.gbv`) as the section header directly above this list, so a
+// list that does not add up to it is two numbers disagreeing on one screen.
+//
+// The reconciliation runs on THREE levers, in order of how much a sitter would
+// notice them:
+//   1. units   — duration, the lever real booking data actually varies. Capped
+//                per service by MAX_UNITS.
+//   2. rate    — fine-tuning only, inside RATE_BAND of the client's locked
+//                standard rate and always inside the country-config band.
+//   3. count   — if the whole roster still cannot absorb the gbv, another past
+//                booking is added rather than one being inflated.
 //
 // `shareFor(gbv)` is passed in rather than a tier object: inside the rollout the
 // share varies per booking with the running GBV, outside it every booking pays
@@ -281,37 +479,87 @@ const isoKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0
 const buildPastBookings = (client, count, targetGbv, shareFor) => {
   if (count === 0) return []
 
+  // Everything a booking is before it is priced: which service, at roughly what
+  // rate, with what the additional pets add on top. Resolved for every booking
+  // up front so the roster's total capacity is known before any of it is spent.
+  const planFor = (i) => {
+    const seed = hash(client.id, i + 1)
+    const serviceKey = SERVICE_KEYS[seed % SERVICE_KEYS.length]
+    const jitter = ((seed % 41) - 20) / 100 // -0.20 .. +0.20
+    const rate = clampRate(client, serviceKey, standardRateFor(client, serviceKey) * (1 + jitter))
+    return {
+      seed,
+      serviceKey,
+      rate,
+      // The fixed per-unit cost of every pet after the first.
+      extras: buildRateRows(client, serviceKey, { units: 1, perUnit: 0 }).subtotal,
+      lo: clampRate(client, serviceKey, rate * (1 - RATE_BAND)),
+      hi: clampRate(client, serviceKey, rate * (1 + RATE_BAND)),
+      maxUnits: MAX_UNITS[serviceKey],
+    }
+  }
+
+  const plans = []
+  for (let i = 0; i < count; i++) plans.push(planFor(i))
+
+  // Prefer another booking over an improbable one: a client who has spent
+  // thousands has booked more often, not once at an impossible price. Capped so
+  // a pathological gbv can never generate an unbounded list.
+  const MAX_EXTRA_BOOKINGS = 24
+  const capacityOf = (p) => p.maxUnits * (p.hi + p.extras)
+  if (targetGbv > 0) {
+    let capacity = plans.reduce((s, p) => s + capacityOf(p), 0)
+    while (capacity < targetGbv && plans.length < count + MAX_EXTRA_BOOKINGS) {
+      const p = planFor(plans.length)
+      plans.push(p)
+      capacity += capacityOf(p)
+    }
+  }
+
   const bookings = []
   const cursor = new Date(PROTO_TODAY)
   cursor.setHours(0, 0, 0, 0)
   cursor.setDate(cursor.getDate() - 4) // start a few days before "today"
 
-  // Distribute targetGbv across `count` bookings; pick service+span per id.
-  const targetPerBooking = targetGbv > 0 ? targetGbv / count : 60
   let runningGbv = 0
 
-  for (let i = 0; i < count; i++) {
-    const seed = hash(client.id, i + 1)
-    const serviceKey = SERVICE_KEYS[seed % SERVICE_KEYS.length]
+  plans.forEach((p, i) => {
+    const { seed, serviceKey } = p
     const svc = SERVICES[serviceKey]
 
-    // Span: multi-day services pick 1-4 nights based on seed.
-    const span = svc.multiDay ? 1 + (seed % 4) : 1
+    let units
+    let perUnit
+    if (targetGbv > 0) {
+      // Fair share of what is left, recomputed every booking so a booking that
+      // could not absorb its share rolls the remainder forward rather than
+      // stranding it on the last one.
+      const left = plans.length - i
+      // Wobble each share ±25% on the booking's own seed so the list does not
+      // read as N identical totals. The last booking takes the exact remainder,
+      // and every share is recomputed from what is actually left, so the wobble
+      // costs nothing in reconciliation.
+      const wobble = left > 1 ? 1 + (((seed % 51) - 25) / 100) : 1
+      const share = Math.max(1, ((targetGbv - runningGbv) / left) * wobble)
+      units = Math.min(p.maxUnits, Math.max(1, Math.round(share / (p.rate + p.extras))))
+      // Then the closest round rate at that duration — subtotal is linear in the
+      // rate, so this is a division, not a search — held inside the band.
+      perUnit = Math.min(p.hi, Math.max(p.lo, Math.round(share / units - p.extras)))
+    } else {
+      // No gbv to reconcile to: multi-day services pick 1-4 nights on the seed.
+      units = svc.multiDay ? 1 + (seed % 4) : 1
+      perUnit = p.rate
+    }
+
+    // The date range IS the unit count — a 10-walk booking runs a walk a day, a
+    // 6-night stay runs six nights — so `unitCount` and the "$X × N nights"
+    // multiplier can never disagree with the dates above them.
     const end = new Date(cursor)
     const start = new Date(cursor)
-    start.setDate(end.getDate() - (span - 1))
+    start.setDate(end.getDate() - (units - 1))
 
-    // Price: anchor on (daily × span) but jitter ±20% so the list feels real.
-    const base = svc.daily * span
-    const jitter = ((seed % 41) - 20) / 100 // -0.20 .. +0.20
-    let price = Math.max(20, Math.round(base * (1 + jitter)))
-
-    // For the final couple of bookings, nudge price so total ≈ targetGbv.
-    if (i >= count - 2 && targetGbv > 0) {
-      const remaining = targetGbv - runningGbv
-      const remainingBookings = count - i
-      price = Math.max(20, Math.round(remaining / remainingBookings))
-    }
+    const { rows: rateRows, subtotal: price } = buildRateRows(client, serviceKey, {
+      units, unitLabel: SERVICE_DETAIL[serviceKey].unit, perUnit,
+    })
     runningGbv += price
 
     // Earnings: tier the booking landed in (based on cumulative gbv at that point).
@@ -321,23 +569,28 @@ const buildPastBookings = (client, count, targetGbv, shareFor) => {
     bookings.push({
       id: `${client.id}-past-${i + 1}`,
       price: money(price),
-      dates: span === 1 ? `${fmt(start)}, ${start.getFullYear()}` : fmtRange(start, end),
+      dates: units === 1 ? `${fmt(start)}, ${start.getFullYear()}` : fmtRange(start, end),
       serviceName: svc.name,
       serviceIcon: svc.icon,
       serviceKey,
+      rateRows,
+      // The generated standard rate this booking was priced from. buildModifyFields
+      // must seed the rate selector with it, not with the locked snapshot, or the
+      // modify screen opens showing a per-unit rate the ledger never charged.
+      perUnit,
       earnings: money(earnings),
       serviceStatus: 'completed_service_deposit',
       conversationOpk: `${client.id}-conv-past-${i + 1}`,
       startDate: isoKey(start),
       endDate: isoKey(end),
-      ...statusFields('completed_service_deposit', start, end, serviceKey, span),
-      ...detailFields(start, end, serviceKey, span),
+      ...statusFields('completed_service_deposit', start, end, serviceKey, units),
+      ...detailFields(start, end, serviceKey, units),
     })
 
-    // Step cursor backwards: span days + 2-6 day gap.
+    // Step cursor backwards: the booking's own days + a 2-6 day gap.
     const gap = 2 + (seed % 5)
-    cursor.setDate(cursor.getDate() - span - gap)
-  }
+    cursor.setDate(cursor.getDate() - units - gap)
+  })
 
   return bookings
 }
@@ -357,7 +610,11 @@ const buildUpcomingBookings = (client, count, share) => {
     const end   = new Date(PROTO_TODAY); end.setHours(0,0,0,0);   end.setDate(end.getDate() + 1)
     const svc = SERVICES.boarding
     const span = 4
-    const price = Math.round(svc.daily * span)
+    // Priced off owen's locked boarding rates, like every other booking: the
+    // total is the sum of the pets' rate rows, never a figure set beside them.
+    const { rows: rateRows, subtotal: price } = buildRateRows(client, 'boarding', {
+      units: span, unitLabel: SERVICE_DETAIL.boarding.unit,
+    })
     out.push({
       id: `${client.id}-up-active`,
       price: money(price),
@@ -367,6 +624,7 @@ const buildUpcomingBookings = (client, count, share) => {
       serviceName: svc.name,
       serviceIcon: svc.icon,
       serviceKey: 'boarding',
+      rateRows,
       earnings: money(price * share),
       serviceStatus: 'completed_service_deposit',
       conversationOpk: `${client.id}-conv-up-active`,
@@ -381,34 +639,21 @@ const buildUpcomingBookings = (client, count, share) => {
   // *locked* rates (see lockableRates.js) rather than the sitter's defaults —
   // 3 nights x ($38 standard + $28 additional dog).
   //
-  // This is the only booking carrying a `ledger`, because it is the only one
-  // BookingDetailsScreen renders. The rows mirror
-  // price_ledger.py:_get_rate_price(): one row per pet, titled with the pet's
-  // name, described by the add-on type, with the "$X x N nights" multiplier as
-  // a sub-line. A sitter's ledger ends at Subtotal + Your earnings — no
-  // service fee, no tax, no due-now (`_get_requester_prices` returns [] for
-  // providers).
+  // Every booking now carries a `ledger` — production builds one for every
+  // conversation (see buildLedger above) — but this is the one whose figures
+  // are pinned: LOCKED_PRICE_OVERRIDES in lockableRates.js fixes her boarding
+  // rates at $38 / $28 so the locked-rates demo always shows the same numbers.
   if (client.id === 'lena' && count > 0) {
     const start = new Date(PROTO_TODAY); start.setHours(0,0,0,0); start.setDate(start.getDate() + 6)
     const end   = new Date(PROTO_TODAY); end.setHours(0,0,0,0);   end.setDate(end.getDate() + 9)
     // Paid a week before "today" — derived from PROTO_TODAY, never hardcoded.
     const paid  = new Date(PROTO_TODAY); paid.setHours(0,0,0,0);  paid.setDate(paid.getDate() - 7)
-    const locked = lockedRatesFor(client, 'boarding').rates
     const nights = 3
-    const perNight = locked[0].lockedPrice + locked[1].lockedPrice
-    const price = perNight * nights
-
     // First pet bills at the standard rate, each additional pet at the
     // additional-dog rate — the same shape as the BookingAddOn rows behind
-    // production's ledger.
-    const rateRows = client.pets.map((p, i) => {
-      const rate = locked[i === 0 ? 0 : 1]
-      return {
-        title: p.name,
-        description: rate.label,
-        text: [rateMultiplier(`$${rate.lockedPrice}`, nights, rate.unit, `${rate.unit}s`)],
-        amount: money(rate.lockedPrice * nights),
-      }
+    // production's ledger. 3 nights × ($38 standard + $28 additional dog).
+    const { rows: rateRows, subtotal: price } = buildRateRows(client, 'boarding', {
+      units: nights, unitLabel: SERVICE_DETAIL.boarding.unit,
     })
 
     out.push({
@@ -420,6 +665,7 @@ const buildUpcomingBookings = (client, count, share) => {
       serviceName: SERVICES.boarding.name,
       serviceIcon: SERVICES.boarding.icon,
       serviceKey: 'boarding',
+      rateRows,
       earnings: money(price * share),
       serviceStatus: 'completed_service_deposit',
       conversationOpk: `${client.id}-conv-up-locked`,
@@ -434,18 +680,6 @@ const buildUpcomingBookings = (client, count, share) => {
       // collapsed range ("Aug 25 to 28, 2026") that can't be split back apart.
       // See detailFields / SERVICE_DETAIL above.
       ...detailFields(start, end, 'boarding', nights),
-      ledger: {
-        sections: [
-          { title: LEDGER_SECTION_TITLE, items: rateRows },
-          { items: [{ title: SUBTOTAL, amount: money(price), style: 'bold' }] },
-          { items: [{
-              title: YOUR_EARNINGS,
-              amount: money(price * share),
-              style: 'bold',
-              action: 'earnings',
-            }] },
-        ],
-      },
     })
   }
 
@@ -462,9 +696,13 @@ const buildUpcomingBookings = (client, count, share) => {
     const end = new Date(cursor)
     end.setDate(start.getDate() + (span - 1))
 
-    const base = svc.daily * span
+    // Same rule as the past bookings: jitter the round standard rate, then let
+    // the rate rows decide the total.
     const jitter = ((seed % 31) - 15) / 100
-    const price = Math.max(20, Math.round(base * (1 + jitter)))
+    const perUnit = clampRate(client, serviceKey, standardRateFor(client, serviceKey) * (1 + jitter))
+    const { rows: rateRows, subtotal: price } = buildRateRows(client, serviceKey, {
+      units: span, unitLabel: SERVICE_DETAIL[serviceKey].unit, perUnit,
+    })
 
     out.push({
       id: `${client.id}-up-${i + 1}`,
@@ -475,6 +713,11 @@ const buildUpcomingBookings = (client, count, share) => {
       serviceName: svc.name,
       serviceIcon: svc.icon,
       serviceKey,
+      rateRows,
+      // The generated standard rate this booking was priced from. buildModifyFields
+      // must seed the rate selector with it, not with the locked snapshot, or the
+      // modify screen opens showing a per-unit rate the ledger never charged.
+      perUnit,
       earnings: money(price * share),
       serviceStatus: 'pending_service_deposit',
       conversationOpk: `${client.id}-conv-up-${i + 1}`,
@@ -539,13 +782,8 @@ export const buildRecurringWeekBooking = (client, share, skippedThisWeek = false
   // recurringSchedule.pricing block is shaped in contacts.js.
   const petRows = tpl.pricing.pets
   const addOnRows = tpl.pricing.addOns ?? []
-  const perVisit =
-    petRows.reduce((s, p) => s + p.ratePerWalk, 0) +
-    addOnRows.reduce((s, a) => s + a.ratePerWalk, 0)
-  const weeklyPrice = perVisit * visits
 
   const unit = SERVICE_DETAIL[RECURRING_SERVICE_KEY].unit
-  const plural = `${unit}s`
 
   // One schedule row per service day, dated inside this week — production's
   // NonContiguousServiceDatesStringBuilder emits a real date per occurrence,
@@ -557,22 +795,19 @@ export const buildRecurringWeekBooking = (client, share, skippedThisWeek = false
     return { day: fmtLong(d), times: [t.time] }
   })
 
-  // Ledger rows mirror `_get_rate_price()` the same way Lena's do: one row per
-  // pet titled with the pet's name and described by the add-on type, with the
-  // "$X × N walks" multiplier as a sub-line, then the schedule's add-ons.
-  const rateRows = [
-    ...petRows.map(p => ({
-      title: p.petName,
-      description: p.rateType,
-      text: [rateMultiplier(`$${p.ratePerWalk}`, visits, unit, plural)],
-      amount: money(p.ratePerWalk * visits),
-    })),
-    ...addOnRows.map(a => ({
-      title: a.label,
-      text: [rateMultiplier(`$${a.ratePerWalk}`, visits, unit, plural)],
-      amount: money(a.ratePerWalk * visits),
-    })),
-  ]
+  // Ledger rows come from the shared builder, the same as every other booking.
+  // The week bills off its own `pricing` block rather than off the client's
+  // locked snapshot, so the per-rate figures travel in as `amounts` (keyed by
+  // the slug each pricing row already carries) and the 60-min add-on as an
+  // extra row. `weeklyPrice` is the sum of those rows, never a figure set
+  // beside them.
+  const { rows: rateRows, subtotal: weeklyPrice } = buildRateRows(client, RECURRING_SERVICE_KEY, {
+    units: visits,
+    unitLabel: unit,
+    pets: petRows,
+    amounts: Object.fromEntries(petRows.map(p => [p.slug, p.ratePerWalk])),
+    extraRows: addOnRows.map(a => ({ title: a.label, pricePerUnit: a.ratePerWalk, unit })),
+  })
 
   // The owner is charged each Monday morning for the week ahead
   // (price_ledger.py:302-306), so this week's payment date is its Monday.
@@ -603,6 +838,7 @@ export const buildRecurringWeekBooking = (client, share, skippedThisWeek = false
     serviceSummaryTitle: `${svc.name} ${WEEKLY_SUFFIX}`,
     serviceIcon: svc.icon,
     serviceKey: RECURRING_SERVICE_KEY,
+    rateRows,
     rateAmounts,
     earnings: money(weeklyPrice * share),
     serviceStatus: 'completed_service_deposit',
@@ -613,18 +849,6 @@ export const buildRecurringWeekBooking = (client, share, skippedThisWeek = false
       { recurring: true, skippedThisWeek },
     ),
     ...detailFields(weekStart, weekEnd, RECURRING_SERVICE_KEY, visits, { schedules }),
-    ledger: {
-      sections: [
-        { title: LEDGER_SECTION_TITLE, items: rateRows },
-        { items: [{ title: SUBTOTAL_THIS_WEEK, amount: money(weeklyPrice), style: 'bold' }] },
-        { items: [{
-            title: YOUR_EARNINGS_THIS_WEEK,
-            amount: money(weeklyPrice * share),
-            style: 'bold',
-            action: 'earnings',
-          }] },
-      ],
-    },
     // The recurring-ONLY extra section, kept off `ledger.sections` on purpose:
     // production appends it as a separate PriceSection after the standard ones
     // (price_ledger.py:504-507), so the details screen appends it too rather
@@ -678,25 +902,27 @@ export const buildRecurringWeekBooking = (client, share, skippedThisWeek = false
 // server pricer round-trip on every field change (`checkPrice`,
 // ModifyBooking.duck.ts), which is explicitly out of scope.
 const buildModifyFields = (client, booking) => {
-  const cfg = lockedRatesFor(client, booking.serviceKey)
   const units = booking.unitCount ?? 1
   const d = SERVICE_DETAIL[booking.serviceKey] ?? SERVICE_DETAIL.boarding
 
-  // First pet bills at the standard rate, each additional pet at the
-  // additional-dog rate — the same BookingAddOn shape the ledger uses.
-  // `lockedPrice` is the rate the owner agreed to (the editable value);
+  // Same pet → rate pairing the ledger uses, reshaped for the rate selector.
+  // `pricePerUnit` is the rate the owner agreed to (the editable value);
   // `defaultPrice` is today's profile rate (production's "List price").
-  const rateRows = (cfg?.rates?.length ? client.pets : []).map((p, i) => {
-    const rate = cfg.rates[i === 0 ? 0 : 1] ?? cfg.rates[0]
-    return {
-      petName: p.name,
-      slug: rate.slug,
-      label: rate.label,
-      pricePerUnit: rate.lockedPrice,
-      listPrice: rate.defaultPrice,
-      unit: rate.unit,
-    }
+  // `booking.perUnit` is the generated standard rate the booking was priced
+  // from. Omitting it re-reads the locked snapshot, which is a different number
+  // — the modify screen would then open showing a per-unit rate that disagrees
+  // with the details ledger and with `previousTotal`.
+  const { assignments } = buildRateRows(client, booking.serviceKey, {
+    units, unitLabel: d.unit, perUnit: booking.perUnit,
   })
+  const rateRows = assignments.map(({ pet, rate, pricePerUnit }) => ({
+    petName: pet.name ?? pet.petName,
+    slug: rate.slug,
+    label: rate.label,
+    pricePerUnit,
+    listPrice: rate.defaultPrice,
+    unit: rate.unit,
+  }))
 
   return {
     units,
@@ -711,8 +937,34 @@ const buildModifyFields = (client, booking) => {
   }
 }
 
-const withModifyFields = (client) => (booking) =>
-  booking.isRecurring ? booking : { ...booking, modify: buildModifyFields(client, booking) }
+// ── The one per-booking mapper ───────────────────────────────────────────────
+// Everything derived from a finished booking object is attached here, from one
+// place, so upcoming / past / archived get it identically.
+const withDerivedFields = (client, share) => (booking) => ({
+  ...booking,
+  // Production's collapsed summary reads `payment.date_paid`
+  // (price_ledger.py:321-364), which exists for every paid conversation. Only
+  // the two hand-written bookings carried a `paidOn` before every booking had
+  // a ledger, so the generated ones would interpolate `undefined` into
+  // "{owner} paid $X on … for this stay". Rover charges when the service
+  // begins, so the booking's own start date is the honest stand-in.
+  ...(booking.isPaid && !booking.paidOn && booking.startDate
+    ? { paidOn: fmt(new Date(`${booking.startDate}T00:00:00`)) }
+    : {}),
+  // Production suppresses the whole rates block on a recurring stay
+  // (ModifyBookingForm.utils.ts:74-89), so a recurring week gets no modify block.
+  ...(booking.isRecurring ? {} : { modify: buildModifyFields(client, booking) }),
+  ledger: buildLedger(client, booking, share),
+  // `_is_collapsed()` (price_ledger.py:1650-1657) OR'd with
+  // `should_collapse_financial_sections()` (base.py:389-397), whose mobile
+  // provider branch collapses an unpaid conversation outright. Two deliberate
+  // simplifications: production's second clause is is_cancelled_with_full_refund
+  // rather than plain cancellation, and `hasModification` is always false here.
+  ledgerCollapsed: !booking.isPaid || (booking.isPaid && !booking.hasModification && !booking.isCancelled),
+  // `_get_info_text()` (price_ledger.py:1850-1858): the provider on a recurring
+  // conversation is reminded to send a Rover Card, unless the stay is cancelled.
+  ledgerInfo: booking.isRecurring && !booking.isCancelled ? RECURRING_ROVER_CARD_INFO : null,
+})
 
 const buildArchivedBookings = (client, count) => {
   const out = []
@@ -730,7 +982,11 @@ const buildArchivedBookings = (client, count) => {
     const end = new Date(cursor)
     end.setDate(start.getDate() + (span - 1))
 
-    const price = Math.max(20, Math.round(svc.daily * span * 0.95))
+    // Year-old history, so the rate sits slightly below today's locked one.
+    const perUnit = clampRate(client, serviceKey, standardRateFor(client, serviceKey) * 0.95)
+    const { rows: rateRows, subtotal: price } = buildRateRows(client, serviceKey, {
+      units: span, unitLabel: SERVICE_DETAIL[serviceKey].unit, perUnit,
+    })
 
     out.push({
       id: `${client.id}-arc-${i + 1}`,
@@ -739,6 +995,11 @@ const buildArchivedBookings = (client, count) => {
       serviceName: svc.name,
       serviceIcon: svc.icon,
       serviceKey,
+      rateRows,
+      // The generated standard rate this booking was priced from. buildModifyFields
+      // must seed the rate selector with it, not with the locked snapshot, or the
+      // modify screen opens showing a per-unit rate the ledger never charged.
+      perUnit,
       earnings: money(0),
       serviceStatus: 'no_service_deposit',
       conversationOpk: `${client.id}-conv-arc-${i + 1}`,
@@ -773,13 +1034,26 @@ const buildCancelledArchived = (client) => {
     const start = new Date(cursor)
     start.setDate(end.getDate() - (span - 1))
 
+    // `b.price` is the authored figure, but the rate rows are what the ledger
+    // shows — so it becomes a target: pick the round standard rate landing
+    // closest to it, and take the resulting subtotal as the price. A client
+    // with more pets than the authored number assumed therefore prices higher.
+    const opts = { units: span, unitLabel: SERVICE_DETAIL[b.serviceKey].unit }
+    const perUnit = rateForTarget(client, b.serviceKey, opts, b.price)
+    const { rows: rateRows, subtotal: price } = buildRateRows(client, b.serviceKey, { ...opts, perUnit })
+
     const item = {
       id: `${client.id}-arc-${i + 1}`,
-      price: money(b.price),
+      price: money(price),
       dates: span === 1 ? `${fmt(start)}, ${start.getFullYear()}` : fmtRange(start, end),
       serviceName: svc.name,
       serviceIcon: svc.icon,
       serviceKey: b.serviceKey,
+      rateRows,
+      // The generated standard rate this booking was priced from. buildModifyFields
+      // must seed the rate selector with it, not with the locked snapshot, or the
+      // modify screen opens showing a per-unit rate the ledger never charged.
+      perUnit,
       earnings: money(0),
       serviceStatus: 'no_service_deposit',
       conversationOpk: `${client.id}-conv-arc-${i + 1}`,
@@ -997,9 +1271,9 @@ export const getRelationshipData = (ownerId, { altMonetization = false } = {}) =
     // adds a key — no existing field is touched — so the surfaces that render
     // these bookings today are unaffected.
     bookings: {
-      upcoming: upcoming.map(withModifyFields(client)),
-      past: past.map(withModifyFields(client)),
-      archived: archived.map(withModifyFields(client)),
+      upcoming: upcoming.map(withDerivedFields(client, shareFor(effectiveGbv))),
+      past: past.map(withDerivedFields(client, shareFor(effectiveGbv))),
+      archived: archived.map(withDerivedFields(client, shareFor(effectiveGbv))),
     },
   }
 }

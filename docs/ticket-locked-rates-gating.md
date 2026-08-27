@@ -7,8 +7,9 @@ collected here.
 Production source of truth: `/Users/bernardoprudencio/Projects/web` (`roverdotcom/web`).
 Paths below are relative to that repo root; prototype paths are relative to this repo root.
 
-**Nothing here is a live defect.** Item 1 is a fidelity gap, item 2 is latent and currently
-unreachable, item 3 is an interaction difference between two surfaces that are both
+**Nothing here is a live defect.** Item 1 is a fidelity gap, item 2's namespace split is
+latent and currently unreachable (its positional-lookup sibling *was* live and is now
+fixed — see the subsection under item 2), item 3 is an interaction difference between two surfaces that are both
 individually faithful to *a* production surface. None of the three blocks the current pass.
 
 > All prototype line numbers were re-confirmed against the tree after the details/modify pass
@@ -139,6 +140,23 @@ Schedule / unit namespace:
 - `src/screens/ScheduleOverlay.jsx:12-13`, `src/screens/relationship/AgendaView.jsx:63`,
   `ManageSheet.jsx:21`, `SummarySheet.jsx:13`, `UnitEditor.jsx:48`, `AddSheet.jsx:23-24, :33`
 - `src/data/scheduleData.js:47` (`getOwnerRelUnit` hardcodes `serviceId: 'dog_walking'`)
+
+### Sibling defect, now fixed — positional rate lookup
+
+The namespace split had a companion: three places picked a client's per-pet rate out of
+`lockedRatesFor(...).rates` **by array position**, `rates[i === 0 ? 0 : 1]`, so every pet
+after the first billed at whatever row happened to sit second. That is `additional-dog`
+for boarding and nothing of the sort elsewhere — `holiday-rate` for house sitting,
+`long-walk` for dog walking, `long-drop-in` for drop-in visits.
+
+Unlike the namespace split this one *was* reachable, and it was live on the modify screen:
+a drop-in booking opened with its second pet's rate selector reading "60 minute rate".
+All three sites now resolve `standard-rate` / `additional-dog` by slug —
+`buildRateRows` in `relationshipData.js` (which `buildModifyFields` and every ledger go
+through) and the rate-selector seed in `ModifyBookingScreen.jsx`, which now takes its
+default from `booking.modify.rateRows[i].slug` rather than re-deriving a position.
+
+**The namespace half below is unaffected and remains latent.**
 
 ### The exact affected call path
 

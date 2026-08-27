@@ -205,9 +205,15 @@ export default function ModifyBookingScreen() {
   // whole answer — production's modify page is per-conversation, so the CTA that
   // sent us here already names the booking.
   //
-  // Without an opk, fall back to the paid demo booking (the one carrying a
-  // ledger), then any upcoming one — a page that modifies a booking needs a
-  // future booking to modify. The past-booking fallback exists only so the route
+  // Without an opk, fall back to the first PAID upcoming booking, then any
+  // upcoming one — a page that modifies a booking needs a future booking to
+  // modify. `isPaid` is the honest predicate for production's `hasStay` branch
+  // this page implements: a stay only exists once the request is paid, and the
+  // modify CTA is offered on a booked stay. (This used to test `b.ledger`, which
+  // worked only while the demo booking was the sole one carrying a ledger;
+  // `PriceLedgerMapper.map()` builds a ledger for every conversation, so
+  // relationshipData.js now puts one on every booking and that test degenerated
+  // to `upcoming[0]`.) The past-booking fallback exists only so the route
   // never renders empty for a client with no upcoming stay (amelia); production
   // would not offer the CTA there at all.
   //
@@ -233,7 +239,7 @@ export default function ModifyBookingScreen() {
       return [...upcoming, ...past, ...archived]
         .find(b => b.conversationOpk === conversationOpk) ?? null
     }
-    return upcoming.find(b => b.ledger) ?? upcoming[0] ?? past[0] ?? null
+    return upcoming.find(b => b.isPaid) ?? upcoming[0] ?? past[0] ?? null
   }, [rel, conversationOpk])
 
   const ownerFirstName = client?.displayName?.split(' ')[0] ?? ''
@@ -303,11 +309,19 @@ export default function ModifyBookingScreen() {
   // this route is opened for.
   const ledger = useMemo(() => {
     if (!booking) return null
+    // `previousTotal` reconciles by construction: `booking.price` is the sum
+    // `buildRateRows` returned for the rows this page renders (relationshipData.js
+    // buildRateRows / buildModifyFields), not an independently authored figure.
     const previousTotal = parseFloat(booking.price.amount)
-    const perUnit = (lockedConfig?.rates ?? []).length
-      ? (client.pets ?? [{}]).reduce(
-          (sum, _p, i) => sum + (lockedConfig.rates[i === 0 ? 0 : 1]?.lockedPrice ?? 0), 0
-        )
+    // One more unit costs the sum of the per-pet rates. `booking.modify.rateRows`
+    // now carries those rates directly — the same pet → rate pairing the rate
+    // selector above renders — so the extra night is priced off the real rows
+    // instead of the old positional guess at the locked snapshot. The
+    // `previousTotal / 3` fallback is kept only for a booking with no rate rows
+    // at all (a service with no lockable add-ons).
+    const modifyRows = booking.modify?.rateRows ?? []
+    const perUnit = modifyRows.length
+      ? modifyRows.reduce((sum, r) => sum + r.pricePerUnit, 0)
       : Math.round(previousTotal / 3)
     const subtotal = previousTotal + perUnit
     const earningsRatio = previousTotal > 0 && booking.earnings
@@ -320,7 +334,7 @@ export default function ModifyBookingScreen() {
       earnings: subtotal * earningsRatio,
       isPriceIncrease: subtotal > previousTotal,
     }
-  }, [booking, client, lockedConfig])
+  }, [booking])
 
   const messageError = messageTouched && message.trim().length < copy.MESSAGE_MIN_LENGTH
     ? copy.MESSAGE_TOO_SHORT
@@ -442,12 +456,25 @@ export default function ModifyBookingScreen() {
             <SectionHeading>{copy.RATES_HEADING[serviceKey] ?? copy.RATES_HEADING.boarding}</SectionHeading>
             <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg }}>
               {client.pets.map((p, i) => {
-                const defaultSlug = rateOptions[i === 0 ? 0 : 1]?.slug ?? rateOptions[0]?.slug ?? ''
+                // Seed from the booking's own rate rows, which are what priced
+                // it — same pet → rate pairing the details ledger renders, so
+                // the two surfaces can't disagree. Falling back to
+                // `rateOptions[i === 0 ? 0 : 1]` would reintroduce the index
+                // bug the data layer just removed: position 1 is
+                // `additional-dog` for boarding only, and `long-drop-in` /
+                // `long-walk` / `holiday-rate` for the other services.
+                const billed = booking?.modify?.rateRows?.[i]
+                const defaultSlug = billed?.slug
+                  ?? (i === 0
+                    ? rateOptions.find(r => r.slug === 'standard-rate')?.slug
+                    : rateOptions.find(r => r.slug === 'additional-dog')?.slug)
+                  ?? rateOptions[0]?.slug ?? ''
                 const slug = petRates[p.id]?.slug ?? defaultSlug
                 const lockedRate = (lockedConfig?.rates ?? []).find(r => r.slug === slug)
                 const profileRate = rateOptions.find(r => r.slug === slug)
                 const price = petRates[p.id]?.price
-                  ?? String(lockedRate?.lockedPrice ?? profileRate?.defaultPrice ?? '')
+                  ?? String((slug === billed?.slug ? billed.pricePerUnit : null)
+                    ?? lockedRate?.lockedPrice ?? profileRate?.defaultPrice ?? '')
                 const setPet = (patch) => setPetRates(prev => ({
                   ...prev, [p.id]: { slug, price, ...patch },
                 }))
