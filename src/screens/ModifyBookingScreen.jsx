@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { colors, radius, shadows, spacing, textStyles, typography } from '../tokens'
-import { BackIcon, InfoCircleIcon } from '../assets/icons'
+import { BackIcon } from '../assets/icons'
 import {
   Button, BottomSheet, CalInput, Chip, Select, Switch, Textarea,
   LockRatesToggleRow,
@@ -152,32 +152,6 @@ const NoPenaltyCard = () => {
   )
 }
 
-// ── ShortNoticeBanner.tsx:20-41 ──────────────────────────────────────────────
-// Kibble `Banner severity="warning"`. Which of the two strings shows is real
-// logic, reproduced from :25-34 — and it is date-derived, so it follows
-// PROTO_TODAY rather than a literal.
-const shortNoticeMessage = (startDateKey, active, price) => {
-  if (!startDateKey) return null
-  const start = new Date(`${startDateKey}T00:00:00`)
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const daysUntilStart = Math.max(0, Math.round((start - today) / 86400000))
-  const isShortNotice = daysUntilStart < 2
-  const hasValue = Boolean(parseFloat(price))
-  if (active && daysUntilStart >= 2 && hasValue) return copy.SHORT_NOTICE_REMOVE_FEE
-  if (isShortNotice && (!active || !hasValue)) return copy.SHORT_NOTICE_ADD_FEE
-  return null
-}
-
-const WarningBanner = ({ text }) => (
-  <div style={{
-    background: colors.yellow100, borderRadius: radius.secondary, padding: spacing.lg,
-    display: 'flex', gap: spacing.md, alignItems: 'flex-start',
-  }}>
-    <div style={{ flexShrink: 0, display: 'flex' }}><InfoCircleIcon size={16} color={colors.cautionText} /></div>
-    <p style={{ ...textStyles.paragraph100, color: colors.primary, margin: 0 }}>{text}</p>
-  </div>
-)
-
 // ── Adjustments — STATIC MOCK DATA ───────────────────────────────────────────
 // Production gets these off the pricer response (`addOns`), each row an
 // OnOffSwitch plus a currency input (AdjustmentComponent.tsx:45-61, :115-152).
@@ -188,7 +162,6 @@ const WarningBanner = ({ text }) => (
 // (see the same deliberate divergence noted in lockableRates.js); production's
 // `add_on_type.name` is Title Case (services/constants.py:457-462).
 const ADJUSTMENTS = [
-  { slug: 'short-notice',    name: 'Short notice',          price: '10.00', active: true  },
   { slug: 'holiday-rate',    name: 'Holiday rate',          price: '15.00', active: false },
   { slug: 'pick-up-drop-off', name: 'Sitter pick-up and drop-off', price: '25.00', active: false },
 ]
@@ -353,9 +326,6 @@ export default function ModifyBookingScreen() {
       </div>
     )
   }
-
-  const shortNotice = adjustments['short-notice']
-  const shortNoticeText = shortNoticeMessage(startDate, shortNotice.active, shortNotice.price)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
@@ -559,12 +529,6 @@ export default function ModifyBookingScreen() {
                         ariaLabel={`${a.name} amount`}
                       />
                     </div>
-                    {/* The banner is inserted immediately after the
-                        short-notice row, not at the end of the list
-                        (AdjustmentsListComponent.tsx:198-205). */}
-                    {a.slug === 'short-notice' && shortNoticeText && (
-                      <WarningBanner text={shortNoticeText} />
-                    )}
                   </React.Fragment>
                 )
               })}

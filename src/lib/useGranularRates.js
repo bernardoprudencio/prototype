@@ -12,15 +12,21 @@ import { isLockableConversation, defaultAmountsFor, lockedSeedFor } from '../dat
  * The lock is still all-or-nothing per service — there is no per-rate lock and
  * no per-rate revert (01-locked-rates-client-management.md §1). What is new is
  * that each rate carries an *amount* the provider sets while locking, and that
- * the entry point is one of three offers rather than a switch.
+ * the entry point is an offer rather than a switch.
  *
  * ── The offer (§3.1) ────────────────────────────────────────────────────────
- *   offer = !isLocked           ? 'lock'
- *         : bookedDiffersFromLocked ? 'update'
- *         :                      'manage'
- * `lock` gets no padlock; the other two do. `lock` and `update` seed the modal
- * from the request's own prices and open with the switch already on, which is
- * why Save is enabled the moment the modal appears.
+ *   offer = isLocked ? 'manage' : 'lock'
+ * Two offers, decided by the saved lock state alone. `lock` gets no padlock;
+ * `manage` does. Only `lock` seeds the modal from the request's own prices and
+ * opens with the switch already on, which is why Save is enabled the moment
+ * that modal appears.
+ *
+ * There used to be a third offer, `update`, taken when a locked service's saved
+ * amounts no longer matched the booked ones; it re-seeded the modal from the
+ * request. It is gone by product decision, not because production lacks it: the
+ * request's prices are consulted **only while locking**. Once a service is
+ * locked, the surface offers `manage` and the sheet seeds purely from the saved
+ * amounts — the way back to request-seeded amounts is to unlock and lock again.
  *
  * @param client  the contacts.js client, or null
  * @param booking the conversation's booking, or null on the relationship page —
@@ -45,11 +51,14 @@ export function useGranularRates(client, booking = null) {
   const state = passesGate ? stateFor(serviceKey) : null
   const available = Boolean(state)
 
-  // The prices the owner is actually booked at. One-off bookings carry them per
+  // The prices the owner is actually booked at — all rates at the sitter's
+  // default except the ones this request prices. One-off bookings carry them per
   // pet on `modify.rateRows` (relationshipData.js buildModifyFields); recurring
   // weeks have no modify block and publish `rateAmounts` instead. Either way the
-  // seeded modal opens on the same numbers the ledger above it shows. Rates the
-  // request doesn't price fall back to the sitter's default.
+  // seeded modal opens on the same numbers the ledger above it shows.
+  //
+  // Only the `lock` offer ever sees these: an already-locked service is seeded
+  // from what is saved, never re-prefilled from a booking.
   const requestAmounts = (() => {
     if (!available) return null
     const out = { ...defaultAmountsFor(serviceKey) }
@@ -59,15 +68,12 @@ export function useGranularRates(client, booking = null) {
     return out
   })()
 
-  // §3.1 — set membership, not amount comparison, decides `isLocked`; the
-  // amounts only decide `update` vs `manage`.
+  // §3.1 — set membership, not amount comparison, decides `isLocked`, and the
+  // lock state alone decides the offer. The booked amounts are not consulted
+  // here at all: a locked service always offers `manage`.
   const offer = (() => {
     if (!available) return null
-    if (!state.locked) return 'lock'
-    const differs = Object.keys(state.amounts).some(
-      slug => Number(requestAmounts?.[slug]) !== Number(state.amounts[slug])
-    )
-    return differs ? 'update' : 'manage'
+    return state.locked ? 'manage' : 'lock'
   })()
 
   const openSheet = (key, opts = {}) => setSheet({
@@ -76,13 +82,15 @@ export function useGranularRates(client, booking = null) {
     requestAmounts: opts.requestAmounts ?? null,
   })
 
-  // The conversation row opens the modal in place, seeded from the request on
-  // the two offers that have one.
+  // The conversation row opens the modal in place. Only `lock` is seeded from
+  // the request — `manage` opens on the saved amounts, with the switch in its
+  // saved position, so pressing the row can never quietly reprice a lock.
   const openFromRow = () => {
     if (!available) return
+    const isLockOffer = offer === 'lock'
     openSheet(serviceKey, {
-      opensLocked: offer === 'lock' || offer === 'update',
-      requestAmounts,
+      opensLocked: isLockOffer,
+      requestAmounts: isLockOffer ? requestAmounts : null,
     })
   }
 
@@ -98,7 +106,10 @@ export function useGranularRates(client, booking = null) {
 
   return {
     enabled, available, clientName,
-    serviceKey, state, offer, requestAmounts,
+    // `requestAmounts` is deliberately not returned: it is lock-path seeding
+    // only, and it reaches the sheet through `sheet.requestAmounts`, which
+    // `openFromRow` fills in on the `lock` offer and leaves null otherwise.
+    serviceKey, state, offer,
     stateFor, seedFor: (key) => lockedSeedFor(client, key),
     sheet, openSheet, openFromRow, closeSheet,
     save,

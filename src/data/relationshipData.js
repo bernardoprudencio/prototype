@@ -14,7 +14,8 @@ import {
   SUBTOTAL_THIS_WEEK, SUBTOTAL_PER_WEEK, PAID_EACH_TUESDAY,
   YOUR_EARNINGS_THIS_WEEK, RECURRING_ROVER_CARD_INFO,
 } from './bookingDetailsCopy'
-import { lockedRatesFor } from './lockableRates'
+import { lockedRatesFor, SERVICE_STATE_KEY } from './lockableRates'
+import { DEFAULT_SERVICE_STATES, SERVICE_STATE } from './sitterServices'
 
 // ── isRecurringClient ────────────────────────────────────────────────────────
 // Production derives recurring-ness from FK presence:
@@ -90,6 +91,96 @@ export const SERVICES = {
 }
 
 const SERVICE_KEYS = Object.keys(SERVICES)
+
+// ── Per-client service pool ───────────────────────────────────────────────────
+// The relationship page's Rates section splits the catalogue into "Previously
+// booked" / "Not booked" from the client's actual bookings
+// (RelationshipPage.jsx builds `bookedServiceKeys` from upcoming ∪ past ∪
+// archived). Generating each booking's service as
+// `SERVICE_KEYS[seed % SERVICE_KEYS.length]` spread a client with several
+// bookings across all five browsable services, which made that split say
+// nothing: every client had booked everything.
+//
+// Real relationships are narrow — an owner comes back for the same one or two
+// services — so each client gets a pool of at most two service keys and every
+// generator draws from it. Everything downstream of a booking's service
+// (price, ledger rows, the inbox thread's service label) moves with it.
+//
+// SERVICES lists the browsable catalogue, not what THIS sitter offers. A
+// generated booking for a service the sitter never turned on would put a row
+// under "Previously booked" that reads "Inactive service" — plausible in
+// production (a sitter can retire a service they used to offer) but noise as a
+// default. So the derived candidates are the intersection with the sitter's own
+// active services, which means crossing the two service-key namespaces through
+// SERVICE_STATE_KEY: DEFAULT_SERVICE_STATES speaks `doggy_daycare` / `drop_in`,
+// this file speaks `dog_daycare` / `drop_in_visits` (CLAUDE.md, "Two service-key
+// namespaces"). With the shipped defaults that leaves dog_daycare,
+// drop_in_visits and boarding, in SERVICES key order.
+//
+// These are the *defaults*, deliberately, not the live `serviceStates` dev
+// flag: booking history is generated once per client and must not reshuffle
+// when the sitter deactivates a service mid-session.
+const OFFERED_SERVICE_KEYS = (() => {
+  const offered = SERVICE_KEYS.filter(
+    k => DEFAULT_SERVICE_STATES[SERVICE_STATE_KEY[k]] !== SERVICE_STATE.INACTIVE,
+  )
+  // A preset that turns everything off would otherwise leave nothing to book.
+  return offered.length > 0 ? offered : SERVICE_KEYS
+})()
+
+// Services a client is booked for by hand, which the pool has to own or the
+// booked group grows a third entry behind its back. Both are the demo stays in
+// buildUpcomingBookings below: owen's active 4-night boarding and lena's paid
+// boarding, the one that makes the locked-rates surfaces reachable.
+const PINNED_SERVICE_KEYS = {
+  owen: ['boarding'],
+  lena: ['boarding'],
+}
+
+// Memoised per client id so all three generation sites (past, upcoming,
+// archived) agree — they are called from different places and must not derive
+// the pool independently.
+const servicePoolCache = new Map()
+
+const servicePoolFor = (client) => {
+  const cached = servicePoolCache.get(client.id)
+  if (cached) return cached
+
+  const pool = []
+  const add = (key) => { if (key && !pool.includes(key)) pool.push(key) }
+
+  // First the keys that are not ours to choose. RECURRING_SERVICE_KEY is
+  // declared further down (its comment belongs with buildRecurringWeekBooking);
+  // the reference resolves at call time, not at module init.
+  if (isRecurringClient(client)) add(RECURRING_SERVICE_KEY)
+  ;(PINNED_SERVICE_KEYS[client.id] ?? []).forEach(add)
+
+  // Hand-authored history wins outright: `cancelledBookings` in contacts.js
+  // already names 1–2 services per client (priya is the widest — dog_walking
+  // plus drop_in_visits), and buildCancelledArchived bills each entry off its
+  // own serviceKey, so the pool has to report them rather than pick.
+  if (client.cancelledBookings) {
+    const authored = []
+    client.cancelledBookings.forEach(b => {
+      if (!authored.includes(b.serviceKey)) authored.push(b.serviceKey)
+    })
+    authored.slice(0, 2).forEach(add)
+    servicePoolCache.set(client.id, pool)
+    return pool
+  }
+
+  // Otherwise derive: one or two services, off the same deterministic hash the
+  // generators use, walking OFFERED_SERVICE_KEYS from a per-client offset so
+  // the picks can never collide.
+  const want = Math.max(pool.length, 1 + (hash(client.id, 7) % 2))
+  const start = hash(client.id, 13) % OFFERED_SERVICE_KEYS.length
+  for (let i = 0; pool.length < Math.min(want, 2) && i < OFFERED_SERVICE_KEYS.length; i++) {
+    add(OFFERED_SERVICE_KEYS[(start + i) % OFFERED_SERVICE_KEYS.length])
+  }
+
+  servicePoolCache.set(client.id, pool)
+  return pool
+}
 
 // ── Booking-details Starts/Ends presentation ────────────────────────────────
 // Production formats times `g:i A` (service_summary.py) and prints each half's
@@ -484,7 +575,8 @@ const buildPastBookings = (client, count, targetGbv, shareFor) => {
   // up front so the roster's total capacity is known before any of it is spent.
   const planFor = (i) => {
     const seed = hash(client.id, i + 1)
-    const serviceKey = SERVICE_KEYS[seed % SERVICE_KEYS.length]
+    const pool = servicePoolFor(client)
+    const serviceKey = pool[seed % pool.length]
     const jitter = ((seed % 41) - 20) / 100 // -0.20 .. +0.20
     const rate = clampRate(client, serviceKey, standardRateFor(client, serviceKey) * (1 + jitter))
     return {
@@ -506,7 +598,18 @@ const buildPastBookings = (client, count, targetGbv, shareFor) => {
   // thousands has booked more often, not once at an impossible price. Capped so
   // a pathological gbv can never generate an unbounded list.
   const MAX_EXTRA_BOOKINGS = 24
-  const capacityOf = (p) => p.maxUnits * (p.hi + p.extras)
+
+  // Capacity is measured at the plan's OWN jittered rate rather than the top of
+  // its band, and then discounted: the allocator wobbles each booking's share
+  // ±25% and rounds units to whole days, so what a plan realistically absorbs
+  // is well under `maxUnits × hi`. Counting that theoretical maximum let the
+  // guard pass on a roster that then underspent — which surfaced once each
+  // client's bookings were narrowed to one or two services (servicePoolFor
+  // above), because the rolling remainder can land on a tail booking whose
+  // service is rate-capped low. Under-counting capacity only ever adds a
+  // booking, which is the lever this builder already prefers.
+  const REALISED_CAPACITY = 0.75
+  const capacityOf = (p) => p.maxUnits * (p.rate + p.extras) * REALISED_CAPACITY
   if (targetGbv > 0) {
     let capacity = plans.reduce((s, p) => s + capacityOf(p), 0)
     while (capacity < targetGbv && plans.length < count + MAX_EXTRA_BOOKINGS) {
@@ -689,7 +792,8 @@ const buildUpcomingBookings = (client, count, share) => {
 
   for (let i = 0; i < count; i++) {
     const seed = hash(client.id, 100 + i)
-    const serviceKey = SERVICE_KEYS[seed % SERVICE_KEYS.length]
+    const pool = servicePoolFor(client)
+    const serviceKey = pool[seed % pool.length]
     const svc = SERVICES[serviceKey]
     const span = svc.multiDay ? 1 + (seed % 4) : 1
     const start = new Date(cursor)
@@ -975,7 +1079,8 @@ const buildArchivedBookings = (client, count) => {
 
   for (let i = 0; i < count; i++) {
     const seed = hash(client.id, 999 + i)
-    const serviceKey = SERVICE_KEYS[seed % SERVICE_KEYS.length]
+    const pool = servicePoolFor(client)
+    const serviceKey = pool[seed % pool.length]
     const svc = SERVICES[serviceKey]
     const span = svc.multiDay ? 1 + (seed % 3) : 1
     const start = new Date(cursor)

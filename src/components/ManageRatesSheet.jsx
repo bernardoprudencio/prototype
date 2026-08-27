@@ -59,8 +59,9 @@ const validateRateDraft = (rate, input) => {
 }
 
 /**
- * One editable rate: the amount, its `Use default` way back to the provider's
- * own price, and the default itself for reference.
+ * One editable rate: the label on its own line, the amount field under it, and
+ * under that — only when there is something to say — the helper or error text
+ * with `Use default` right-aligned beside it (Figma 1491:16535).
  *
  * Presentational and controlled — it never writes. `Use default` only *fills the
  * field*: it writes the default amount into the draft, so the rate stays this
@@ -72,39 +73,29 @@ function RateAmountField({ rate, value, error, onChange }) {
   const isDefaultAmount = resolveAmount(value) === Number(rate.defaultPrice)
   const isInvalid = !!error
 
-  // One slot, three things it can say — the POC's `helperMessage` /
-  // `validationMessage` pair, whose switch has these exact two cases
-  // (RateEditor.tsx:207, 209-220). At rest the helper holds the line.
+  // The left half of the line under the field: an error where there is one, the
+  // default-rate helper where the amount has moved off the default, otherwise
+  // nothing. The POC's `helperMessage` / `validationMessage` pair share the slot
+  // and the errors win it (RateEditor.tsx:207, 209-220); what the Figma frame
+  // adds is that the helper is conditional — a rate sitting at its default has
+  // no line at all.
   const feedback = error === 'missing_amount'
     ? AMOUNT_REQUIRED
     : error === 'out_of_range'
       ? amountOutOfRange(formatRateAmount(rate.minPrice), formatRateAmount(rate.maxPrice))
-      : defaultRateHelper(formatRateAmount(rate.defaultPrice))
+      : (!isDefaultAmount ? defaultRateHelper(formatRateAmount(rate.defaultPrice)) : null)
 
   return (
     <div style={{ marginBottom: spacing.lg }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: spacing.sm, marginBottom: spacing.xs, minHeight: 32,
-      }}>
+      {/* Label-only, with nothing to its right — `Use default` lives under the
+          field now, on the helper's line. */}
+      <div style={{ marginBottom: spacing.xs }}>
         <label
           htmlFor={`rate-${rate.slug}`}
           style={{ ...textStyles.text100Semibold, color: colors.primary }}
         >
           {rate.label}
         </label>
-        {/* Compared as amounts rather than as strings, so "45" and "45.00" are
-            the same price and the link stays away while one is being typed. */}
-        {!isDefaultAmount && (
-          <Button
-            variant="flat"
-            size="small"
-            onClick={() => onChange(toWholeAmount(rate.defaultPrice))}
-            style={{ paddingTop: 0, paddingBottom: 0, paddingLeft: 0, paddingRight: 0 }}
-          >
-            {USE_DEFAULT}
-          </Button>
-        )}
       </div>
 
       {/* The field itself knows nothing about money: the symbol leads and the
@@ -141,18 +132,40 @@ function RateAmountField({ rate, value, error, onChange }) {
         )}
       </div>
 
-      {/* One line, three jobs — the POC's `helperMessage` / `errorMessage` pair
-          share this slot (RateEditor.tsx:207-216). At rest it says the one thing
-          a provider prices against, their own default; a failed save swaps in
-          the error sentence and recolours the field's border with it. */}
-      <p style={{
-        ...textStyles.paragraph100,
-        color: isInvalid ? colors.destructive : colors.tertiary,
-        margin: 0,
-        marginTop: spacing.xs,
-      }}>
-        {feedback}
-      </p>
+      {/* One line under the field, with two slots: the sentence on the left and
+          the way back to the default on the right. Both are conditional and both
+          are governed by the same fact — an amount that already IS the default
+          has neither a helper to print nor a default to restore — so at rest a
+          default-priced rate renders no line here at all rather than an empty
+          spacer. A failed save prints its error regardless, and recolours the
+          field's border with it. */}
+      {(feedback || !isDefaultAmount) && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: spacing.sm, marginTop: spacing.xs,
+        }}>
+          <p style={{
+            ...textStyles.paragraph100,
+            color: isInvalid ? colors.destructive : colors.tertiary,
+            margin: 0,
+            flex: 1, minWidth: 0,
+          }}>
+            {feedback}
+          </p>
+          {/* Compared as amounts rather than as strings, so "45" and "45.00" are
+              the same price and the link stays away while one is being typed. */}
+          {!isDefaultAmount && (
+            <Button
+              variant="flat"
+              size="small"
+              onClick={() => onChange(toWholeAmount(rate.defaultPrice))}
+              style={{ paddingTop: 0, paddingBottom: 0, paddingLeft: 0, paddingRight: 0 }}
+            >
+              {USE_DEFAULT}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -187,7 +200,9 @@ function RateAmountRow({ rate }) {
 
 /**
  * ManageRatesSheet — the POC's `ManageRatesModal`, as this prototype's
- * BottomSheet. One modal, opened from all three surfaces.
+ * BottomSheet. One modal, opened from every surface: the conversation /
+ * booking-details rates row on either of its two offers (`lock`, `manage`) and
+ * the relationship page's rate list.
  *
  * Three things this sheet gets deliberately, each of which reads as a bug on
  * first meeting and is not:
@@ -207,7 +222,9 @@ function RateAmountRow({ rate }) {
  *     §4.1's "never armed on open" while keeping its reason: what that rule
  *     forbids is arming from "there exists a write we could send". Here the
  *     arming has provenance — the provider pressed a row that said
- *     `Lock these rates for Sam` (doc 02, "What opening dirty forces").
+ *     `Lock these rates for Sam` (doc 02, "What opening dirty forces"). Only
+ *     the `lock` offer opens this way; a `manage` open is an ordinary,
+ *     unarmed sheet over the saved lock.
  *
  * Props:
  *   serviceName     string          — "Boarding"; heading is `{serviceName} rates for {clientName}`
@@ -216,8 +233,11 @@ function RateAmountRow({ rate }) {
  *   savedLocked     bool            — the SAVED lock state (drives the status line)
  *   savedAmounts    { [slug]: number }
  *   lockedAt        Date | null
- *   opensLocked     bool            — seeded from a `lock`/`update` offer: switch opens ON
- *   requestAmounts  { [slug]: number } | null — prefill from the request's prices
+ *   opensLocked     bool            — seeded from the `lock` offer: switch opens ON
+ *   requestAmounts  { [slug]: number } | null — prefill from the request's prices.
+ *                                   Only ever non-null alongside `opensLocked`:
+ *                                   the booked prices seed a lock being made and
+ *                                   never re-seed one already saved.
  *   onSave          ({ locked, amounts }) => void
  *   onClose         () => void
  */
@@ -297,23 +317,16 @@ export default function ManageRatesSheet({
     ))
   ), [isLockOn, rates, touched, amounts, savedAmounts])
 
-  /**
-   * A seeded amount that is not what this client is charged today. Provenance
-   * the phrase "there is a write we could send" does not have: the caller is
-   * holding a request priced away from this client's rates. Used for enablement
-   * and nothing else — it is not a change of theirs, so it must not make closing
-   * ask (doc 02).
-   */
-  const seedDiverges = useMemo(() => (
-    isLockOn && !!requestAmounts && rates.some(rate => {
-      const seeded = requestAmounts[rate.slug]
-      return seeded !== undefined && Number(seeded) !== Number(savedAmountOf(rate))
-    })
-  ), [isLockOn, requestAmounts, rates, savedAmounts])
-
   // Never "there exists a write we could send" — see note 3 in this component's
   // doc comment for why the seeded term is allowed to arm it anyway.
-  const hasWriteToOffer = isLockStaged || providerChanged || seedDiverges || (opensLocked && isLockOn)
+  //
+  // There used to be a fourth term here, `seedDiverges`: "a seeded amount that
+  // is not what this client is charged today", which armed Save on an `update`
+  // open of an already-locked service. With `update` gone, `requestAmounts` only
+  // ever arrives alongside `opensLocked`, so that term could never be true while
+  // `opensLocked && isLockOn` was false — it is subsumed, and removed with the
+  // offer it existed for.
+  const hasWriteToOffer = isLockStaged || providerChanged || (opensLocked && isLockOn)
 
   // Over every rate a save would write, not just the edited ones: a seeded
   // amount is untouched by construction, and a rate that is in the write is in

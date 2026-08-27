@@ -224,7 +224,6 @@ export default function ServiceVariantConfigSheet({
     showConfirmServiceDeactivation, setShowConfirmServiceDeactivation,
     showServiceSettingsHelpTip,     setShowServiceSettingsHelpTip,
     showRegionalAlertCalifornia,    setShowRegionalAlertCalifornia,
-    showShortNoticeRateBanner,      setShowShortNoticeRateBanner,
     showHubFetchError,              setShowHubFetchError,
     showCiafMigrationOnboarding,        setShowCiafMigrationOnboarding,
     showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBanner,
@@ -362,17 +361,6 @@ export default function ServiceVariantConfigSheet({
         <OptionToggle
           value={boolToId(showRegionalAlertCalifornia)}
           onChange={(id) => setShowRegionalAlertCalifornia(idToBool(id))}
-          options={BOOL_OPTIONS}
-        />
-      </ConfigRow>
-
-      <ConfigRow
-        label="Short-notice rate banner"
-        note="Renders inside the Pet sitting section, above the Services row."
-      >
-        <OptionToggle
-          value={boolToId(showShortNoticeRateBanner)}
-          onChange={(id) => setShowShortNoticeRateBanner(idToBool(id))}
           options={BOOL_OPTIONS}
         />
       </ConfigRow>

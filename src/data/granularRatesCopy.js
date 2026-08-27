@@ -15,16 +15,17 @@
  */
 
 // ── The conversation / booking-details rates row (ConversationRatesRow.tsx) ──
-// Three offers, decided by the lock state and whether the booked prices still
-// match what is locked. The padlock renders on `update` and `manage` only.
+// Two offers, decided by the saved lock state alone. The padlock renders on
+// `manage` only.
+//
+// The POC also shipped an `Update {name}’s locked rates` offer, taken when a
+// locked service's saved amounts no longer matched the booked ones. It is
+// deleted by product decision — not for lack of a production equivalent: a
+// booking's prices seed a lock only while the sitter is locking, so an
+// already-locked service always reads `manage`.
 export const ratesRowCopy = (offer, clientName, lockedAt, locale) => {
   const name = clientName?.trim() || null
   switch (offer) {
-    case 'update':
-      return {
-        title: name ? `Update ${name}’s locked rates` : 'Update this client’s locked rates',
-        subtitle: lockedOnLine(lockedAt, locale),
-      }
     case 'manage':
       return {
         title: name ? `Manage ${name}’s locked rates` : 'Manage this client’s locked rates',
@@ -41,7 +42,7 @@ export const ratesRowCopy = (offer, clientName, lockedAt, locale) => {
   }
 }
 
-export const showsPadlock = (offer) => offer === 'update' || offer === 'manage'
+export const showsPadlock = (offer) => offer === 'manage'
 
 // ── Dates (serviceRateStates.ts formatLockedAt) ──────────────────────────────
 export const formatLockedAt = (lockedAt, locale) => {
@@ -92,7 +93,7 @@ export const lockToggleAnnouncement = (isOn, clientName, serviceName, isEditable
     : `${what} for ${who} will lock when you save.`
 }
 
-export const defaultRateHelper = (amount) => `Default rate is ${amount}`
+export const defaultRateHelper = (amount) => `Your default rate is ${amount}`
 // RateEditor.tsx:212-213 — replaces the helper line on a failed save attempt.
 export const AMOUNT_REQUIRED = 'Enter an amount for this rate.'
 // RateEditor.tsx:216-219 — the other half of the same switch. Bounds are per
@@ -114,12 +115,13 @@ export const CANCEL = 'Cancel'
 export const unitAsSentence = (unit) => `per ${unit}`
 
 // ── The review step (ReviewRatesStep.tsx) ────────────────────────────────────
-export const REVIEW_HEADING = 'Review rates'
-
-export const reviewIntentLine = (intent, clientName) => {
+// The step's only heading. There is no separate title above it and no
+// subheading under it: the Figma frame (2365:19780) prints this one line in all
+// three intents, and no terminal period.
+export const reviewHeading = (intent, clientName) => {
   const who = clientName || 'this client'
   const verb = intent === 'unlocking' ? 'unlocking' : intent === 'updating' ? 'updating' : 'locking'
-  return `You are ${verb} ${who}’s rates.`
+  return `You are ${verb} ${who}’s rates`
 }
 
 export const wasAmount = (amount) => `Was ${amount}`

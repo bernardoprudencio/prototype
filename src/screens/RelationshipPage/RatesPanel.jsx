@@ -55,6 +55,16 @@ export default function RatesPanel({
   const isInactive = (serviceKey) =>
     serviceStates?.[SERVICE_STATE_KEY[serviceKey]] === SERVICE_STATE.INACTIVE
 
+  // Inactive services sink to the bottom of their own group. A service the
+  // provider no longer offers is still listed (it carries custom rates), but it
+  // is not something they can be booked for, so it must never sit above one
+  // that is. The partition is stable — active and inactive both keep the order
+  // the caller passed — so the only thing that moves is the inactive tail.
+  const inactiveLast = (services) => [
+    ...services.filter(s => !isInactive(s.key)),
+    ...services.filter(s => isInactive(s.key)),
+  ]
+
   const isEmpty = bookedServices.length === 0 && notBookedServices.length === 0
 
   const renderRow = (service) => {
@@ -93,8 +103,8 @@ export default function RatesPanel({
         </p>
       ) : (
         [
-          { heading: GROUP_BOOKED,     services: bookedServices },
-          { heading: GROUP_NOT_BOOKED, services: notBookedServices },
+          { heading: GROUP_BOOKED,     services: inactiveLast(bookedServices) },
+          { heading: GROUP_NOT_BOOKED, services: inactiveLast(notBookedServices) },
         ].map(group => group.services.length > 0 && (
           <div key={group.heading} style={{ paddingBottom: 8 }}>
             <h3 style={{ ...textStyles.heading100, color: colors.secondary, margin: '8px 0 0' }}>

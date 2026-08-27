@@ -69,7 +69,7 @@ stack over the active tab without unmounting it.
 | `lockedRatesByOwner` | map keyed `clientId:serviceKey` → bool | Locked-rates overrides. Starts `{}`; read through `isRatesLocked(client, serviceKey)`, which falls back to `client.lockedServices.includes(serviceKey)` (`AppContext.jsx:220-224`) |
 | `lockedAmountsByOwner` | map keyed `clientId:serviceKey` → `{ locked, amounts, lockedAt }` | The granular proposal's state. Starts `{}`; read through `getRatesState(client, serviceKey)`, which layers it over `lockedSeedFor` in `lockableRates.js`; written by `commitRatesState` |
 | `ratesMode` | `'granular'` \| `'current'` | Which locked-rates experience renders. Defaults to `'granular'` (the proposal under test); flip in Testing mode |
-| dev variant flags | bool / enum | `scheduleMode`, `altMonetizationRollout`, `serviceStates`, `showShortNoticeRateBanner`, `showLockedRates`, … — persisted to `localStorage` via `persistJson`, edited in `ServiceVariantConfigSheet` (service-settings-scoped flags) or `TestingModeScreen` (app-wide ones) |
+| dev variant flags | bool / enum | `scheduleMode`, `altMonetizationRollout`, `serviceStates`, `showLockedRates`, … — persisted to `localStorage` via `persistJson`, edited in `ServiceVariantConfigSheet` (service-settings-scoped flags) or `TestingModeScreen` (app-wide ones) |
 
 **Overlay zIndex ladder** (`App.jsx`): 10 — `/conversation/:ownerId/*`,
 `/conversation/:ownerId/thread/:conversationOpk/*`, `/contacts/:ownerId`; 15 —

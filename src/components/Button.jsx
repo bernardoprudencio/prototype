@@ -15,6 +15,10 @@ const VARIANTS = {
   flat:        { background: 'transparent',     borderColor: 'transparent',            color: colors.link,      boxShadow: 'none' },
   disabled:    { background: colors.disabledBg, borderColor: colors.disabledBorder,    color: colors.disabledText, boxShadow: 'none' },
   destructive: { background: colors.destructive, borderColor: 'transparent',            color: colors.white,     boxShadow: shadows.medium },
+  // Kibble's `destructive` secondary: the outlined counterpart to `destructive`,
+  // exactly as `default` is to `primary` — white ground, no shadow, the red
+  // carried by the border and the label instead of the fill.
+  destructiveSecondary: { background: colors.white, borderColor: colors.destructive, color: colors.destructive, boxShadow: 'none' },
 }
 
 /**

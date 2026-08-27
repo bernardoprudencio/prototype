@@ -90,8 +90,6 @@ export default function ServiceSettingsLayout() {
     showServiceSettingsHelpTip,
     showRegionalAlertCalifornia,
     setShowRegionalAlertCalifornia,
-    showShortNoticeRateBanner,
-    setShowShortNoticeRateBanner,
     showHubFetchError,
     setShowHubFetchError,
     showCiafMigrationOnboarding,
@@ -214,19 +212,6 @@ export default function ServiceSettingsLayout() {
   const bannersFor = (family, slot) => {
     const out = []
     const at = (copy) => copy.scope?.family === family && copy.scope?.slot === slot
-
-    if (showShortNoticeRateBanner && at(HUB_COPY.shortNoticeRateBanner)) {
-      out.push(
-        <HubBanner
-          key="short-notice"
-          severity={HUB_COPY.shortNoticeRateBanner.severity}
-          title={HUB_COPY.shortNoticeRateBanner.title}
-          body={HUB_COPY.shortNoticeRateBanner.body}
-          cta={{ label: HUB_COPY.shortNoticeRateBanner.ctaLabel, onClick: noop }}
-          onDismiss={() => setShowShortNoticeRateBanner(false)}
-        />
-      )
-    }
 
     if (showRegionalAlertCalifornia && at(HUB_COPY.californiaProviderGroup)) {
       out.push(

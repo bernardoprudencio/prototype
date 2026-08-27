@@ -50,12 +50,13 @@ export default function DiscardChangesConfirm({ onKeepEditing, onDiscard }) {
       </Button>
 
       {/* Kibble spells this `<Button fullWidth destructive mt="3x">` — a
-          secondary in the footer slot, tinted destructive. This Button has no
-          `destructive` modifier on top of a variant, so the destructive variant
-          stands in; it is the only red the prototype has. 12px above it is
-          Kibble's `mt="3x"`. */}
+          secondary in the footer slot, tinted destructive, which is what
+          `destructiveSecondary` is: outlined and unshadowed like `default`, red
+          on the border and the label rather than the fill. The solid
+          `destructive` variant would out-weigh `Keep editing`, which is the
+          primary here. 12px above it is Kibble's `mt="3x"`. */}
       <Button
-        variant="destructive"
+        variant="destructiveSecondary"
         size="default"
         fullWidth
         onClick={onDiscard}

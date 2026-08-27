@@ -93,12 +93,6 @@ export const ADJUSTMENTS_HEADING_GROOMING = 'Extras and adjustments' // :137
 export const ADJUSTMENTS_HEADING_OWNER    = 'Extras and Upgrades'    // :138
 export const ADJUSTMENTS_HEADING_SITTER   = 'Extras and Adjustments' // :139
 
-// MBP/components/ShortNoticeBanner.tsx:20 / :21. Both are sitter-only
-// (`isUserSitter` gates each branch at :29-34); which one shows depends on
-// whether a short-notice fee is already applied.
-export const SHORT_NOTICE_REMOVE_FEE = 'Short notice usually applies when the booking starts the same day or next day. You may want to remove this fee.' // :20
-export const SHORT_NOTICE_ADD_FEE    = 'This booking starts soon. You may want to apply a short notice fee.' // :21
-
 // MBP/components/NoPenaltyInsertCard.tsx — shown when the modification is a
 // price increase (AdjustmentsListComponent.tsx:218).
 export const NO_PENALTY_TEXT     = 'No cancellation penalty applied.' // :23

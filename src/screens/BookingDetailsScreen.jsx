@@ -238,7 +238,7 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
   // each returns `available: false` outside its own mode, so exactly one of the
   // two locked-rates surfaces below can ever render:
   //   'current'  → the shipped binary switch + LockRatesSheet (`lr`)
-  //   'granular' → the POC proposal's three-offer RatesRow + ManageRatesSheet
+  //   'granular' → the POC proposal's two-offer RatesRow + ManageRatesSheet
   //                (`gr`, 01-locked-rates-client-management.md §3.1)
   // `useGranularRates` already tests `ratesMode === 'granular'` internally;
   // `useLockedRates` predates the flag, so the current-mode gate is written out
@@ -627,11 +627,13 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
               />
             )}
 
-            {/* `granular` — the POC's three-offer row (§3.1). It carries no
-                service name (every title interpolates the client and nothing
-                else) and it does NOT navigate: `onManage` opens the management
-                modal in place, because "lock rates based on this request" only
-                means anything where the request's rates are in scope. */}
+            {/* `granular` — the POC's two-offer row (§3.1): `lock` while the
+                service follows the defaults, `manage` once it is locked. It
+                carries no service name (every title interpolates the client and
+                nothing else) and it does NOT navigate: pressing it opens the
+                management modal in place, because "lock rates based on this
+                request" only means anything where the request's rates are in
+                scope. */}
             {gr.available && (
               <RatesRow
                 offer={gr.offer}
@@ -754,8 +756,9 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
       {/* The granular modal, opened in place by the row above. `gr.sheet` names
           the service; the SAVED state for it comes back through `stateFor`, so
           the modal always seeds from what is committed rather than from this
-          conversation's own booking — the request only supplies `opensLocked`
-          and the prefill amounts. */}
+          conversation's own booking. The request supplies `opensLocked` and the
+          prefill amounts on the `lock` offer only — on `manage` both come
+          through null and the sheet is purely the saved lock. */}
       {gr.sheet && (() => {
         const saved = gr.stateFor(gr.sheet.serviceKey)
         if (!saved) return null

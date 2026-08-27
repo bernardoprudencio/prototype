@@ -22,8 +22,8 @@ import { ratesRowCopy, showsPadlock } from '../data/granularRatesCopy'
  * The padlock and the chevron share ONE flex group so both marks line up on the
  * row's right edge. Figma draws no padlock in this node, but the row sits among
  * booking-detail rows that carry no left icon and the padlock is how it reads as
- * a rates row at all — so it shows for the two offers made to an already-locked
- * client, and stays off the one that is offering the lock.
+ * a rates row at all — so it shows on the `manage` offer, made to an already-
+ * locked client, and stays off the `lock` offer that is offering the lock.
  *
  * The chevron is filled `primary` like this screen's other rows that lead
  * somewhere (BookingDetailsScreen `FlatRow`), not the tertiary default; the
@@ -31,7 +31,7 @@ import { ratesRowCopy, showsPadlock } from '../data/granularRatesCopy'
  * because its glyph fills the viewBox the chevron only sits inside.
  *
  * Props:
- *   offer       'lock' | 'update' | 'manage'
+ *   offer       'lock' | 'manage'
  *   clientName  string
  *   lockedAt    Date | null
  *   onPress     () => void

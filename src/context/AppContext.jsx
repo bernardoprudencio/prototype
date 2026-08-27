@@ -40,7 +40,6 @@ const SHOW_ADDITIONAL_PREFERENCES_MODAL_KEY = 'showAdditionalPreferencesModal'
 const SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY = 'showConfirmServiceDeactivation'
 const SHOW_SERVICE_SETTINGS_HELP_TIP_KEY   = 'showServiceSettingsHelpTip'
 const SHOW_REGIONAL_ALERT_CALIFORNIA_KEY   = 'showRegionalAlertCalifornia'
-const SHOW_SHORT_NOTICE_RATE_BANNER_KEY    = 'showShortNoticeRateBanner'
 const SHOW_HUB_FETCH_ERROR_KEY             = 'showHubFetchError'
 const SHOW_CIAF_MIGRATION_ONBOARDING_KEY        = 'showCiafMigrationOnboarding'
 const SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY      = 'showTrainingCredentialsUploadBanner'
@@ -89,7 +88,6 @@ const readInitialShowAdditionalPreferencesModal  = () => readInitialBool(SHOW_AD
 const readInitialShowConfirmServiceDeactivation  = () => readInitialBool(SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY, true)
 const readInitialShowServiceSettingsHelpTip      = () => readInitialBool(SHOW_SERVICE_SETTINGS_HELP_TIP_KEY,    false)
 const readInitialShowRegionalAlertCalifornia     = () => readInitialBool(SHOW_REGIONAL_ALERT_CALIFORNIA_KEY,    false)
-const readInitialShowShortNoticeRateBanner       = () => readInitialBool(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     false)
 const readInitialShowHubFetchError               = () => readInitialBool(SHOW_HUB_FETCH_ERROR_KEY,              false)
 const readInitialShowCiafMigrationOnboarding     = () => readInitialBool(SHOW_CIAF_MIGRATION_ONBOARDING_KEY,    false)
 const readInitialShowTrainingCredentialsUpload   = () => readInitialBool(SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY,  false)
@@ -180,7 +178,6 @@ export function AppProvider({ children }) {
   const [showConfirmServiceDeactivation,  setShowConfirmServiceDeactivationRaw]  = useState(readInitialShowConfirmServiceDeactivation)
   const [showServiceSettingsHelpTip,      setShowServiceSettingsHelpTipRaw]      = useState(readInitialShowServiceSettingsHelpTip)
   const [showRegionalAlertCalifornia,     setShowRegionalAlertCaliforniaRaw]     = useState(readInitialShowRegionalAlertCalifornia)
-  const [showShortNoticeRateBanner,       setShowShortNoticeRateBannerRaw]       = useState(readInitialShowShortNoticeRateBanner)
   const [showHubFetchError,               setShowHubFetchErrorRaw]               = useState(readInitialShowHubFetchError)
   const [showCiafMigrationOnboarding,        setShowCiafMigrationOnboardingRaw]        = useState(readInitialShowCiafMigrationOnboarding)
   const [showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBannerRaw] = useState(readInitialShowTrainingCredentialsUpload)
@@ -269,7 +266,6 @@ export function AppProvider({ children }) {
   const setShowConfirmServiceDeactivation = (next) => persistJson(SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY, next, setShowConfirmServiceDeactivationRaw)
   const setShowServiceSettingsHelpTip     = (next) => persistJson(SHOW_SERVICE_SETTINGS_HELP_TIP_KEY,    next, setShowServiceSettingsHelpTipRaw)
   const setShowRegionalAlertCalifornia    = (next) => persistJson(SHOW_REGIONAL_ALERT_CALIFORNIA_KEY,    next, setShowRegionalAlertCaliforniaRaw)
-  const setShowShortNoticeRateBanner      = (next) => persistJson(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     next, setShowShortNoticeRateBannerRaw)
   const setShowHubFetchError              = (next) => persistJson(SHOW_HUB_FETCH_ERROR_KEY,              next, setShowHubFetchErrorRaw)
   const setShowCiafMigrationOnboarding        = (next) => persistJson(SHOW_CIAF_MIGRATION_ONBOARDING_KEY,        next, setShowCiafMigrationOnboardingRaw)
   const setShowTrainingCredentialsUploadBanner = (next) => persistJson(SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY,     next, setShowTrainingCredentialsUploadBannerRaw)
@@ -349,7 +345,6 @@ export function AppProvider({ children }) {
       showConfirmServiceDeactivation, setShowConfirmServiceDeactivation,
       showServiceSettingsHelpTip,     setShowServiceSettingsHelpTip,
       showRegionalAlertCalifornia,    setShowRegionalAlertCalifornia,
-      showShortNoticeRateBanner,      setShowShortNoticeRateBanner,
       showHubFetchError,              setShowHubFetchError,
       showCiafMigrationOnboarding,        setShowCiafMigrationOnboarding,
       showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBanner,

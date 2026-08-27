@@ -109,11 +109,13 @@ export const BOARDING_SETTINGS = {
   baseRate: 45,
   baseRateUnit: 'night',
   autoUpdateAdditionalRates: true,
-  // The eight add-on rates boarding carries in production, all active.
+  // Seven of the eight add-on rates boarding carries in production, all active.
   // `ALLOWED_ADDITIONAL_RATES_FOR_SERVICE_TYPE` (services/constants.py:812-866)
   // lists boarding as standard-rate + holiday-rate, additional-dog, puppy,
-  // additional-cat, extended-stay, bathing-grooming, pick-up-drop-off and
-  // short-notice — nine rows once `lockableRates.js` prepends the base rate.
+  // additional-cat, extended-stay, bathing-grooming and pick-up-drop-off —
+  // eight rows once `lockableRates.js` prepends the base rate. Production's
+  // eighth add-on is omitted on purpose: that rate has not launched everywhere,
+  // so the prototype does not show it anywhere.
   //
   // Slugs match production's add-on types, which is why `bath` is
   // `bathing-grooming` and `pickup-dropoff` is `pick-up-drop-off`. Bathing is no
@@ -132,7 +134,6 @@ export const BOARDING_SETTINGS = {
     { slug: 'extended-stay',       label: 'Extended stay',       price: 55, unit: 'night',   active: true, isFree: false },
     { slug: 'bathing-grooming',    label: 'Bathing / grooming',  price: 20, unit: 'service', active: true, isFree: false },
     { slug: 'pick-up-drop-off',    label: 'Pick-up / drop-off',  price: 25, unit: 'service', active: true, isFree: false },
-    { slug: 'short-notice',        label: 'Short notice',        price: 10, unit: 'night',   active: true, isFree: false, isNew: true },
   ],
 
   // Availability

@@ -4,7 +4,7 @@ import { colors, textStyles, spacing } from '../tokens'
 import { useIsWide } from '../lib/useMediaQuery'
 import { formatRateAmount } from '../data/relationshipData'
 import {
-  REVIEW_HEADING, reviewIntentLine, unitAsSentence, wasAmount, CONFIRM, GO_BACK,
+  reviewHeading, unitAsSentence, wasAmount, CONFIRM, GO_BACK,
 } from '../data/granularRatesCopy'
 
 // Visually hidden, still read: Kibble's `A11yHiddenBox`. The struck-through
@@ -83,7 +83,7 @@ function ReviewRateRow({ row }) {
  * not reach the discard confirm: nothing has been discarded.
  *
  * Its three regions are handed back to the caller when `children` is a
- * function, so the sheet can *place* them: at >=769px the heading goes in
+ * function, so the sheet can *place* them: at >=769px the single heading goes in
  * `BottomSheet`'s header slot and the buttons in its footer, leaving only the
  * rows in the scroller, which is what keeps `Confirm` on screen with nine of
  * them. Called any other way it renders the same three in the same order it
@@ -100,21 +100,13 @@ function ReviewRateRow({ row }) {
 export default function ReviewRatesStep({ intent, clientName, rows = [], onConfirm, onGoBack, children }) {
   const isWide = useIsWide()
 
+  // One heading and nothing else: what used to be the subheading IS the heading
+  // now, so the step names the write in the same line it titles itself with
+  // (Figma 2365:19780, whose three intent variants differ only in that verb).
   const header = (
-    <>
-      <h2 style={{ ...textStyles.heading300, color: colors.primary, margin: 0, paddingTop: spacing.sm }}>
-        {REVIEW_HEADING}
-      </h2>
-
-      <p style={{
-        ...textStyles.paragraph200,
-        color: colors.primary,
-        margin: 0,
-        paddingTop: spacing.sm,
-      }}>
-        {reviewIntentLine(intent, clientName)}
-      </p>
-    </>
+    <h2 style={{ ...textStyles.heading300, color: colors.primary, margin: 0, paddingTop: spacing.sm }}>
+      {reviewHeading(intent, clientName)}
+    </h2>
   )
 
   const body = (
