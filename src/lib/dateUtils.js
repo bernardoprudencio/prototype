@@ -38,6 +38,26 @@ export function fmtRelDate(d) {
 }
 export function isPast(d) { return d < new Date(new Date().setHours(0,0,0,0)) }
 
+// Inbox last-activity label. Mirrors how a messaging list reads: the clock for
+// today, a word for yesterday, a weekday inside the last week, then a date.
+export function fmtActivityLabel(d) {
+  if (!d) return ''
+  if (isToday(d))     return fmtClock(d)
+  if (isYesterday(d)) return 'Yesterday'
+  const startOfToday = new Date(new Date().setHours(0,0,0,0))
+  const daysBack = Math.round((startOfToday - new Date(new Date(d).setHours(0,0,0,0))) / 86400000)
+  if (daysBack > 1 && daysBack < 7) return DAYS_FULL[d.getDay()]
+  if (d.getFullYear() === startOfToday.getFullYear()) return fmtDate(d)
+  return fmtDateFull(d)
+}
+
+// A Date's time of day as "10:07 AM".
+export function fmtClock(d) {
+  if (!d) return ''
+  const h = d.getHours()
+  return `${h % 12 || 12}:${String(d.getMinutes()).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`
+}
+
 export function nightCount(u) {
   if (!u.startDate || !u.endDate) return 1
   return Math.max(1, Math.round((parseDate(u.endDate) - parseDate(u.startDate)) / 86400000))

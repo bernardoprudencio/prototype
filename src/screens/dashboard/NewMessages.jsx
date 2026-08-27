@@ -12,10 +12,11 @@ import Widget, { WidgetLink } from './Widget'
  * message_list.html — the dashboard's recent-conversation list, capped at
  * MAX_DASHBOARD_MESSAGES.
  *
- * Production selects unread messages. No prototype thread carries `unread: true`
- * (`threads.js:384,421,435,449` all set it false), so unread threads are
- * preferred when they exist and the most recent non-archived threads stand in
- * otherwise — the widget is never empty in the prototype's data.
+ * Production selects unread messages. `threads.js` marks the newest few
+ * client-sent threads unread (`markUnread`), so that pool is preferred; the most
+ * recent non-archived threads stand in otherwise, and since getInboxThreads()
+ * returns them sorted by `lastActivityAt` newest-first, "most recent" here is
+ * literal. The widget is never empty in the prototype's data.
  */
 export default function NewMessages() {
   const navigate = useNavigate()

@@ -3,6 +3,8 @@ import { colors, spacing, textStyles } from '../tokens'
 import { peopleImages } from '../assets/images'
 import { getThreadStatusDisplay } from '../lib/threadStatus'
 
+// Fallback only. Threads carry a derived `activityLabel`; this strips the clock
+// off a raw timestamp string for anything that doesn't.
 const dateOnly = (ts) => ts.replace(/\s+\d{1,2}:\d{2}\s*(AM|PM)/i, '').trim()
 const buildSnippet = (text, sender) => sender === 'you' ? `You: ${text}` : text
 
@@ -14,7 +16,8 @@ export default function ThreadRow({ thread, owner, displayMessage, onClick, size
   const avatarPx = isLarge ? 48 : 32
   const titleStyle = isLarge ? textStyles.heading200 : textStyles.heading100
   const snippet = buildSnippet(displayMessage.text, displayMessage.sender)
-  const { serviceLabel, alert } = thread
+  const { serviceLabel, alert, unread } = thread
+  const activityLabel = displayMessage.activityLabel ?? thread.activityLabel ?? dateOnly(displayMessage.timestamp)
   const statusDisplay = getThreadStatusDisplay(thread)
 
   return (
@@ -41,13 +44,27 @@ export default function ThreadRow({ thread, owner, displayMessage, onClick, size
               <p style={{ ...titleStyle, color: colors.primary, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{owner.name}</p>
               <p style={{ ...textStyles.text100, color: colors.tertiary, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{owner.petNames}</p>
             </div>
-            <div style={{ flexShrink: 0 }}>
-              <p style={{ ...textStyles.text100, color: colors.tertiary, margin: 0, textAlign: 'right', whiteSpace: 'nowrap' }}>{dateOnly(displayMessage.timestamp)}</p>
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+              {unread && <span style={{ width: 8, height: 8, borderRadius: '50%', background: colors.link, flexShrink: 0 }} />}
+              <p style={{
+                ...textStyles.text100,
+                color: unread ? colors.link : colors.tertiary,
+                margin: 0,
+                textAlign: 'right',
+                whiteSpace: 'nowrap',
+              }}>{activityLabel}</p>
             </div>
           </div>
 
           {/* Message snippet */}
-          <p style={{ ...textStyles.text100, color: colors.primary, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{snippet}</p>
+          <p style={{
+            ...(unread ? textStyles.heading100 : textStyles.text100),
+            color: colors.primary,
+            margin: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>{snippet}</p>
 
           {/* Service detail */}
           <p style={{ ...textStyles.text100, color: colors.tertiary, margin: 0, paddingTop: spacing.lg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{serviceLabel}</p>

@@ -9,6 +9,7 @@ import { getClient } from '../data/contacts'
 import { getInboxThreads } from '../data/threads'
 import { useAppContext } from '../context/AppContext'
 import { useIsWide } from '../lib/useMediaQuery'
+import { fmtClock } from '../lib/dateUtils'
 import { TAB_PATHS } from '../lib/tabPaths'
 
 // Filter definitions
@@ -173,8 +174,10 @@ export default function InboxScreen() {
 
           const ownerLiveEvents = !thread.bookingId ? (liveEvents[thread.ownerId] ?? []) : []
           const lastLive = [...ownerLiveEvents].reverse().find(e => e.type === 'message')
+          // A live message is the newest thing in the thread by definition, so it
+          // carries the label the activity column would show for right now.
           const displayMessage = lastLive
-            ? { text: lastLive.text, sender: 'you', timestamp: 'Today' }
+            ? { text: lastLive.text, sender: 'you', timestamp: 'Today', activityLabel: fmtClock(new Date()) }
             : thread.lastMessage
 
           return (
