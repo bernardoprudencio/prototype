@@ -551,6 +551,12 @@ export const getInboxThreads = () => {
       const activityDay = activityDayFor(client, booking, kind, upIndex[booking.conversationOpk] ?? 0)
       const history = getChatHistory(booking.conversationOpk)
       const lastMessage = lastMessageFromHistory(history, client, booking, activityDay)
+        // Land her just under the newest thread (Owen's recurring, today 10:07 AM).
+      if (booking.conversationOpk === 'lauren-conv-up-request') {
+    const t = new Date(START_OF_TODAY); t.setHours(9, 0, 0, 0)
+    lastMessage.at = t
+      lastMessage.timestamp = `${fmtRelDate(t)} 9:00 AM`
+  }
       threads.push({
         conversationOpk: booking.conversationOpk,
         ownerId: client.id,
