@@ -188,9 +188,13 @@ export default function ConversationScreen() {
   // scroller under the header (ConversationUnderHeaderButtons.tsx:39-48); at
   // desktop they stack full-width in the details rail, because
   // ConversationDetailsActions.tsx:27 returns null when `isSmDown`.
-  const feedbackCta = (
-    <Button variant="primary" fullWidth={isDesktop} style={{ boxShadow: shadows.medium, flexShrink: 0 }}>Leave feedback</Button>
-  )
+const isComplete = thread.status === 'past'
+
+const feedbackCta = isComplete ? (
+  <Button variant="primary" fullWidth={isDesktop} style={{ boxShadow: shadows.medium, flexShrink: 0 }}>Leave feedback</Button>
+) : null
+  
+
   const bookingCta = isRecurring ? (
     <Button variant="default" fullWidth={isDesktop} style={{ flexShrink: 0 }} onClick={onOpenSchedule}>
       {scheduleMode === 'agenda' ? 'Manage schedule' : 'Modify schedule'}

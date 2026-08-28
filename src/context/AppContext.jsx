@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from 'react'
 import { DEFAULT_FAMILY_IN_GEO, DEFAULT_SERVICE_STATES } from '../data/sitterServices'
 import { mergeAvailabilityPatches } from '../lib/calendarUtils'
-import { lockedSeedFor } from '../data/lockableRates'
+import { lockedSeedFor, defaultAmountsFor } from '../data/lockableRates'
 
 const AppContext = createContext(null)
 
@@ -305,15 +305,18 @@ export function AppProvider({ children }) {
   // One save writes the whole set, as production's full-set replacement does.
   // `lockedAt` moves to now on every lock or amount change and clears on unlock.
   const commitRatesState = (client, serviceKey, { locked, amounts }) => {
-    if (!client || !serviceKey) return
-    const key = `${client.id}:${serviceKey}`
-    setLockedAmountsByOwner(prev => ({
-      ...prev,
-      [key]: { locked, amounts: { ...amounts }, lockedAt: locked ? new Date() : null },
-    }))
-    // Keep the binary flag in step so flipping to `current` mode is coherent.
-    setLockedRatesByOwner(prev => ({ ...prev, [key]: locked }))
-  }
+  if (!client || !serviceKey) return
+  const key = `${client.id}:${serviceKey}`
+  // On unlock, don't carry the old locked amounts forward — a future re-lock
+  // must seed from the sitter's defaults, not the discount just removed.
+  const nextAmounts = locked ? { ...amounts } : defaultAmountsFor(serviceKey)
+  setLockedAmountsByOwner(prev => ({
+    ...prev,
+    [key]: { locked, amounts: nextAmounts, lockedAt: locked ? new Date() : null },
+  }))
+  // Keep the binary flag in step so flipping to `current` mode is coherent.
+  setLockedRatesByOwner(prev => ({ ...prev, [key]: locked }))
+}
 
   return (
     <AppContext.Provider value={{

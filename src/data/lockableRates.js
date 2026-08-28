@@ -151,6 +151,7 @@ const boardingRates = () => [
 // it reads alongside 'Additional dog rate' in the same sheet.
 const RATE_LABEL = {
   'standard-rate':          'Dog care',
+  'cat-care':               'Cat care',
   'additional-dog':         'Additional dog rate',
   'additional-cat':         'Additional cat rate',
   puppy:                    'Puppy rate',
@@ -202,6 +203,7 @@ const RATE_TABLE = {
   // the pet, so there is nothing to collect and nowhere to bathe.
   house_sitting: [
     { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 65, unit: 'night', minPrice: minPriceFor('house_sitting', 'standard-rate'),  maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'cat-care',       label: RATE_LABEL['cat-care'],       defaultPrice: 60, unit: 'night', minPrice: minPriceFor('house_sitting', 'cat-care'),       maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'holiday-rate',   label: RATE_LABEL['holiday-rate'],   defaultPrice: 80, unit: 'night', minPrice: minPriceFor('house_sitting', 'holiday-rate'),   maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 40, unit: 'night', minPrice: minPriceFor('house_sitting', 'additional-dog'), maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 70, unit: 'night', minPrice: minPriceFor('house_sitting', 'puppy'),          maxPrice: MAX_ADD_ON_PRICE },
@@ -224,6 +226,7 @@ const RATE_TABLE = {
   // 60-minute variant of the visit.
   drop_in_visits: [
     { slug: 'standard-rate',    label: RATE_LABEL['standard-rate'],    defaultPrice: 30, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'standard-rate'),    maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'cat-care',         label: RATE_LABEL['cat-care'],         defaultPrice: 26, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'cat-care'),         maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'long-drop-in',     label: RATE_LABEL['long-drop-in'],     defaultPrice: 15, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'long-drop-in'),     maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'holiday-rate',     label: RATE_LABEL['holiday-rate'],     defaultPrice: 35, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'holiday-rate'),     maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'additional-dog',   label: RATE_LABEL['additional-dog'],   defaultPrice: 15, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'additional-dog'),   maxPrice: MAX_ADD_ON_PRICE },
@@ -311,7 +314,7 @@ const LOCKED_PRICE_OVERRIDES = {
   // Every row is pinned: the whole point of Lauren's lock is that her prices have
   // not moved since she started booking, so no rate should read as arbitrary.
   'lauren:drop_in_visits': {
-    'standard-rate': 26, 'long-drop-in': 12, 'holiday-rate': 10,
+    'standard-rate': 26, 'long-drop-in': 12, 'holiday-rate': 28,
     'additional-dog': 12, 'puppy': 8, 'additional-cat': 10,
     'extended-stay': 12, 'bathing-grooming': 16,
   },

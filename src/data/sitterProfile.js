@@ -128,6 +128,7 @@ export const BOARDING_SETTINGS = {
   // cannot be saved.
   additionalRates: [
     { slug: 'additional-dog',      label: 'Additional dog',      price: 35, unit: 'night',   active: true, isFree: false },
+    { slug: 'cat-care',            label: 'Cat care',            price: 26, unit: 'night',   active: true, isFree: false },
     { slug: 'puppy',               label: 'Puppy care',          price: 20, unit: 'night',   active: true, isFree: false },
     { slug: 'additional-cat',      label: 'Additional cat',      price: 25, unit: 'night',   active: true, isFree: false },
     // Puppy care and Holiday sit above the $15 country-config floor for boarding
