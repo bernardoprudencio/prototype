@@ -174,6 +174,31 @@ const RECURRING_CHAT_HISTORY = (() => {
   }
 })()
 
+// ── Hand-written history for Lauren's house-sitting request ──────────────────
+// The locked-rates user-testing thread. Overrides the generic house-sitting
+// builder for this one conversation, exactly like the recurring histories above:
+// booking confirmed, and the sitter is about to raise prices but is keeping
+// Lauren on her current rate. Dated today so it agrees with the inbox label
+// (keep the activityDayFor "today" bump for this opk in place).
+const SEEDED_CHAT_HISTORY = (() => {
+  const earlier = dayAgo(2)
+  const today = START_OF_TODAY
+  return {
+    'lauren-conv-up-request': [
+      { type: 'divider', label: fmtRelDate(earlier) },
+      { type: 'bubble', text: "Hi! Just confirming the house sitting for Juniper and Fig for those dates — all set?", time: '10:12 AM' },
+      { type: 'bubble', text: "Yes, all confirmed! Looking forward to it 🐾", time: '10:15 AM', isOwner: true, showCheck: true },
+      { type: 'bubble', text: "Perfect, thank you! Spare key's under the planter as always.", time: '10:17 AM' },
+      { type: 'divider', label: fmtRelDate(today) },
+      { type: 'bubble', text: "Quick heads up before your stay — I'm raising my house sitting rates for new clients soon. Since you've been booking with me for so long, you'll keep the rates you have now. Nothing changes on your end 🙂", time: '9:02 AM', isOwner: true, showCheck: true },
+      { type: 'bubble', text: "Oh wow, that's so kind of you. Thank you for looking out for us!", time: '9:20 AM' },
+      { type: 'bubble', text: "Of course! Your rate stays locked at $58/night, same as always.", time: '9:22 AM', isOwner: true, showCheck: true },
+      { type: 'bubble', text: "Amazing. See you soon! 🐾", time: '9:25 AM' },
+    ],
+  }
+})()
+
+
 // Last-message payloads for the recurring threads. The clock time matches each
 // thread's final bubble; the day comes from RECURRING_DAYS_AGO.
 const RECURRING_LAST_MESSAGE = {
@@ -641,6 +666,11 @@ export const getChatHistory = (conversationOpk) => {
   if (RECURRING_CHAT_HISTORY[conversationOpk]) {
     return RECURRING_CHAT_HISTORY[conversationOpk]
   }
+
+    if (SEEDED_CHAT_HISTORY[conversationOpk]) {
+    return SEEDED_CHAT_HISTORY[conversationOpk]
+  }
+
 
   const ctx = findBookingByOpk(conversationOpk)
   if (!ctx) return []
