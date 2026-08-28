@@ -202,10 +202,10 @@ const RATE_TABLE = {
   // the pet, so there is nothing to collect and nowhere to bathe.
   house_sitting: [
     { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 65, unit: 'night', minPrice: minPriceFor('house_sitting', 'standard-rate'),  maxPrice: MAX_ADD_ON_PRICE },
-    { slug: 'holiday-rate',   label: RATE_LABEL['holiday-rate'],   defaultPrice: 20, unit: 'night', minPrice: minPriceFor('house_sitting', 'holiday-rate'),   maxPrice: MAX_ADD_ON_PRICE },
-    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 30, unit: 'night', minPrice: minPriceFor('house_sitting', 'additional-dog'), maxPrice: MAX_ADD_ON_PRICE },
-    { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 15, unit: 'night', minPrice: minPriceFor('house_sitting', 'puppy'),          maxPrice: MAX_ADD_ON_PRICE },
-    { slug: 'additional-cat', label: RATE_LABEL['additional-cat'], defaultPrice: 25, unit: 'night', minPrice: minPriceFor('house_sitting', 'additional-cat'), maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',   label: RATE_LABEL['holiday-rate'],   defaultPrice: 80, unit: 'night', minPrice: minPriceFor('house_sitting', 'holiday-rate'),   maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 40, unit: 'night', minPrice: minPriceFor('house_sitting', 'additional-dog'), maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 70, unit: 'night', minPrice: minPriceFor('house_sitting', 'puppy'),          maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-cat', label: RATE_LABEL['additional-cat'], defaultPrice: 45, unit: 'night', minPrice: minPriceFor('house_sitting', 'additional-cat'), maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'extended-stay',  label: RATE_LABEL['extended-stay'],  defaultPrice: 55, unit: 'night', minPrice: minPriceFor('house_sitting', 'extended-stay'),  maxPrice: MAX_ADD_ON_PRICE },
   ],
 
@@ -213,7 +213,7 @@ const RATE_TABLE = {
   // additional-cat or extended-stay in its allowed set.
   dog_daycare: [
     { slug: 'standard-rate',          label: RATE_LABEL['standard-rate'],          defaultPrice: 45, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'standard-rate'),          maxPrice: MAX_ADD_ON_PRICE },
-    { slug: 'holiday-rate',           label: RATE_LABEL['holiday-rate'],           defaultPrice: 15, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'holiday-rate'),           maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',           label: RATE_LABEL['holiday-rate'],           defaultPrice: 50, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'holiday-rate'),           maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'additional-dog',         label: RATE_LABEL['additional-dog'],         defaultPrice: 25, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'additional-dog'),         maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'puppy',                  label: RATE_LABEL.puppy,                     defaultPrice: 15, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'puppy'),                  maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'bathing-grooming',       label: RATE_LABEL['bathing-grooming'],       defaultPrice: 20, unit: 'service', minPrice: minPriceFor('dog_daycare', 'bathing-grooming'),       maxPrice: MAX_ADD_ON_PRICE },
@@ -225,7 +225,7 @@ const RATE_TABLE = {
   drop_in_visits: [
     { slug: 'standard-rate',    label: RATE_LABEL['standard-rate'],    defaultPrice: 30, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'standard-rate'),    maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'long-drop-in',     label: RATE_LABEL['long-drop-in'],     defaultPrice: 15, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'long-drop-in'),     maxPrice: MAX_ADD_ON_PRICE },
-    { slug: 'holiday-rate',     label: RATE_LABEL['holiday-rate'],     defaultPrice: 12, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'holiday-rate'),     maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',     label: RATE_LABEL['holiday-rate'],     defaultPrice: 35, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'holiday-rate'),     maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'additional-dog',   label: RATE_LABEL['additional-dog'],   defaultPrice: 15, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'additional-dog'),   maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'puppy',            label: RATE_LABEL.puppy,               defaultPrice: 10, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'puppy'),            maxPrice: MAX_ADD_ON_PRICE },
     { slug: 'additional-cat',   label: RATE_LABEL['additional-cat'],   defaultPrice: 12, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'additional-cat'),   maxPrice: MAX_ADD_ON_PRICE },
