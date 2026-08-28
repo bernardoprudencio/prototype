@@ -301,7 +301,7 @@ const LOCKED_PRICE_OVERRIDES = {
   // country-config floor (MIN_ADD_ON_PRICE.boarding: $15, or $10 for the cat
   // rate), which is what puppy and holiday were raised in sitterProfile.js to
   // allow — at the old $15 default they sat ON the floor with nowhere to drift.
-  'owen:house_sitting': {
+  'owen:boarding': {
     'standard-rate': 28, 'additional-dog': 22, puppy: 15, 'additional-cat': 16,
     holiday: 16, 'extended-stay': 38, 'bathing-grooming': 12,
     'pick-up-drop-off': 15,
@@ -368,15 +368,32 @@ export const lockedRatesFor = (client, serviceKey) => {
 // lock was taken. `lockedRatesFor` above already derives a per-rate snapshot, so
 // this only adds the timestamp and reshapes it into the map the modal edits.
 //
-// The seed date is derived, never hardcoded: three weeks before module load, so
-// "Locked on <date>" always reads as a past event whenever the prototype runs.
-const SEED_LOCK_AGE_DAYS = 21
-export const SEEDED_LOCKED_AT = (() => {
+// The seed date is derived, never hardcoded, so "Locked on <date>" always reads
+// as a past event. The default is a few weeks back; a client/service can be
+// pinned older to show rates that drifted while frozen.
+const DEFAULT_SEED_LOCK_AGE_DAYS = 22
+
+// Keyed `${clientId}:${serviceKey}`, value in days-ago — same keying as
+// LOCKED_PRICE_OVERRIDES. Owen's boarding is deliberately ancient.
+const SEED_LOCK_AGE_OVERRIDES = {
+  'owen:boarding': 365 * 3,   // ~3 years ago
+}
+
+const daysAgoMidnight = (days) => {
   const d = new Date()
-  d.setDate(d.getDate() - SEED_LOCK_AGE_DAYS)
+  d.setDate(d.getDate() - days)
   d.setHours(0, 0, 0, 0)
   return d
-})()
+}
+
+const seededLockedAtFor = (clientId, serviceKey) =>
+  daysAgoMidnight(
+    SEED_LOCK_AGE_OVERRIDES[`${clientId}:${serviceKey}`] ?? DEFAULT_SEED_LOCK_AGE_DAYS
+  )
+
+// Kept for the public export's callers; equals the un-pinned default.
+export const SEEDED_LOCKED_AT = daysAgoMidnight(DEFAULT_SEED_LOCK_AGE_DAYS)
+
 
 /**
  * The untouched starting point for one (client x service): what the server
@@ -409,7 +426,8 @@ export const lockedSeedFor = (client, serviceKey) => {
     rates: config.rates,
     locked: config.locked,
     amounts,
-    lockedAt: config.locked ? SEEDED_LOCKED_AT : null,
+    lockedAt: config.locked ? seededLockedAtFor(client.id, serviceKey) : null,
+
   }
 }
 
