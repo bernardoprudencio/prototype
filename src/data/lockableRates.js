@@ -312,7 +312,7 @@ const LOCKED_PRICE_OVERRIDES = {
   // not moved since she started booking, so no rate should read as arbitrary.
   'lauren:drop_in_visits': {
     'standard-rate': 26, 'long-drop-in': 12, 'holiday-rate': 10,
-    'additional-dog': 12, puppy: 10, 'additional-cat': 10,
+    'additional-dog': 12, 'puppy': 8, 'additional-cat': 10,
     'extended-stay': 12, 'bathing-grooming': 16,
   },
   // House sitting is NOT in lauren's `lockedServices`. This only prices her
@@ -376,7 +376,7 @@ const DEFAULT_SEED_LOCK_AGE_DAYS = 22
 // Keyed `${clientId}:${serviceKey}`, value in days-ago — same keying as
 // LOCKED_PRICE_OVERRIDES. Owen's boarding is deliberately ancient.
 const SEED_LOCK_AGE_OVERRIDES = {
-  'owen:boarding': 365 * 3,   // ~3 years ago
+  'lauren:drop_in_visits': 365 * 3,   // ~3 years ago
 }
 
 const daysAgoMidnight = (days) => {
