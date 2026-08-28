@@ -128,9 +128,13 @@ export const BOARDING_SETTINGS = {
   // cannot be saved.
   additionalRates: [
     { slug: 'additional-dog',      label: 'Additional dog',      price: 35, unit: 'night',   active: true, isFree: false },
-    { slug: 'puppy',               label: 'Puppy care',          price: 15, unit: 'night',   active: true, isFree: false },
+    { slug: 'puppy',               label: 'Puppy care',          price: 20, unit: 'night',   active: true, isFree: false },
     { slug: 'additional-cat',      label: 'Additional cat',      price: 25, unit: 'night',   active: true, isFree: false },
-    { slug: 'holiday',             label: 'Holiday rate',        price: 15, unit: 'night',   active: true, isFree: false },
+    // Puppy care and Holiday sit above the $15 country-config floor for boarding
+    // (MIN_ADD_ON_PRICE.boarding in lockableRates.js). At the floor there is no
+    // room between the sitter's rate and a legal locked price, so a locked client
+    // could not show a drift on those two rows at all.
+    { slug: 'holiday',             label: 'Holiday rate',        price: 25, unit: 'night',   active: true, isFree: false },
     { slug: 'extended-stay',       label: 'Extended stay',       price: 55, unit: 'night',   active: true, isFree: false },
     { slug: 'bathing-grooming',    label: 'Bathing / grooming',  price: 20, unit: 'service', active: true, isFree: false },
     { slug: 'pick-up-drop-off',    label: 'Pick-up / drop-off',  price: 25, unit: 'service', active: true, isFree: false },

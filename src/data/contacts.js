@@ -94,6 +94,10 @@ export const CLIENTS = [
     ],
     bookingCount: 12,
     gbv: 3580,
+    // Owen's boarding starts locked, so the "manage an existing lock" path has a
+    // demo on a client who also has a recurring relationship. His amounts are
+    // pinned in lockableRates.js LOCKED_PRICE_OVERRIDES rather than hash-derived.
+    lockedServices: ['boarding'],
     recurringSchedule: {
       service: 'Weekly 60 min walks',
       serviceDuration: 60,
@@ -248,6 +252,29 @@ export const CLIENTS = [
     pets: [pet(1, 'Sushi', petImages.sushi, { breeds: 'Shiba Inu', gender: 'Female', birthday: '2 years old', weight: '18 lbs' })],
     bookingCount: 2,
     gbv: 750,
+  }),
+  // The locked-rates user-testing persona. Over a year of history, drop-in
+  // visits most weeks and house sitting when she travels — her service pool is
+  // pinned to exactly those two in relationshipData.js PINNED_SERVICE_KEYS.
+  //
+  // Deliberately NO recurringSchedule: RECURRING_SERVICE_KEY is hardcoded
+  // `dog_walking` (relationshipData.js), so a recurring block would force dog
+  // walking into her pool and hand her a weekly-walks conversation. "Books
+  // drop-ins most weeks" is carried by her booking history instead.
+  client({
+    id: 'lauren',
+    displayName: 'Lauren M.',
+    imageUrl: peopleImages.lauren,
+    pets: [
+      pet(1, 'Juniper', petImages.juniper, { breeds: 'Border Collie', gender: 'Female', birthday: '5 years old', weight: '42 lbs' }),
+      pet(2, 'Fig',     petImages.fig,     { breeds: 'Cavalier King Charles Spaniel', gender: 'Male', birthday: '3 years old', weight: '18 lbs' }),
+    ],
+    bookingCount: 18,
+    gbv: 4200,
+    // "Their prices haven't changed since they started booking with you" — the
+    // drop-in rates she has always paid are already locked. House sitting is
+    // deliberately NOT locked: her new request is the thing under test.
+    lockedServices: ['drop_in_visits'],
   }),
 ]
 

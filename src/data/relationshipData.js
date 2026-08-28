@@ -132,9 +132,14 @@ const OFFERED_SERVICE_KEYS = (() => {
 // booked group grows a third entry behind its back. Both are the demo stays in
 // buildUpcomingBookings below: owen's active 4-night boarding and lena's paid
 // boarding, the one that makes the locked-rates surfaces reachable.
+// lauren is pinned to both of her services rather than one: the user-testing
+// scenario names them ("drop-in visits most weeks, house sitting when they
+// travel"), and the pool caps at two, so this IS her whole pool — her generated
+// history can never wander into a third service.
 const PINNED_SERVICE_KEYS = {
   owen: ['boarding'],
   lena: ['boarding'],
+  lauren: ['drop_in_visits', 'house_sitting'],
 }
 
 // Memoised per client id so all three generation sites (past, upcoming,
@@ -783,6 +788,54 @@ const buildUpcomingBookings = (client, count, share) => {
       // collapsed range ("Aug 25 to 28, 2026") that can't be split back apart.
       // See detailFields / SERVICE_DETAIL above.
       ...detailFields(start, end, 'boarding', nights),
+    })
+  }
+
+  // Lauren gets the locked-rates user-testing request: a 5-night house sitting
+  // stay priced BELOW the sitter's own rates. Her drop-in visits are already
+  // locked (contacts.js `lockedServices`), house sitting is not — so this booking
+  // is the one the tester is asked to lock, and the sheet must open seeded from
+  // the request's own prices rather than from the sitter's defaults.
+  //
+  // `perUnit` is what carries the standard-rate override end to end: the ledger
+  // prices from it here, `buildModifyFields` re-prices the rate selector from it,
+  // and `useGranularRates`'s `requestAmounts` reads it back off
+  // `modify.rateRows[].pricePerUnit` to seed the lock sheet. The additional-dog
+  // override rides along on LOCKED_PRICE_OVERRIDES['lauren:house_sitting'].
+  //
+  // Paid rather than truly pending, deliberately: `isLockableConversation()`
+  // (lockableRates.js) gates the whole rates surface on `booking.isPaid`, so an
+  // unpaid request would render no rates row at all. The cost is that its inbox
+  // thread reads 'upcoming' rather than 'pending'.
+  if (client.id === 'lauren' && count > 0) {
+    const start = new Date(PROTO_TODAY); start.setHours(0,0,0,0); start.setDate(start.getDate() + 9)
+    const end   = new Date(PROTO_TODAY); end.setHours(0,0,0,0);   end.setDate(end.getDate() + 14)
+    const paid  = new Date(PROTO_TODAY); paid.setHours(0,0,0,0);  paid.setDate(paid.getDate() - 1)
+    const nights = 5
+    // The override: the sitter's house sitting standard rate is $65
+    // (lockableRates.js RATE_TABLE.house_sitting), Lauren's request is at $58.
+    const perUnit = 58
+    const { rows: rateRows, subtotal: price } = buildRateRows(client, 'house_sitting', {
+      units: nights, unitLabel: SERVICE_DETAIL.house_sitting.unit, perUnit,
+    })
+
+    out.push({
+      id: `${client.id}-up-request`,
+      price: money(price),
+      dates: fmtRange(start, end),
+      startDate: isoKey(start),
+      endDate: isoKey(end),
+      serviceName: SERVICES.house_sitting.name,
+      serviceIcon: SERVICES.house_sitting.icon,
+      serviceKey: 'house_sitting',
+      rateRows,
+      perUnit,
+      earnings: money(price * share),
+      serviceStatus: 'completed_service_deposit',
+      conversationOpk: `${client.id}-conv-up-request`,
+      ...statusFields('completed_service_deposit', start, end, 'house_sitting', nights),
+      paidOn: fmt(paid),
+      ...detailFields(start, end, 'house_sitting', nights),
     })
   }
 

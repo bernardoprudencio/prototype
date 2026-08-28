@@ -275,8 +275,51 @@ const hash = (s) => {
 
 // Lena's boarding numbers are load-bearing: relationshipData.js prices her demo
 // booking's ledger off `standard-rate` + `additional-dog`.
+//
+// Owen and Lauren are the user-testing personas, and their numbers are pinned for
+// the same reason plus one more: the hash below produces a plausible but arbitrary
+// discount per rate, which reads as noise in a sheet a tester is asked to compare
+// against the sitter's defaults. Pinned figures make every row's override legible
+// at a glance. Owen's standard rate is deliberately NOT Lena's 38, so the two
+// locked-boarding demos stay distinguishable.
+//
+// Note what a pin does and does not mean. These are *snapshot* prices: they price
+// the client's bookings through `buildRateRows`, and — only when the service is in
+// the client's `lockedServices` — they also become the seeded `amounts` the manage
+// sheet opens on (`lockedSeedFor`). So 'lauren:house_sitting' below prices her
+// request without locking it, which is exactly the scenario under test: a pending
+// request carrying an override the sitter has not yet locked in.
 const LOCKED_PRICE_OVERRIDES = {
+  // Owen's lock is the "locked long ago and left there" case: EVERY row sits well
+  // below today's rate, as it would for a client whose prices were frozen while
+  // the sitter's own went up year after year. So no row may equal its default.
+  //
+  // Sitter defaults (BOARDING_SETTINGS): standard 45, additional-dog 35, puppy 20,
+  // additional-cat 25, holiday 25, extended-stay 55, bathing-grooming 20,
+  // pick-up-drop-off 25 — roughly a 25-40% drift below each. Boarding's holiday
+  // slug is `holiday`, not `holiday-rate`. Every figure still clears its
+  // country-config floor (MIN_ADD_ON_PRICE.boarding: $15, or $10 for the cat
+  // rate), which is what puppy and holiday were raised in sitterProfile.js to
+  // allow — at the old $15 default they sat ON the floor with nowhere to drift.
+  'owen:house_sitting': {
+    'standard-rate': 28, 'additional-dog': 22, puppy: 15, 'additional-cat': 16,
+    holiday: 16, 'extended-stay': 38, 'bathing-grooming': 12,
+    'pick-up-drop-off': 15,
+  },
   'lena:boarding': { 'standard-rate': 38, 'additional-dog': 28, puppy: 8 },
+  // Sitter defaults (RATE_TABLE.drop_in_visits): 30 / 15 / 12 / 15 / 10 / 12 / 15 / 20.
+  // Every row is pinned: the whole point of Lauren's lock is that her prices have
+  // not moved since she started booking, so no rate should read as arbitrary.
+  'lauren:drop_in_visits': {
+    'standard-rate': 26, 'long-drop-in': 12, 'holiday-rate': 10,
+    'additional-dog': 12, puppy: 10, 'additional-cat': 10,
+    'extended-stay': 12, 'bathing-grooming': 16,
+  },
+  // House sitting is NOT in lauren's `lockedServices`. This only prices her
+  // bookings — including the new request, whose standard rate is set on the
+  // booking itself (relationshipData.js `perUnit`) so the modify screen and the
+  // details ledger agree on it.
+  'lauren:house_sitting': { 'additional-dog': 24 },
 }
 
 const lockedPriceFor = (clientId, serviceKey, rate) => {

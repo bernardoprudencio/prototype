@@ -15,6 +15,8 @@ export const petImages = {
   henry:   'https://images.unsplash.com/photo-1530281700549-e82e7bf110d6?w=200&h=200&fit=crop&crop=face',
   bean:    'https://images.unsplash.com/photo-1577023311546-cdc07a8454d9?w=200&h=200&fit=crop&crop=face',
   sushi:   'https://images.unsplash.com/photo-1495360010541-f48722b34f7d?w=200&h=200&fit=crop&crop=face',
+  juniper: 'https://images.unsplash.com/photo-1568572933382-74d440642117?w=200&h=200&fit=crop&crop=face',
+  fig:     'https://images.unsplash.com/photo-1504595403659-9088ce801e29?w=200&h=200&fit=crop&crop=face',
   promo1: new URL('./promo1.png', import.meta.url).href,
   promo2: new URL('./promo2.png', import.meta.url).href,
 }
@@ -33,6 +35,7 @@ export const peopleImages = {
   nora:     'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&h=200&fit=crop&crop=face',
   takashi:  'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=200&h=200&fit=crop&crop=face',
   amelia:   'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&h=200&fit=crop&crop=face',
+  lauren:   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face',
   // Sitters
   rachel:   'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=200&h=200&fit=crop&crop=face',
   tom:      'https://images.unsplash.com/photo-1463453091185-61582044d556?w=200&h=200&fit=crop&crop=face',
