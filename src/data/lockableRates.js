@@ -309,13 +309,13 @@ const LOCKED_PRICE_OVERRIDES = {
     holiday: 16, 'extended-stay': 38, 'bathing-grooming': 12,
     'pick-up-drop-off': 15,
   },
-  'lena:boarding': { 'standard-rate': 38, 'additional-dog': 28, puppy: 8 },
+  'lena:boarding': { 'standard-rate': 38, 'additional-dog': 28, puppy: 10 },
   // Sitter defaults (RATE_TABLE.drop_in_visits): 30 / 15 / 12 / 15 / 10 / 12 / 15 / 20.
   // Every row is pinned: the whole point of Lauren's lock is that her prices have
   // not moved since she started booking, so no rate should read as arbitrary.
   'lauren:drop_in_visits': {
     'standard-rate': 26, 'long-drop-in': 12, 'holiday-rate': 28,
-    'additional-dog': 12, 'puppy': 8, 'additional-cat': 10,
+    'additional-dog': 12, 'puppy': 10, 'additional-cat': 10,
     'extended-stay': 12, 'bathing-grooming': 16,
   },
   // House sitting is NOT in lauren's `lockedServices`. This only prices her
