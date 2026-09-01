@@ -25,7 +25,7 @@ individually faithful to *a* production surface. None of the three blocks the cu
 |---|---|---|---|
 | Conversation details ledger | `ConversationLockRates` (server-driven `LockRates` payload) — `details/ConversationPriceLedger.tsx:88` | `LockRatesToggleRow` in `BookingDetailsScreen.jsx` (`useLockedRates(client, booking)`, `:198`) | **modal** — `LockRatesModal.tsx` / `LockRatesSheet.jsx` |
 | Modify booking (one-time) | `LockedRatesComponent` nested in `RatesComponent` — `RatesComponent.tsx:77-81, :104` | `ModifyBookingScreen`'s Rates section | **no modal** — matches production, via `useLockedRates(..., { mode: 'immediate', snackbar: false })` |
-| Manage current week (recurring) | **not rendered** — `RatesComponent` suppressed, see item 1 | `PricingLedger` renders it — `CurrentWeekScreen.jsx:134-136, :187-214` | modal |
+| Manage current week (recurring) | **not rendered** — `RatesComponent` suppressed, see item 1 | **not rendered** — block removed; see "Resolved" below | — |
 | Relationship page "Rates" row | **does not exist** in production | `RelationshipPage/RelationshipPage.jsx:88-106` | modal |
 
 The canonical server-side gate is `_get_lock_rates_toggle()`
@@ -311,7 +311,7 @@ have been settled by the details/modify pass — confirm before acting.
 
 | Not changing | Why |
 |---|---|
-| `isLockableConversation`'s five gates (`lockableRates.js:139-144`) | Faithful mirror of `_get_lock_rates_toggle()` (`price_ledger.py:1720-1742`), including the deliberate absence of an `is_recurring` check. Do not add one |
+| `isLockableConversation`'s five production gates (`lockableRates.js`) | Faithful mirror of `_get_lock_rates_toggle()` (`price_ledger.py:1720-1742`). **Superseded in part** — two prototype-only clauses (`!isRecurring`, `!isOngoing`) now sit on top of them by product decision; see "Resolved" below. The five mirrored gates themselves stay as they are |
 | `lockedRatesByOwner` being a single boolean per (client × service) | Production's write is full-set replacement (`lockAddOns` / `unlockAddOns`, `duck.ts:654-661`); per-rate locking is not a thing |
 | The locked-price snapshot derivation (`lockableRates.js:158-177`) | Deterministic mock data; production reads real `LockedServiceAddOn` rows. Lena's boarding overrides stay pinned because `relationshipData.js` prices her ledger off them |
 | Sentence-case rate labels | Documented deliberate divergence (`lockableRates.js:23-29`) |
@@ -319,3 +319,49 @@ have been settled by the details/modify pass — confirm before acting.
 | Bright Horizons branches (`RatesComponent.tsx:77-81, :98, :105-109`) | Out of scope everywhere in this prototype |
 | Owner-facing lock copy | This prototype is the sitter's app (`lockedRatesCopy.js:123-124`) |
 | `showLockedRates` dev flag | Works as intended; all four surfaces respect it |
+
+---
+
+## Resolved — confirmed one-time bookings, and nothing else
+
+Reported as "a future drop-in visit with Lauren has no locked-rates option". Two causes,
+neither drop-in specific and neither the item-2 namespace trap.
+
+**1. Every generated upcoming booking was unpaid.** `buildUpcomingBookings` seeded its
+generated loop with `serviceStatus: 'pending_service_deposit'`, which `statusFields`
+short-circuits into `isPaid: false` / `'waitingForPayment'`. `isLockableConversation`'s
+`is_paid()` mirror then correctly refused the control. Lauren's hand-built house-sitting
+request already worked around this — its comment says so outright, "Paid rather than truly
+pending, deliberately … an unpaid request would render no rates row at all" — but the
+workaround covered that one booking, leaving her generated drop-in visit (`lauren-up-2`),
+the service she already has locked, unreachable.
+
+Fixed in the **data**, not the paid gate: generated bookings now carry
+`completed_service_deposit` plus a `paidOn` derived from `PROTO_TODAY`, so a future start
+resolves to `statusKey: 'confirmed', isPaid: true`. Same trade-off Lauren's request already
+accepted, now across the board — nothing seeded is `pending_service_deposit`, so the Inbox
+"Pending" chip lists no threads. The categorisation branch in `threads.js` is left in place
+so re-seeding one pending booking restores that state.
+
+**2. Nothing excluded ongoing or recurring conversations.** A lock is a promise about what a
+client pays *next* time, so it does not belong on a week already under way, nor on a
+recurring relationship whose sentinel requests production prices `.without_locked_rates()`
+(`recurring/models.py:616-628`).
+
+`!isRecurring && !isOngoing` moved into `isLockableConversation`. The recurring half
+previously lived in `useGranularRates` alone, deliberately scoped so `ratesMode: 'current'`
+was unaffected; sharing it means **both** rates modes and all four surfaces now agree. This
+is a knowing divergence from production, which has neither check — recorded here rather
+than in the "Explicitly NOT changing" table, whose "do not add an `is_recurring` check" line
+was about fidelity and is overridden on product grounds.
+
+What it removes: Owen's active boarding stay (`statusKey: 'ongoing'`), every recurring week
+conversation, and either of those as the relationship page's `repBooking`. Paid **past**
+bookings deliberately still pass — one-time, finished, and the relationship page falls back
+to one for a client with no upcoming booking.
+
+**Item 1 is closed by this.** `CurrentWeekScreen`'s `PricingLedger` forced the gate open
+with a synthetic `{ serviceKey: 'dog_walking', isPaid: true, isCancelled: false }` booking
+that no gate change could reach. The whole block — toggle, `ledgerRowSitter` line, sheet and
+snackbar — is deleted along with its now-unused imports, which also retires the LEGACY-ONLY
+`ledgerRowSitter` copy from the rendered surface area.

@@ -250,12 +250,34 @@ const RATE_TABLE = {
 // (price_ledger.py:1720-1742), which decides whether the locked-rates control is
 // offered on a given conversation: browsable (non-grooming) service type, paid,
 // and no cancelled stay. Gate 2 (the viewer is the provider) is structurally free
-// here — the sitter always is. Note there is deliberately no recurring check.
+// here — the sitter always is.
+//
+// The last two clauses are a DELIBERATE PROTOTYPE DIVERGENCE, not a mirror:
+// production's canonical toggle has neither. Locked rates belong on a **one-time
+// booking that has not started yet**, because a lock is a promise about what this
+// client pays next time. A week already under way cannot honour it, and a
+// recurring relationship's sentinel requests are priced
+// `.without_locked_rates()` anyway (recurring/models.py:616-628).
+//
+//   !isRecurring  — a recurring conversation is one week of an ongoing
+//                   relationship, not a one-time booking
+//   !isOngoing    — a stay already under way (statusKey 'ongoing') and,
+//                   redundantly but explicitly, the recurring week
+//                   ('ongoingRecurring' / 'skippedWeek')
+//
+// The recurring half used to live in `useGranularRates` alone, scoped so the
+// 'current' ratesMode was unaffected. It is shared here now, so BOTH rates modes
+// and all four surfaces refuse recurring and ongoing conversations alike.
+//
+// Paid PAST bookings still pass: they are one-time and finished, and the
+// relationship page reaches for one when a client has no upcoming booking.
 export const isLockableConversation = (booking) => Boolean(
   booking &&
   BROWSABLE_SERVICE_KEYS.includes(booking.serviceKey) &&
   booking.isPaid &&
-  !booking.isCancelled
+  !booking.isCancelled &&
+  !booking.isRecurring &&
+  !booking.isOngoing
 )
 
 export const lockableRatesFor = (serviceKey) =>
