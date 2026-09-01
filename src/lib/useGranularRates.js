@@ -43,11 +43,11 @@ export function useGranularRates(client, booking = null) {
 
   // ── This conversation's service ────────────────────────────────────────────
   const serviceKey = booking?.serviceKey ?? null
-  // The proposal does not offer locking on recurring weeks — one-time bookings
-  // only. Production's `_get_lock_rates_toggle()` has no such check (the
-  // recurring exclusion lives on the retiring legacy stay page), so this is a
-  // deliberate divergence, scoped to the granular flow.
-  const passesGate = enabled && isLockableConversation(booking) && !booking?.isRecurring
+  // One-time, not-yet-started bookings only. The recurring exclusion used to be
+  // written out here and scoped to this flow; it now lives in
+  // `isLockableConversation` alongside an ongoing exclusion, so both rates modes
+  // agree. See the comment on that function for the divergence rationale.
+  const passesGate = enabled && isLockableConversation(booking)
   const state = passesGate ? stateFor(serviceKey) : null
   const available = Boolean(state)
 

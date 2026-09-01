@@ -843,6 +843,25 @@ const buildUpcomingBookings = (client, count, share) => {
   cursor.setHours(0, 0, 0, 0)
   cursor.setDate(cursor.getDate() + 5)
 
+  // Generated upcoming bookings are *confirmed* one-time bookings, for the same
+  // reason Lauren's request above is paid rather than truly pending:
+  // `isLockableConversation()` gates the whole rates surface on `booking.isPaid`,
+  // so a pending seed renders no rates row at all. Doing it by hand for one
+  // booking left every generated one — including Lauren's own drop-in visit,
+  // the service she already has locked — with no way to reach the control.
+  // 'completed_service_deposit' plus a future start sends statusFields down its
+  // `s > today` branch for `isPaid: true, statusKey: 'confirmed'`.
+  //
+  // Same cost as Lauren's, now paid across the board: no seeded booking is
+  // 'pending_service_deposit' any more, so the Inbox "Pending" filter lists
+  // nothing. threads.js still categorises one if a pending booking is re-seeded.
+  //
+  // Paid a week before "today", derived from PROTO_TODAY and never hardcoded.
+  // Invariant across the loop, so it is computed once.
+  const paidAt = new Date(PROTO_TODAY)
+  paidAt.setHours(0, 0, 0, 0)
+  paidAt.setDate(paidAt.getDate() - 7)
+
   for (let i = 0; i < count; i++) {
     const seed = hash(client.id, 100 + i)
     const pool = servicePoolFor(client)
@@ -876,9 +895,10 @@ const buildUpcomingBookings = (client, count, share) => {
       // modify screen opens showing a per-unit rate the ledger never charged.
       perUnit,
       earnings: money(price * share),
-      serviceStatus: 'pending_service_deposit',
+      serviceStatus: 'completed_service_deposit',
       conversationOpk: `${client.id}-conv-up-${i + 1}`,
-      ...statusFields('pending_service_deposit', start, end, serviceKey, span),
+      ...statusFields('completed_service_deposit', start, end, serviceKey, span),
+      paidOn: fmt(paidAt),
       ...detailFields(start, end, serviceKey, span),
     })
 
