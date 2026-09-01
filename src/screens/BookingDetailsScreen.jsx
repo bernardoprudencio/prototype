@@ -1,13 +1,20 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { colors, radius, shadows, spacing, textStyles, typography } from '../tokens'
 import {
   BackIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon,
   InfoCircleIcon, CheckCircleIcon, CautionIcon,
 } from '../assets/icons'
-import { Button, BottomSheet, PetAvatar, LockRatesToggleRow, LockRatesSheet, Snackbar } from '../components'
+import {
+  Button, BottomSheet, PetAvatar, LockRatesToggleRow, LockRatesSheet, Snackbar,
+  RatesRow, ManageRatesSheet,
+} from '../components'
 import { getClient } from '../data/contacts'
+import { useApp } from '../context/AppContext'
 import { useLockedRates } from '../lib/useLockedRates'
+import { useIsWide } from '../lib/useMediaQuery'
+import { webColumn } from '../lib/webColumn'
+import { useGranularRates } from '../lib/useGranularRates'
 import { useRelationshipData } from '../lib/useRelationshipData'
 import { toggleLabelLedger } from '../data/lockedRatesCopy'
 import * as copy from '../data/bookingDetailsCopy'
@@ -195,6 +202,10 @@ const FlatRow = ({ leftItem, label, lines = [] }) => (
  * DetailsActions after DetailsWarnings), which is where it renders below.
  */
 function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
+  // Only the standalone page (`chrome`) has a viewport to overrun; the rail
+  // variant is already inside a column its parent page sized.
+  const isWide = useIsWide()
+  const column = webColumn(chrome && isWide)
   const navigate = useNavigate()
   const { ownerId, conversationOpk: opkFromUrl } = useParams()
   const conversationOpk = opkProp ?? opkFromUrl
@@ -221,13 +232,44 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
   })()
 
   // Visibility is per conversation, so the resolved booking is what gates it.
+  //
+  // ── The `ratesMode` fork ──────────────────────────────────────────────────
+  // Both hooks run unconditionally (hooks cannot be called behind a branch) and
+  // each returns `available: false` outside its own mode, so exactly one of the
+  // two locked-rates surfaces below can ever render:
+  //   'current'  → the shipped binary switch + LockRatesSheet (`lr`)
+  //   'granular' → the POC proposal's two-offer RatesRow + ManageRatesSheet
+  //                (`gr`, 01-locked-rates-client-management.md §3.1)
+  // `useGranularRates` already tests `ratesMode === 'granular'` internally;
+  // `useLockedRates` predates the flag, so the current-mode gate is written out
+  // at its render sites.
+  const { ratesMode } = useApp()
   const lr = useLockedRates(client, booking)
+  const gr = useGranularRates(client, booking)
   const [earningsOpen, setEarningsOpen] = useState(false)
 
-  // `_is_collapsed`: a paid, unmodified, not-fully-refunded booking opens
-  // collapsed — only the title and the "{owner} paid ... for this stay." line.
-  const startsCollapsed = Boolean(booking?.isPaid && !booking?.hasModification && !booking?.isCancelled)
-  const [ledgerOpen, setLedgerOpen] = useState(!startsCollapsed)
+  // `_is_collapsed()` (price_ledger.py:1650-1657) OR'd with
+  // `should_collapse_financial_sections()` (base.py:389-397) — both folded into
+  // `booking.ledgerCollapsed` by relationshipData.js's `withDerivedFields`, so
+  // every booking now carries the answer rather than this screen re-deriving it.
+  //
+  // Collapsibility drives THREE things, exactly as production does with the one
+  // `isCollapsible={collapsed}` prop (ConversationLedger.tsx:38): the initial
+  // open state, whether the chevron renders, and whether the header row is
+  // clickable. A non-collapsed ledger has no chevron and cannot be re-collapsed.
+  const ledgerCollapsible = Boolean(booking?.ledgerCollapsed)
+  const [ledgerOpen, setLedgerOpen] = useState(!ledgerCollapsible)
+
+  // `useState` seeds once, but `booking` can change identity under a live
+  // component — the rail renders inside a conversation route whose opk can
+  // change in place. Re-seed so the open state always describes THIS booking.
+  const seededFor = useRef(booking?.id ?? null)
+  useEffect(() => {
+    const id = booking?.id ?? null
+    if (seededFor.current === id) return
+    seededFor.current = id
+    setLedgerOpen(!ledgerCollapsible)
+  }, [booking, ledgerCollapsible])
 
   if (!client || !booking) {
     return (
@@ -290,10 +332,52 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
   // (PriceLedgerAccordion.tsx renders `text` on `text && !expanded`).
   // price_ledger.py:346-353 forks the same line on recurring-ness: one week's
   // payment ("…for this week.") instead of the whole stay's.
-  const summaryLine = booking.isPaid
+  // The two mutually exclusive locked-rates surfaces. `gr.available` already
+  // carries the granular-mode test (useGranularRates), so only the current one
+  // needs the flag spelled out.
+  const showCurrentLock = ratesMode === 'current' && lr.available
+
+  // The ledger's own figures, so the summary line and the earnings subtitle can
+  // never disagree with the rows behind them. The earnings row is the only item
+  // carrying an `action` (buildLedger routes it to the breakdown modal); the
+  // subtotal is the last bold item that is not it.
+  const ledgerItems    = (booking.ledger?.sections ?? []).flatMap(s => s.items ?? [])
+  const earningsItem   = ledgerItems.find(i => i.action)
+  const subtotalItem   = [...ledgerItems].reverse().find(i => i.style === 'bold' && !i.action)
+  const hasLedgerBody  = ledgerItems.length > 0 || Boolean(booking.weeklyTotal)
+
+  // `should_collapse_financial_sections()` (base.py:389-397) — the mobile
+  // provider branch, i.e. an unbooked/unpaid conversation. It is the FIRST
+  // check in `_get_title_text()` (price_ledger.py:249-260), before the paid
+  // fork, and it short-circuits to `get_total_price_data()` (base.py:319-331).
+  const collapsedUnpaid = !booking.isPaid
+
+  // `_get_provider_title()` (price_ledger.py:321-364) resolves in this exact
+  // order: cancelled, then has_modification, then recurring, then the plain
+  // stay line — cancelled and modified PRE-EMPT the recurring branch.
+  // `_get_price_label()` (base.py:306-314) returns SUBTOTAL under earnings
+  // transparency, which this prototype models as ON, so PRICE never renders.
+  const summaryLine = collapsedUnpaid
+    ? (subtotalItem ? copy.totalPriceLine(copy.SUBTOTAL, fmtMoney(subtotalItem.amount)) : null)
+    : booking.isCancelled
+      ? copy.cancelledFinalAmount(fmtMoney(booking.price), firstName, booking.paidOn)
+      : booking.hasModification
+        ? copy.paidAfterModifications(firstName, booking.paidOn, fmtMoney(booking.price))
+        : booking.isRecurring
+          ? copy.paidForWeek(firstName, fmtMoney(booking.price), booking.paidOn)
+          : copy.paidForStay(firstName, fmtMoney(booking.price), booking.paidOn)
+
+  // `_get_provider_earnings_subtitle()` (price_ledger.py:226-247) — returned
+  // ONLY while the financial sections are collapsed for an unbooked request;
+  // once a stay exists it returns None and the paid-provider copy above stands
+  // alone. So it is gated on the same condition as the branch above and never
+  // accompanies a "paid on" line. Rendered as PriceLedgerAccordion's `subText`
+  // (:98-102): a second 100/secondary line, with the summary above it picking
+  // up `mb="1x"` when it is present.
+  const earningsSubtitle = collapsedUnpaid && earningsItem
     ? (booking.isRecurring
-        ? copy.paidForWeek(firstName, fmtMoney(booking.price), booking.paidOn)
-        : copy.paidForStay(firstName, fmtMoney(booking.price), booking.paidOn))
+        ? copy.providerEarningsPerWeek(fmtMoney(earningsItem.amount))
+        : copy.providerEarnings(fmtMoney(earningsItem.amount)))
     : null
 
   return (
@@ -305,10 +389,16 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
           `flexDirection="row" gap="3x" px="4x"`: a back control with an
           underlined "Back" link, the React-Native-only centred title, and
           `details_buttons` at the right end. */}
+      {/* The bar is app chrome and stays as-is: the `chrome` variant is
+          mobile-only by route (App.jsx early-returns null at wide, mirroring
+          ConversationDetailsPage.tsx:24), so there is no wide presentation of
+          this header to design. */}
       <div style={{
         background: colors.white, boxShadow: shadows.headerShadow, padding: '0 16px',
-        display: 'flex', alignItems: 'center', gap: spacing.md, height: 56, flexShrink: 0, zIndex: 3,
+        height: 56, flexShrink: 0, zIndex: 3,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md, height: '100%', width: '100%', ...column }}>
         <div role="button" tabIndex={0} onClick={onBack} aria-label={copy.BACK_TEXT}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: spacing.xs, flexShrink: 0 }}>
           <BackIcon />
@@ -334,6 +424,7 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
           {copy.MODIFY_REQUEST}
         </Button>
       </div>
+      </div>
       </>}
 
       {/* At wide width the page owns the scroll and the rail's own container
@@ -341,6 +432,7 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
       <div className="hide-scrollbar" style={chrome
         ? { flex: 1, overflowY: 'auto', padding: '0 16px' }
         : { height: 'auto', overflowY: 'visible' }}>
+      <div style={column}>
 
         {/* ─── 1. Booking status — pt="6x" pb="2x", column gap="2x" ─── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm, paddingTop: spacing.xl, paddingBottom: spacing.sm }}>
@@ -434,37 +526,48 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
         {/* ─── 4. Price ledger + the locked-rates switch ───
             ConversationPriceLedger.tsx wraps both in one `pb="4x" gap="4x"`
             column, so the switch sits 16px below the ledger as a sibling. */}
-        {(booking.ledger || lr.available) && (
+        {(hasLedgerBody || showCurrentLock || gr.available) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg, paddingBottom: spacing.lg }}>
             {/* PriceLedgerAccordion: pt="4x" pb="0x", header row space-between
-                with a 4px gap and no horizontal padding. Only the demo booking
-                carries a ledger, so the switch below renders on its own for
-                any other conversation — production's toggle is gated on the
-                stay being paid, not on the ledger. */}
-            {booking.ledger && <div style={{ paddingTop: spacing.lg }}>
+                with a 4px gap and no horizontal padding. `PriceLedgerMapper.map()`
+                builds a ledger for EVERY conversation, so this is no longer the
+                demo booking's privilege — the only ledger-less case is
+                `is_cancelled_with_full_refund()` (price_ledger.py:439-440), which
+                yields `sections: []`. That renders nothing at all here rather
+                than an empty bordered box with a header over it, and the locked-
+                rates switch below still stands on its own. */}
+            {hasLedgerBody && <div style={{ paddingTop: spacing.lg }}>
               <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: summaryLine && !ledgerOpen ? spacing.lg : 0 }}>
                 <div
                   role="button"
                   aria-label={copy.LEDGER_SECTION_TITLE}
-                  onClick={() => startsCollapsed && setLedgerOpen(o => !o)}
+                  onClick={() => ledgerCollapsible && setLedgerOpen(o => !o)}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    gap: spacing.xs, cursor: startsCollapsed ? 'pointer' : 'default',
+                    gap: spacing.xs, cursor: ledgerCollapsible ? 'pointer' : 'default',
                   }}
                 >
                   <span style={{ ...textStyles.text200Semibold, color: colors.primary, flex: 1 }}>{copy.LEDGER_SECTION_TITLE}</span>
-                  {startsCollapsed && <LedgerChevron open={ledgerOpen} />}
+                  {ledgerCollapsible && <LedgerChevron open={ledgerOpen} />}
                 </div>
 
                 {summaryLine && !ledgerOpen && (
-                  <span style={{ ...textStyles.text100, color: colors.secondary, lineHeight: 1.5 }}>{summaryLine}</span>
+                  <span style={{
+                    ...textStyles.text100, color: colors.secondary, lineHeight: 1.5,
+                    // PriceLedgerAccordion.tsx:92 — `mb="1x"` on the summary
+                    // line only while the subText below it renders.
+                    marginBottom: earningsSubtitle ? spacing.xs : 0,
+                  }}>{summaryLine}</span>
+                )}
+                {earningsSubtitle && !ledgerOpen && (
+                  <span style={{ ...textStyles.text100, color: colors.secondary, lineHeight: 1.5 }}>{earningsSubtitle}</span>
                 )}
               </div>
 
               {/* PriceLedgerSection.tsx: `py="4x" gap="4x"` with a 1px
                   border.primary bottom rule — ConversationLedger passes
                   showBorderBottom on every section, including the last. */}
-              {ledgerOpen && booking.ledger.sections.map((section, si) => (
+              {ledgerOpen && (booking.ledger?.sections ?? []).map((section, si) => (
                 <div key={si} style={{
                   display: 'flex', flexDirection: 'column', gap: spacing.lg,
                   padding: '16px 0', borderBottom: `1px solid ${colors.borderInteractive}`,
@@ -498,13 +601,45 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
               )}
             </div>}
 
-            {/* ─── Locked rates — a switch BELOW the ledger, not a ledger row ─── */}
-            {lr.available && (
+            {/* `_get_info_text()` (price_ledger.py:1850-1858) — the recurring
+                provider's Rover Card reminder, None everywhere else.
+                ConversationPriceLedger.tsx:82-86 puts it in this same 16px-gap
+                column, BETWEEN the ledger and the lock-rates control, as a
+                `Paragraph size="100" textColor="tertiary"`. */}
+            {booking.ledgerInfo && (
+              <p style={{ ...textStyles.paragraph100, color: colors.tertiary, margin: 0 }}>
+                {booking.ledgerInfo}
+              </p>
+            )}
+
+            {/* ─── Locked rates — a sibling BELOW the ledger, not a ledger row ───
+                Both modes render in this same slot, inside the shared 16px-gap
+                column, so the surface's position is unchanged by the flag —
+                only what occupies it. */}
+
+            {/* `current` — the shipped binary switch, untouched. */}
+            {showCurrentLock && (
               <LockRatesToggleRow
                 label={toggleLabelLedger(lr.ownerFirstName)}
                 ownerFirstName={lr.ownerFirstName}
                 checked={lr.locked}
                 onRequestChange={lr.requestChange}
+              />
+            )}
+
+            {/* `granular` — the POC's two-offer row (§3.1): `lock` while the
+                service follows the defaults, `manage` once it is locked. It
+                carries no service name (every title interpolates the client and
+                nothing else) and it does NOT navigate: pressing it opens the
+                management modal in place, because "lock rates based on this
+                request" only means anything where the request's rates are in
+                scope. */}
+            {gr.available && (
+              <RatesRow
+                offer={gr.offer}
+                clientName={gr.clientName}
+                lockedAt={gr.state?.lockedAt ?? null}
+                onPress={gr.openFromRow}
               />
             )}
           </div>
@@ -590,6 +725,7 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
           </div>
         </div>
       </div>
+      </div>
 
       {/* ─── Modals ─── */}
       {earningsOpen && (
@@ -606,7 +742,7 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
         </BottomSheet>
       )}
 
-      {lr.sheetMode && (
+      {ratesMode === 'current' && lr.sheetMode && (
         <LockRatesSheet
           mode={lr.sheetMode}
           ownerFirstName={lr.ownerFirstName}
@@ -617,6 +753,32 @@ function BookingDetails({ chrome = true, opk: opkProp, ctas = null }) {
         />
       )}
 
+      {/* The granular modal, opened in place by the row above. `gr.sheet` names
+          the service; the SAVED state for it comes back through `stateFor`, so
+          the modal always seeds from what is committed rather than from this
+          conversation's own booking. The request supplies `opensLocked` and the
+          prefill amounts on the `lock` offer only — on `manage` both come
+          through null and the sheet is purely the saved lock. */}
+      {gr.sheet && (() => {
+        const saved = gr.stateFor(gr.sheet.serviceKey)
+        if (!saved) return null
+        return (
+          <ManageRatesSheet
+            serviceName={saved.serviceName}
+            clientName={gr.clientName}
+            rates={saved.rates}
+            savedLocked={saved.locked}
+            savedAmounts={saved.amounts}
+            lockedAt={saved.lockedAt}
+            opensLocked={gr.sheet.opensLocked}
+            requestAmounts={gr.sheet.requestAmounts}
+            onSave={payload => gr.save(gr.sheet.serviceKey, payload)}
+            onClose={gr.closeSheet}
+          />
+        )
+      })()}
+
+      {/* Only `ratesMode === 'current'` toasts; the granular save is silent. */}
       <Snackbar message={lr.snackbar} onDone={lr.dismissSnackbar} />
     </div>
   )

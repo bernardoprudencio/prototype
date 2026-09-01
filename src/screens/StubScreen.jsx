@@ -1,5 +1,7 @@
 import React from 'react'
 import { colors, typography } from '../tokens'
+import { useIsWide } from '../lib/useMediaQuery'
+import { webColumn } from '../lib/webColumn'
 
 /**
  * Placeholder for a web navbar destination that exists in production but has no
@@ -14,15 +16,20 @@ import { colors, typography } from '../tokens'
  * pane the same way every other page does.
  */
 export default function StubScreen({ title, note = 'Not built in this prototype yet.' }) {
+  const isWide = useIsWide()
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
+      {/* Full-bleed rule, title inside the navbar's content column. */}
       <div style={{ borderBottom: `1px solid ${colors.border}`, padding: '24px 16px 16px', flexShrink: 0 }}>
-        <h1 style={{
-          fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26,
-          lineHeight: 1.25, color: colors.primary, margin: 0,
-        }}>
-          {title}
-        </h1>
+        <div style={webColumn(isWide)}>
+          <h1 style={{
+            fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26,
+            lineHeight: 1.25, color: colors.primary, margin: 0,
+          }}>
+            {title}
+          </h1>
+        </div>
       </div>
 
       <div className="hide-scrollbar" style={{

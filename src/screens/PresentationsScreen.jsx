@@ -1,7 +1,9 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { colors, typography } from '../tokens'
+import { colors, typography, textStyles } from '../tokens'
 import { BackIcon, ChevronRightIcon } from '../assets/icons'
+import { useIsWide } from '../lib/useMediaQuery'
+import { webColumn } from '../lib/webColumn'
 
 const MenuRow = ({ Icon, title, subtitle, onPress }) => (
   <div
@@ -44,43 +46,51 @@ const MenuRow = ({ Icon, title, subtitle, onPress }) => (
 
 export default function PresentationsScreen() {
   const navigate = useNavigate()
+  const isWide = useIsWide()
   const onBack = () => navigate('/more')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
+      {/* Below 769px this is the app's bar chrome, back arrow and all. At and
+          above it the web navbar is the navigation: no bar, no back arrow, and
+          the title reads as a page heading in the navbar's content column. */}
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          height: 56,
-          paddingLeft: 16,
-          paddingRight: 16,
-          borderBottom: `1px solid ${colors.border}`,
+          justifyContent: 'center',
+          height: isWide ? 'auto' : 56,
+          padding: isWide ? '24px 16px 16px' : '0 16px',
+          borderBottom: isWide ? 'none' : `1px solid ${colors.border}`,
           background: colors.white,
           flexShrink: 0,
         }}
       >
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 24,
-            height: 24,
-          }}
-        >
-          <BackIcon />
-        </button>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        height: '100%', width: '100%', ...webColumn(isWide),
+      }}>
+        {!isWide && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 24,
+              height: 24,
+            }}
+          >
+            <BackIcon />
+          </button>
+        )}
         <h1
-          style={{
+          style={isWide ? { ...textStyles.display400, color: colors.primary, margin: 0 } : {
             fontFamily: typography.fontFamily,
             fontWeight: 600,
             fontSize: 17,
@@ -92,6 +102,7 @@ export default function PresentationsScreen() {
           Presentations
         </h1>
       </div>
+      </div>
 
       <div
         className="hide-scrollbar"
@@ -100,6 +111,7 @@ export default function PresentationsScreen() {
           overflowY: 'auto',
         }}
       >
+      <div style={webColumn(isWide)}>
         <MenuRow
           title="Incomplete Rover Cards"
           subtitle="Leadership review · April 30, 2026"
@@ -110,6 +122,7 @@ export default function PresentationsScreen() {
           subtitle="Leadership review · May 14, 2026"
           onPress={() => navigate('/presentations/mgmt-hub-migration')}
         />
+      </div>
       </div>
     </div>
   )

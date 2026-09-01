@@ -192,6 +192,17 @@ export const paidForStay = (ownerName, finalAmount, datePaid) =>
 // week and "Price per week" outside it.
 export const PRICE_THIS_WEEK = 'Price this week'
 export const PRICE_PER_WEEK  = 'Price per week'
+// The final fall-through of the same method (base.py:314) — the plain label for a
+// non-recurring conversation outside earnings transparency. This prototype models
+// earnings transparency as ON, so SUBTOTAL (:307) is what actually renders and
+// PRICE is kept for provenance/completeness.
+export const PRICE = 'Price'
+
+// mappers/base.py:319-331 — `get_total_price_data()` composes the label and the
+// formatted price with a colon and a single space:
+//   return f"{price_label}: {price}"
+// e.g. "Subtotal: $135.00".
+export const totalPriceLine = (label, amount) => `${label}: ${amount}`
 
 // mappers/details/price_ledger.py:1069-1080 — `_get_total_price_title()`.
 // Non-recurring returns "Subtotal" (already exported above). Recurring forks on
@@ -234,6 +245,39 @@ export const CHARGED_EACH_MONDAY  = 'Charged each Monday morning'
 //   _("{owner_name} paid {final_amount} on {date_paid} for this week.")
 export const paidForWeek = (ownerName, finalAmount, datePaid) =>
   `${ownerName} paid ${finalAmount} on ${datePaid} for this week.`
+
+// mappers/details/price_ledger.py:328-335 — `_get_provider_title()`, cancelled
+// branch. It is checked FIRST, so a cancelled stay never reaches the recurring or
+// per-stay lines above:
+//   _("Because the service has been cancelled, the final amount is {final_amount}. {owner_name} paid on {date_paid}.")
+// (`owner_name` is the requester's short name, `conv.requester.get_short_name()`.)
+export const cancelledFinalAmount = (finalAmount, ownerName, datePaid) =>
+  `Because the service has been cancelled, the final amount is ${finalAmount}. ${ownerName} paid on ${datePaid}.`
+
+// mappers/details/price_ledger.py:337-346 — the same method's `has_modification`
+// branch, checked second:
+//   _("{owner_name} paid on {date_paid}. After modifications the final amount paid is {final_amount}. Rover fees will be deducted from this amount.")
+// Note production interpolates `final_amount` here from
+// `_get_request_payment_amount(request)`, not from the `final_amount` local the
+// other branches use.
+export const paidAfterModifications = (ownerName, datePaid, finalAmount) =>
+  `${ownerName} paid on ${datePaid}. After modifications the final amount paid is ${finalAmount}. Rover fees will be deducted from this amount.`
+
+// mappers/details/price_ledger.py:1850-1858 — `_get_info_text()`. Returns None for
+// a cancelled stay, and the string below only when `_is_provider()` and
+// `conv.is_recurring` are both true; every other case is None. Plain ASCII
+// apostrophe in "We'll", as in production.
+export const RECURRING_ROVER_CARD_INFO =
+  "Send a Rover Card each time. We'll only know if a service happened and you will only get paid if a Rover Card is sent."
+
+// mappers/details/price_ledger.py:226-247 — `_get_provider_earnings_subtitle()`.
+// Only returned for an UNBOOKED request under earnings transparency, while the
+// financial sections are collapsed; once a stay exists it returns None and the
+// paid-provider copy above is used instead. Recurring gets the per-week variant.
+//   _("Your earnings: %(amount)s")           (:247)
+//   _("Your earnings per week: %(amount)s")  (:246)
+export const providerEarnings        = (amount) => `Your earnings: ${amount}`
+export const providerEarningsPerWeek = (amount) => `Your earnings per week: ${amount}`
 
 // conversations/constants.py — YOUR_EARNINGS_TITLE / YOUR_EARNINGS_HELP_TEXT.
 // The production string is HTML; the anchor around "Service fees" points at the

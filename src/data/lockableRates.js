@@ -17,7 +17,6 @@
  *     ZERO_PRICE_LOCKABLE_ADD_ON_TYPE_SLUGS (additional-dog, additional-cat)
  *   - not in NON_LOCKABLE_ADD_ON_TYPE_SLUGS (cost-adjustments,
  *     cancellation-penalty, extended-care, missing-service-deliveries)
- *   - short-notice dropped unless `should_show_short_notice(person)`
  * Both filters are applied below.
  *
  * ── Known divergences, deliberate ──────────────────────────────────────────
@@ -49,6 +48,21 @@ export const SERVICE_DISPLAY_NAME = {
 // BROWSABLE_SERVICE_TYPES (services/constants.py:96-102, 117-119). Gate 4 of
 // `_get_lock_rates_toggle` is membership in this set; training and grooming are
 // out, which is also why they never appear in relationshipData.js SERVICES.
+// Two service-key namespaces exist in this prototype and they do not fully
+// overlap (see CLAUDE.md, "Two service-key namespaces"): the booking/rates side
+// says `dog_daycare` / `drop_in_visits`, the schedule and service-settings side
+// says `doggy_daycare` / `drop_in` (sitterServices.js SITTER_SERVICES ids, which
+// is what AppContext's `serviceStates` is keyed on). This map is the one place
+// that crossing is spelled out, so a rates key can be looked up in `serviceStates`
+// without either side guessing at the other's spelling.
+export const SERVICE_STATE_KEY = {
+  boarding:       'boarding',
+  house_sitting:  'house_sitting',
+  dog_walking:    'dog_walking',
+  drop_in_visits: 'drop_in',
+  dog_daycare:    'doggy_daycare',
+}
+
 export const BROWSABLE_SERVICE_KEYS = Object.keys(SERVICE_DISPLAY_NAME)
 
 // NON_LOCKABLE_ADD_ON_TYPE_SLUGS (services/constants.py:709-714).
@@ -66,17 +80,51 @@ const isLockable = (rate) =>
   !NON_LOCKABLE_SLUGS.has(rate.slug) &&
   (rate.defaultPrice > 0 || ZERO_PRICE_LOCKABLE_SLUGS.has(rate.slug))
 
+// ── Rate bounds ──────────────────────────────────────────────────────────────
+// Production reads these from *country config*, not from the sitter's profile:
+// `get_addon_type_min_price` (services/utils.py:774-781) and
+// `get_addon_type_max_price` (:784-798) look up
+// `minimum_service_add_on_prices` / `maximum_service_add_on_prices` on
+// `CountryConfigurationAbstractNA` (i18n/configuration.py:1612, :1665-1717).
+// `CountryConfigurationCA` (:1948) inherits both and overrides only currency and
+// legal amounts, so the NA numbers apply to this prototype's CAD figures too.
+//
+// Anything absent from the map falls to ALT_MINIMUM_ADD_ON_PRICE = 0
+// (services/constants.py:1633). `maximum_service_add_on_prices` carries entries
+// only for grooming and dog training, so every browsable service takes the
+// blanket `max_add_on_price` (i18n/configuration.py:1732).
+const MAX_ADD_ON_PRICE = 250
+
+// Keys are this file's slugs. Production keys the holiday minimum on
+// `holiday-rate` and the cat minimum on `cat-care`; boarding's profile data uses
+// `holiday` and `additional-cat`, so both spellings are listed.
+const MIN_ADD_ON_PRICE = {
+  // "boarding & traveling" in the config — house sitting is the traveling one.
+  boarding:       { 'standard-rate': 15, holiday: 15, 'holiday-rate': 15, 'extended-stay': 15, puppy: 15, 'additional-cat': 10, 'cat-care': 10 },
+  house_sitting:  { 'standard-rate': 15, holiday: 15, 'holiday-rate': 15, 'extended-stay': 15, puppy: 15, 'additional-cat': 10, 'cat-care': 10 },
+  drop_in_visits: { 'standard-rate': 10, holiday: 10, 'holiday-rate': 10, 'extended-stay': 10, puppy: 10, 'additional-cat': 7,  'cat-care': 7  },
+  dog_daycare:    { 'standard-rate': 15, holiday: 15, 'holiday-rate': 15, 'extended-stay': 15, puppy: 15 },
+  dog_walking:    { 'standard-rate': 10, holiday: 10, 'holiday-rate': 10, 'extended-stay': 10, puppy: 10 },
+}
+
+const minPriceFor = (serviceKey, slug) => MIN_ADD_ON_PRICE[serviceKey]?.[slug] ?? 0
+
 // ── Boarding: derived, so the numbers stay single-sourced ────────────────────
 // The base rate is add-on type `standard-rate`; the rest come straight from
-// BOARDING_SETTINGS.additionalRates. `holiday`, `bath`, `short-notice` and
-// `pickup-dropoff` are `active: false` there, so production's `active=True`
-// filter drops them — which is why the boarding sheet shows three rows.
+// BOARDING_SETTINGS.additionalRates, which now carries seven of boarding's
+// production add-ons as `active: true` — eight rows with the base rate. The
+// `active` and price filters below still run, so deactivating a rate in the
+// sitter's profile still removes it from the lock sheet.
 const boardingRates = () => [
   {
     slug: 'standard-rate',
-    label: 'Standard rate',
+    // Through RATE_LABEL, so boarding's base row is named the same way the four
+    // hand-authored services name theirs.
+    label: RATE_LABEL['standard-rate'],
     defaultPrice: BOARDING_SETTINGS.baseRate,
     unit: BOARDING_SETTINGS.baseRateUnit,
+    minPrice: minPriceFor('boarding', 'standard-rate'),
+    maxPrice: MAX_ADD_ON_PRICE,
     active: true,
   },
   ...BOARDING_SETTINGS.additionalRates.map(r => ({
@@ -87,47 +135,114 @@ const boardingRates = () => [
     label: RATE_LABEL[r.slug] ?? r.label,
     defaultPrice: r.isFree ? 0 : r.price,
     unit: r.unit,
+    // Bounds come from country config, never from the sitter's own profile.
+    minPrice: minPriceFor('boarding', r.slug),
+    maxPrice: MAX_ADD_ON_PRICE,
     active: r.active,
   })),
 ]
 
 // Add-on type names, sentence-cased. Keys are the slugs used in
 // sitterProfile.js; values follow ADD_ON_TYPE_SLUGS (services/constants.py:457).
+//
+// `standard-rate` is the one label that does NOT follow production's name
+// ('Standard Rate'): the Relationship page Figma (node 1491:16535) prints the
+// base rate as 'Dog care', naming what is being priced rather than its tier, so
+// it reads alongside 'Additional dog rate' in the same sheet.
 const RATE_LABEL = {
-  'standard-rate':  'Standard rate',
-  'additional-dog': 'Additional dog rate',
-  'additional-cat': 'Additional cat rate',
-  puppy:            'Puppy rate',
-  holiday:          'Holiday rate',
-  'holiday-rate':   'Holiday rate',
-  'long-walk':      '60 minute rate',
-  'long-drop-in':   '60 minute rate',
+  'standard-rate':          'Dog care',
+  'cat-care':               'Cat care',
+  'additional-dog':         'Additional dog rate',
+  'additional-cat':         'Additional cat rate',
+  puppy:                    'Puppy rate',
+  holiday:                  'Holiday rate',
+  'holiday-rate':           'Holiday rate',
+  'long-walk':              '60 minute rate',
+  'long-drop-in':           '60 minute rate',
+  'extended-stay':          'Extended stay rate',
+  'bathing-grooming':       'Bathing / grooming',
+  'pick-up-drop-off':       'Pick-up / drop-off',
+  'daily-pick-up-drop-off': 'Daily pick-up / drop-off',
 }
 
 // ── The sitter's lockable rates, per browsable service ───────────────────────
 // Only rows surviving `_get_lockable_add_ons()` are listed for the four
 // hand-authored services, so no `active: false` entries appear here.
+//
+// The set per service is `ALLOWED_ADDITIONAL_RATES_FOR_SERVICE_TYPE`
+// (services/constants.py:812-866) plus the base `standard-rate`; the `unit` is
+// `SERVICE_TYPE_PRICE_UNITS` (:321-329). Prices are the prototype's own,
+// anchored on the daily figures in relationshipData.js SERVICES, and every
+// default sits at or above its own `minPrice` — a default below its floor could
+// not be saved. The two flat-fee add-ons (bathing / grooming, pick-up /
+// drop-off) keep unit 'service' rather than the service's own unit, matching how
+// BOARDING_SETTINGS already prices them; daycare's pick-up / drop-off is the
+// `daily-` variant and so is priced per day.
+//
+// ── NOT ESTABLISHED — three open questions on this table ────────────────────
+// The rows below are read off production source, but three things about them are
+// unconfirmed. Confirm before treating the table as production-accurate:
+//
+// 1. `ALLOWED_ADDITIONAL_RATES_FOR_SERVICE_TYPE` is explicitly scoped "for
+//    sitters in the SSU (pet-care-modes) experience". Whether every
+//    locked-rates sitter is in that experience is unconfirmed.
+// 2. `bathing-grooming` is in FREE_ADD_ON_SLUGS and *not* in
+//    ZERO_PRICE_LOCKABLE_ADD_ON_TYPE_SLUGS, so at $0 `_get_lockable_add_ons()`
+//    drops it. Does the boarding sheet in production show 9 rows or 8? This
+//    prototype prices it non-zero, so it shows 9.
+//    true. Unconfirmed for the demo persona; assumed true here.
+// 4. The POC's `RateEditor` comment says "Eleven of these stack in one column",
+//    but the largest set derivable from the source is 9. Unexplained, and
+//    deliberately not rounded up to eleven.
 const RATE_TABLE = {
+  // 8 rows: standard-rate, holiday-rate, additional-dog, puppy, additional-cat,
+  // extended-stay, bathing-grooming, pick-up-drop-off.
   boarding: boardingRates(),
+
+  // 6 rows. No bathing-grooming and no pick-up-drop-off: the sitter travels to
+  // the pet, so there is nothing to collect and nowhere to bathe.
   house_sitting: [
-    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 60, unit: 'night' },
-    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 30, unit: 'night' },
-    { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 10, unit: 'night' },
+    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 65, unit: 'night', minPrice: minPriceFor('house_sitting', 'standard-rate'),  maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'cat-care',       label: RATE_LABEL['cat-care'],       defaultPrice: 60, unit: 'night', minPrice: minPriceFor('house_sitting', 'cat-care'),       maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',   label: RATE_LABEL['holiday-rate'],   defaultPrice: 80, unit: 'night', minPrice: minPriceFor('house_sitting', 'holiday-rate'),   maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 40, unit: 'night', minPrice: minPriceFor('house_sitting', 'additional-dog'), maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 70, unit: 'night', minPrice: minPriceFor('house_sitting', 'puppy'),          maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-cat', label: RATE_LABEL['additional-cat'], defaultPrice: 45, unit: 'night', minPrice: minPriceFor('house_sitting', 'additional-cat'), maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'extended-stay',  label: RATE_LABEL['extended-stay'],  defaultPrice: 55, unit: 'night', minPrice: minPriceFor('house_sitting', 'extended-stay'),  maxPrice: MAX_ADD_ON_PRICE },
   ],
+
+  // 6 rows. Daycare's collection add-on is the daily variant, and there is no
+  // additional-cat or extended-stay in its allowed set.
   dog_daycare: [
-    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 45, unit: 'day' },
-    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 25, unit: 'day' },
-    { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 10, unit: 'day' },
+    { slug: 'standard-rate',          label: RATE_LABEL['standard-rate'],          defaultPrice: 45, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'standard-rate'),          maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',           label: RATE_LABEL['holiday-rate'],           defaultPrice: 50, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'holiday-rate'),           maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-dog',         label: RATE_LABEL['additional-dog'],         defaultPrice: 25, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'additional-dog'),         maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'puppy',                  label: RATE_LABEL.puppy,                     defaultPrice: 15, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'puppy'),                  maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'bathing-grooming',       label: RATE_LABEL['bathing-grooming'],       defaultPrice: 20, unit: 'service', minPrice: minPriceFor('dog_daycare', 'bathing-grooming'),       maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'daily-pick-up-drop-off', label: RATE_LABEL['daily-pick-up-drop-off'], defaultPrice: 15, unit: 'day',     minPrice: minPriceFor('dog_daycare', 'daily-pick-up-drop-off'), maxPrice: MAX_ADD_ON_PRICE },
   ],
+
+  // 8 rows — the longest list alongside boarding. `long-drop-in` is the
+  // 60-minute variant of the visit.
   drop_in_visits: [
-    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 30, unit: 'visit' },
-    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 15, unit: 'visit' },
-    { slug: 'long-drop-in',   label: RATE_LABEL['long-drop-in'],   defaultPrice: 15, unit: 'visit' },
+    { slug: 'standard-rate',    label: RATE_LABEL['standard-rate'],    defaultPrice: 30, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'standard-rate'),    maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'cat-care',         label: RATE_LABEL['cat-care'],         defaultPrice: 26, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'cat-care'),         maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'long-drop-in',     label: RATE_LABEL['long-drop-in'],     defaultPrice: 15, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'long-drop-in'),     maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',     label: RATE_LABEL['holiday-rate'],     defaultPrice: 35, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'holiday-rate'),     maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-dog',   label: RATE_LABEL['additional-dog'],   defaultPrice: 15, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'additional-dog'),   maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'puppy',            label: RATE_LABEL.puppy,               defaultPrice: 10, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'puppy'),            maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-cat',   label: RATE_LABEL['additional-cat'],   defaultPrice: 12, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'additional-cat'),   maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'extended-stay',    label: RATE_LABEL['extended-stay'],    defaultPrice: 15, unit: 'visit',   minPrice: minPriceFor('drop_in_visits', 'extended-stay'),    maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'bathing-grooming', label: RATE_LABEL['bathing-grooming'], defaultPrice: 20, unit: 'service', minPrice: minPriceFor('drop_in_visits', 'bathing-grooming'), maxPrice: MAX_ADD_ON_PRICE },
   ],
+
+  // 5 rows — the shortest list. No cat, extended-stay or grooming add-on.
   dog_walking: [
-    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 25, unit: 'walk' },
-    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 12, unit: 'walk' },
-    { slug: 'long-walk',      label: RATE_LABEL['long-walk'],      defaultPrice: 12, unit: 'walk' },
+    { slug: 'standard-rate',  label: RATE_LABEL['standard-rate'],  defaultPrice: 25, unit: 'walk', minPrice: minPriceFor('dog_walking', 'standard-rate'),  maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'long-walk',      label: RATE_LABEL['long-walk'],      defaultPrice: 12, unit: 'walk', minPrice: minPriceFor('dog_walking', 'long-walk'),      maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'holiday-rate',   label: RATE_LABEL['holiday-rate'],   defaultPrice: 12, unit: 'walk', minPrice: minPriceFor('dog_walking', 'holiday-rate'),   maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'additional-dog', label: RATE_LABEL['additional-dog'], defaultPrice: 12, unit: 'walk', minPrice: minPriceFor('dog_walking', 'additional-dog'), maxPrice: MAX_ADD_ON_PRICE },
+    { slug: 'puppy',          label: RATE_LABEL.puppy,             defaultPrice: 10, unit: 'walk', minPrice: minPriceFor('dog_walking', 'puppy'),          maxPrice: MAX_ADD_ON_PRICE },
   ],
 }
 
@@ -135,12 +250,34 @@ const RATE_TABLE = {
 // (price_ledger.py:1720-1742), which decides whether the locked-rates control is
 // offered on a given conversation: browsable (non-grooming) service type, paid,
 // and no cancelled stay. Gate 2 (the viewer is the provider) is structurally free
-// here — the sitter always is. Note there is deliberately no recurring check.
+// here — the sitter always is.
+//
+// The last two clauses are a DELIBERATE PROTOTYPE DIVERGENCE, not a mirror:
+// production's canonical toggle has neither. Locked rates belong on a **one-time
+// booking that has not started yet**, because a lock is a promise about what this
+// client pays next time. A week already under way cannot honour it, and a
+// recurring relationship's sentinel requests are priced
+// `.without_locked_rates()` anyway (recurring/models.py:616-628).
+//
+//   !isRecurring  — a recurring conversation is one week of an ongoing
+//                   relationship, not a one-time booking
+//   !isOngoing    — a stay already under way (statusKey 'ongoing') and,
+//                   redundantly but explicitly, the recurring week
+//                   ('ongoingRecurring' / 'skippedWeek')
+//
+// The recurring half used to live in `useGranularRates` alone, scoped so the
+// 'current' ratesMode was unaffected. It is shared here now, so BOTH rates modes
+// and all four surfaces refuse recurring and ongoing conversations alike.
+//
+// Paid PAST bookings still pass: they are one-time and finished, and the
+// relationship page reaches for one when a client has no upcoming booking.
 export const isLockableConversation = (booking) => Boolean(
   booking &&
   BROWSABLE_SERVICE_KEYS.includes(booking.serviceKey) &&
   booking.isPaid &&
-  !booking.isCancelled
+  !booking.isCancelled &&
+  !booking.isRecurring &&
+  !booking.isOngoing
 )
 
 export const lockableRatesFor = (serviceKey) =>
@@ -163,8 +300,51 @@ const hash = (s) => {
 
 // Lena's boarding numbers are load-bearing: relationshipData.js prices her demo
 // booking's ledger off `standard-rate` + `additional-dog`.
+//
+// Owen and Lauren are the user-testing personas, and their numbers are pinned for
+// the same reason plus one more: the hash below produces a plausible but arbitrary
+// discount per rate, which reads as noise in a sheet a tester is asked to compare
+// against the sitter's defaults. Pinned figures make every row's override legible
+// at a glance. Owen's standard rate is deliberately NOT Lena's 38, so the two
+// locked-boarding demos stay distinguishable.
+//
+// Note what a pin does and does not mean. These are *snapshot* prices: they price
+// the client's bookings through `buildRateRows`, and — only when the service is in
+// the client's `lockedServices` — they also become the seeded `amounts` the manage
+// sheet opens on (`lockedSeedFor`). So 'lauren:house_sitting' below prices her
+// request without locking it, which is exactly the scenario under test: a pending
+// request carrying an override the sitter has not yet locked in.
 const LOCKED_PRICE_OVERRIDES = {
-  'lena:boarding': { 'standard-rate': 38, 'additional-dog': 28, puppy: 8 },
+  // Owen's lock is the "locked long ago and left there" case: EVERY row sits well
+  // below today's rate, as it would for a client whose prices were frozen while
+  // the sitter's own went up year after year. So no row may equal its default.
+  //
+  // Sitter defaults (BOARDING_SETTINGS): standard 45, additional-dog 35, puppy 20,
+  // additional-cat 25, holiday 25, extended-stay 55, bathing-grooming 20,
+  // pick-up-drop-off 25 — roughly a 25-40% drift below each. Boarding's holiday
+  // slug is `holiday`, not `holiday-rate`. Every figure still clears its
+  // country-config floor (MIN_ADD_ON_PRICE.boarding: $15, or $10 for the cat
+  // rate), which is what puppy and holiday were raised in sitterProfile.js to
+  // allow — at the old $15 default they sat ON the floor with nowhere to drift.
+  'owen:boarding': {
+    'standard-rate': 28, 'additional-dog': 22, puppy: 15, 'additional-cat': 16,
+    holiday: 16, 'extended-stay': 38, 'bathing-grooming': 12,
+    'pick-up-drop-off': 15,
+  },
+  'lena:boarding': { 'standard-rate': 38, 'additional-dog': 28, puppy: 10 },
+  // Sitter defaults (RATE_TABLE.drop_in_visits): 30 / 15 / 12 / 15 / 10 / 12 / 15 / 20.
+  // Every row is pinned: the whole point of Lauren's lock is that her prices have
+  // not moved since she started booking, so no rate should read as arbitrary.
+  'lauren:drop_in_visits': {
+    'standard-rate': 26, 'long-drop-in': 12, 'holiday-rate': 28,
+    'additional-dog': 12, 'puppy': 10, 'additional-cat': 10,
+    'extended-stay': 12, 'bathing-grooming': 16,
+  },
+  // House sitting is NOT in lauren's `lockedServices`. This only prices her
+  // bookings — including the new request, whose standard rate is set on the
+  // booking itself (relationshipData.js `perUnit`) so the modify screen and the
+  // details ledger agree on it.
+  'lauren:house_sitting': { 'additional-dog': 24 },
 }
 
 const lockedPriceFor = (clientId, serviceKey, rate) => {
@@ -199,6 +379,89 @@ export const lockedRatesFor = (client, serviceKey) => {
       lockedPrice: lockedPriceFor(client.id, serviceKey, r),
       defaultPrice: r.defaultPrice,
       unit: r.unit,
+      // The allowed band travels with the rate: the manage sheet validates
+      // against it, and it is picked here explicitly like every other field.
+      minPrice: r.minPrice,
+      maxPrice: r.maxPrice,
     })),
   }
+}
+
+// ── Granular locked rates (POC proposal) ─────────────────────────────────────
+// The proposal keeps the lock all-or-nothing per service but makes each rate's
+// *amount* something the provider sets while locking, and it surfaces when the
+// lock was taken. `lockedRatesFor` above already derives a per-rate snapshot, so
+// this only adds the timestamp and reshapes it into the map the modal edits.
+//
+// The seed date is derived, never hardcoded, so "Locked on <date>" always reads
+// as a past event. The default is a few weeks back; a client/service can be
+// pinned older to show rates that drifted while frozen.
+const DEFAULT_SEED_LOCK_AGE_DAYS = 22
+
+// Keyed `${clientId}:${serviceKey}`, value in days-ago — same keying as
+// LOCKED_PRICE_OVERRIDES. Owen's boarding is deliberately ancient.
+const SEED_LOCK_AGE_OVERRIDES = {
+  'lauren:drop_in_visits': 365 * 3,   // ~3 years ago
+}
+
+const daysAgoMidnight = (days) => {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+const seededLockedAtFor = (clientId, serviceKey) =>
+  daysAgoMidnight(
+    SEED_LOCK_AGE_OVERRIDES[`${clientId}:${serviceKey}`] ?? DEFAULT_SEED_LOCK_AGE_DAYS
+  )
+
+// Kept for the public export's callers; equals the un-pinned default.
+export const SEEDED_LOCKED_AT = daysAgoMidnight(DEFAULT_SEED_LOCK_AGE_DAYS)
+
+
+/**
+ * The untouched starting point for one (client x service): what the server
+ * would return before the sitter does anything this session.
+ *
+ *   { locked, amounts: { [slug]: number }, lockedAt: Date | null, rates, serviceName }
+ *
+ * AppContext layers this session's edits on top — see `getRatesState`.
+ *
+ * `amounts` depends on whether a lock exists yet, because the two states answer
+ * different questions. A locked service reports the *snapshot* the client agreed
+ * to (`lockedPrice`), which is what the manage sheet must show — it is managing
+ * a lock that already prices this client. An unlocked one reports the sitter's
+ * own defaults, because a new lock starts from the sitter's rates rather than
+ * from a discount they never granted. A booking-seeded lock overrides the
+ * unlocked case per rate: `useGranularRates`'s `requestAmounts` layers the
+ * booking's own (possibly modified) prices over the defaults before the sheet
+ * opens. It only ever does so on the `lock` offer — the locked snapshot is never
+ * re-seeded from a booking.
+ */
+export const lockedSeedFor = (client, serviceKey) => {
+  const config = lockedRatesFor(client, serviceKey)
+  if (!config) return null
+  const amounts = config.locked
+    ? Object.fromEntries(config.rates.map(r => [r.slug, r.lockedPrice]))
+    : defaultAmountsFor(serviceKey)
+  return {
+    serviceKey,
+    serviceName: config.serviceName,
+    rates: config.rates,
+    locked: config.locked,
+    amounts,
+    lockedAt: config.locked ? seededLockedAtFor(client.id, serviceKey) : null,
+
+  }
+}
+
+/**
+ * Default amounts for a service — what an unlocked client is charged, and what
+ * `Use default` restores a field to.
+ */
+export const defaultAmountsFor = (serviceKey) => {
+  const out = {}
+  lockableRatesFor(serviceKey).forEach(r => { out[r.slug] = r.defaultPrice })
+  return out
 }

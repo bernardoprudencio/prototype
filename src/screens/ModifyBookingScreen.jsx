@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { colors, radius, shadows, spacing, textStyles, typography } from '../tokens'
-import { BackIcon, InfoCircleIcon } from '../assets/icons'
+import { BackIcon } from '../assets/icons'
 import {
   Button, BottomSheet, CalInput, Chip, Select, Switch, Textarea,
   LockRatesToggleRow,
 } from '../components'
 import { getClient } from '../data/contacts'
+import { useApp } from '../context/AppContext'
 import { lockableRatesFor, lockedRatesFor } from '../data/lockableRates'
 import { useLockedRates } from '../lib/useLockedRates'
+import { useIsWide } from '../lib/useMediaQuery'
+import { webColumn } from '../lib/webColumn'
 import { useRelationshipData } from '../lib/useRelationshipData'
 import { toggleLabel } from '../data/lockedRatesCopy'
 import * as copy from '../data/modifyBookingCopy'
@@ -149,32 +152,6 @@ const NoPenaltyCard = () => {
   )
 }
 
-// ── ShortNoticeBanner.tsx:20-41 ──────────────────────────────────────────────
-// Kibble `Banner severity="warning"`. Which of the two strings shows is real
-// logic, reproduced from :25-34 — and it is date-derived, so it follows
-// PROTO_TODAY rather than a literal.
-const shortNoticeMessage = (startDateKey, active, price) => {
-  if (!startDateKey) return null
-  const start = new Date(`${startDateKey}T00:00:00`)
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const daysUntilStart = Math.max(0, Math.round((start - today) / 86400000))
-  const isShortNotice = daysUntilStart < 2
-  const hasValue = Boolean(parseFloat(price))
-  if (active && daysUntilStart >= 2 && hasValue) return copy.SHORT_NOTICE_REMOVE_FEE
-  if (isShortNotice && (!active || !hasValue)) return copy.SHORT_NOTICE_ADD_FEE
-  return null
-}
-
-const WarningBanner = ({ text }) => (
-  <div style={{
-    background: colors.yellow100, borderRadius: radius.secondary, padding: spacing.lg,
-    display: 'flex', gap: spacing.md, alignItems: 'flex-start',
-  }}>
-    <div style={{ flexShrink: 0, display: 'flex' }}><InfoCircleIcon size={16} color={colors.cautionText} /></div>
-    <p style={{ ...textStyles.paragraph100, color: colors.primary, margin: 0 }}>{text}</p>
-  </div>
-)
-
 // ── Adjustments — STATIC MOCK DATA ───────────────────────────────────────────
 // Production gets these off the pricer response (`addOns`), each row an
 // OnOffSwitch plus a currency input (AdjustmentComponent.tsx:45-61, :115-152).
@@ -185,12 +162,12 @@ const WarningBanner = ({ text }) => (
 // (see the same deliberate divergence noted in lockableRates.js); production's
 // `add_on_type.name` is Title Case (services/constants.py:457-462).
 const ADJUSTMENTS = [
-  { slug: 'short-notice',    name: 'Short notice',          price: '10.00', active: true  },
   { slug: 'holiday-rate',    name: 'Holiday rate',          price: '15.00', active: false },
   { slug: 'pick-up-drop-off', name: 'Sitter pick-up and drop-off', price: '25.00', active: false },
 ]
 
 export default function ModifyBookingScreen() {
+  const isWide = useIsWide()
   const { ownerId, conversationOpk } = useParams()
   const navigate = useNavigate()
 
@@ -201,9 +178,15 @@ export default function ModifyBookingScreen() {
   // whole answer — production's modify page is per-conversation, so the CTA that
   // sent us here already names the booking.
   //
-  // Without an opk, fall back to the paid demo booking (the one carrying a
-  // ledger), then any upcoming one — a page that modifies a booking needs a
-  // future booking to modify. The past-booking fallback exists only so the route
+  // Without an opk, fall back to the first PAID upcoming booking, then any
+  // upcoming one — a page that modifies a booking needs a future booking to
+  // modify. `isPaid` is the honest predicate for production's `hasStay` branch
+  // this page implements: a stay only exists once the request is paid, and the
+  // modify CTA is offered on a booked stay. (This used to test `b.ledger`, which
+  // worked only while the demo booking was the sole one carrying a ledger;
+  // `PriceLedgerMapper.map()` builds a ledger for every conversation, so
+  // relationshipData.js now puts one on every booking and that test degenerated
+  // to `upcoming[0]`.) The past-booking fallback exists only so the route
   // never renders empty for a client with no upcoming stay (amelia); production
   // would not offer the CTA there at all.
   //
@@ -229,7 +212,7 @@ export default function ModifyBookingScreen() {
       return [...upcoming, ...past, ...archived]
         .find(b => b.conversationOpk === conversationOpk) ?? null
     }
-    return upcoming.find(b => b.ledger) ?? upcoming[0] ?? past[0] ?? null
+    return upcoming.find(b => b.isPaid) ?? upcoming[0] ?? past[0] ?? null
   }, [rel, conversationOpk])
 
   const ownerFirstName = client?.displayName?.split(' ')[0] ?? ''
@@ -280,6 +263,16 @@ export default function ModifyBookingScreen() {
   // this surface. Every other caller keeps the sheet, which is its default.
   const lr = useLockedRates(client, booking, { mode: 'immediate', snackbar: false })
 
+  // ── The `ratesMode` fork ───────────────────────────────────────────────────
+  // In the POC proposal the lock/unlock interaction is gone from the modify step
+  // ENTIRELY (01-locked-rates-client-management.md §3.3): the gesture cannot be
+  // triggered consistently across web, Android and iOS, so it does not belong on
+  // a screen all three share. The decision removed the *interaction*, not the
+  // state — production keeps `isRatesLocked` and its setters in the duck — which
+  // is why the hook above still runs and only its control is withheld below.
+  // The pet rate rows are untouched in both modes.
+  const { ratesMode } = useApp()
+
   // ── Static mock ledger ─────────────────────────────────────────────────────
   // One scenario: the modification extends the stay by a night, so the price
   // goes UP. That makes the `priceDiff > 0` branch of `getLedgerSummary`
@@ -289,11 +282,19 @@ export default function ModifyBookingScreen() {
   // this route is opened for.
   const ledger = useMemo(() => {
     if (!booking) return null
+    // `previousTotal` reconciles by construction: `booking.price` is the sum
+    // `buildRateRows` returned for the rows this page renders (relationshipData.js
+    // buildRateRows / buildModifyFields), not an independently authored figure.
     const previousTotal = parseFloat(booking.price.amount)
-    const perUnit = (lockedConfig?.rates ?? []).length
-      ? (client.pets ?? [{}]).reduce(
-          (sum, _p, i) => sum + (lockedConfig.rates[i === 0 ? 0 : 1]?.lockedPrice ?? 0), 0
-        )
+    // One more unit costs the sum of the per-pet rates. `booking.modify.rateRows`
+    // now carries those rates directly — the same pet → rate pairing the rate
+    // selector above renders — so the extra night is priced off the real rows
+    // instead of the old positional guess at the locked snapshot. The
+    // `previousTotal / 3` fallback is kept only for a booking with no rate rows
+    // at all (a service with no lockable add-ons).
+    const modifyRows = booking.modify?.rateRows ?? []
+    const perUnit = modifyRows.length
+      ? modifyRows.reduce((sum, r) => sum + r.pricePerUnit, 0)
       : Math.round(previousTotal / 3)
     const subtotal = previousTotal + perUnit
     const earningsRatio = previousTotal > 0 && booking.earnings
@@ -306,7 +307,7 @@ export default function ModifyBookingScreen() {
       earnings: subtotal * earningsRatio,
       isPriceIncrease: subtotal > previousTotal,
     }
-  }, [booking, client, lockedConfig])
+  }, [booking])
 
   const messageError = messageTouched && message.trim().length < copy.MESSAGE_MIN_LENGTH
     ? copy.MESSAGE_TOO_SHORT
@@ -326,15 +327,29 @@ export default function ModifyBookingScreen() {
     )
   }
 
-  const shortNotice = adjustments['short-notice']
-  const shortNoticeText = shortNoticeMessage(startDate, shortNotice.active, shortNotice.price)
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
       {/* ─── 1. Header ─── */}
+      {/* Below 769px this is the app's bar: shadowed chrome, the "Back" control
+          and an optically centred title. At and above it the web navbar is the
+          navigation, so the bar chrome and the back control go and the title
+          becomes a left-aligned page heading in the navbar's column. */}
       <div style={{
-        background: colors.white, boxShadow: shadows.headerShadow, padding: `0 ${spacing.lg}px`,
-        display: 'flex', alignItems: 'center', gap: spacing.md, height: 56, flexShrink: 0, zIndex: 3,
+        background: colors.white, padding: `0 ${spacing.lg}px`,
+        boxShadow: isWide ? 'none' : shadows.headerShadow,
+        height: isWide ? 'auto' : 56, flexShrink: 0, zIndex: 3,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+      {isWide ? (
+        <div style={{ padding: `${spacing.xl}px 0 0`, ...webColumn(isWide) }}>
+          <h1 style={{ ...textStyles.display400, color: colors.primary, margin: 0 }}>
+            {copy.HEADER_MODIFY_BOOKING}
+          </h1>
+        </div>
+      ) : (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: spacing.md,
+        height: '100%', width: '100%',
       }}>
         <div role="button" tabIndex={0} onClick={onBack} aria-label={BACK_TEXT}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: spacing.xs, flexShrink: 0 }}>
@@ -347,11 +362,14 @@ export default function ModifyBookingScreen() {
         {/* Balances the back control so the title stays optically centred. */}
         <div style={{ width: 56, flexShrink: 0 }} />
       </div>
+      )}
+      </div>
 
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
         <div style={{
           padding: `${spacing.xl}px ${spacing.lg}px ${spacing.xxl}px`,
           display: 'flex', flexDirection: 'column', gap: spacing.xl,
+          boxSizing: 'border-box', ...webColumn(isWide),
         }}>
           {/* ─── 2. Reason ─── */}
           <Select
@@ -408,12 +426,25 @@ export default function ModifyBookingScreen() {
             <SectionHeading>{copy.RATES_HEADING[serviceKey] ?? copy.RATES_HEADING.boarding}</SectionHeading>
             <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg }}>
               {client.pets.map((p, i) => {
-                const defaultSlug = rateOptions[i === 0 ? 0 : 1]?.slug ?? rateOptions[0]?.slug ?? ''
+                // Seed from the booking's own rate rows, which are what priced
+                // it — same pet → rate pairing the details ledger renders, so
+                // the two surfaces can't disagree. Falling back to
+                // `rateOptions[i === 0 ? 0 : 1]` would reintroduce the index
+                // bug the data layer just removed: position 1 is
+                // `additional-dog` for boarding only, and `long-drop-in` /
+                // `long-walk` / `holiday-rate` for the other services.
+                const billed = booking?.modify?.rateRows?.[i]
+                const defaultSlug = billed?.slug
+                  ?? (i === 0
+                    ? rateOptions.find(r => r.slug === 'standard-rate')?.slug
+                    : rateOptions.find(r => r.slug === 'additional-dog')?.slug)
+                  ?? rateOptions[0]?.slug ?? ''
                 const slug = petRates[p.id]?.slug ?? defaultSlug
                 const lockedRate = (lockedConfig?.rates ?? []).find(r => r.slug === slug)
                 const profileRate = rateOptions.find(r => r.slug === slug)
                 const price = petRates[p.id]?.price
-                  ?? String(lockedRate?.lockedPrice ?? profileRate?.defaultPrice ?? '')
+                  ?? String((slug === billed?.slug ? billed.pricePerUnit : null)
+                    ?? lockedRate?.lockedPrice ?? profileRate?.defaultPrice ?? '')
                 const setPet = (patch) => setPetRates(prev => ({
                   ...prev, [p.id]: { slug, price, ...patch },
                 }))
@@ -457,8 +488,11 @@ export default function ModifyBookingScreen() {
                   (LockedRatesComponent.tsx:30), not the ledger's. Production
                   pairs it with a hover Popover, suppressed under
                   `isMobileEmbedded()` (:31); at 375 LockRatesToggleRow's
-                  BottomSheet stand-in is the mobile equivalent. */}
-              {lr.available && (
+                  BottomSheet stand-in is the mobile equivalent.
+
+                  `current` mode only — §3.3 deletes this block outright in the
+                  granular proposal, so nothing at all renders here then. */}
+              {ratesMode === 'current' && lr.available && (
                 <LockRatesToggleRow
                   label={toggleLabel(lr.ownerFirstName)}
                   ownerFirstName={lr.ownerFirstName}
@@ -495,12 +529,6 @@ export default function ModifyBookingScreen() {
                         ariaLabel={`${a.name} amount`}
                       />
                     </div>
-                    {/* The banner is inserted immediately after the
-                        short-notice row, not at the end of the list
-                        (AdjustmentsListComponent.tsx:198-205). */}
-                    {a.slug === 'short-notice' && shortNoticeText && (
-                      <WarningBanner text={shortNoticeText} />
-                    )}
                   </React.Fragment>
                 )
               })}

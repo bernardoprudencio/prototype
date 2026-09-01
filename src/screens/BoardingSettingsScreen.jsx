@@ -7,6 +7,8 @@ import Chip from '../components/Chip'
 import Button from '../components/Button'
 import SwitchField from '../components/SwitchField'
 import { BOARDING_SETTINGS, CANCELLATION_POLICY_OPTIONS } from '../data/sitterProfile'
+import { useIsWide } from '../lib/useMediaQuery'
+import { webColumn } from '../lib/webColumn'
 
 // ─── Section header (h2) ─────────────────────────────────────────────────────
 // Matches the "SectionHeader" used in roverdotcom/web ServiceForm sections —
@@ -136,6 +138,7 @@ const DAYS = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function BoardingSettingsScreen() {
+  const isWide = useIsWide()
   const navigate = useNavigate()
   const onBack = () => navigate('/service-settings/services/pet_sitting')
 
@@ -185,40 +188,46 @@ export default function BoardingSettingsScreen() {
         background: colors.white,
       }}
     >
-      {/* ── Sticky header ── */}
+      {/* ── Header. Below 769px it is the app's bar chrome, back arrow included.
+          At and above it the web navbar is the navigation, so the bar and the
+          arrow go and the title becomes a page heading in its column. ── */}
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          height: 56,
-          paddingLeft: 16,
-          paddingRight: 16,
-          borderBottom: `1px solid ${colors.border}`,
+          justifyContent: 'center',
+          height: isWide ? 'auto' : 56,
+          padding: isWide ? '24px 16px 16px' : '0 16px',
+          borderBottom: isWide ? 'none' : `1px solid ${colors.border}`,
           background: colors.white,
           flexShrink: 0,
         }}
       >
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 24,
-            height: 24,
-          }}
-        >
-          <BackIcon />
-        </button>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        height: '100%', width: '100%', ...webColumn(isWide),
+      }}>
+        {!isWide && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 24,
+              height: 24,
+            }}
+          >
+            <BackIcon />
+          </button>
+        )}
         <h1
-          style={{
+          style={isWide ? { ...textStyles.display400, color: colors.primary, margin: 0 } : {
             fontFamily: typography.fontFamily,
             fontWeight: 600,
             fontSize: 17,
@@ -229,6 +238,7 @@ export default function BoardingSettingsScreen() {
         >
           Boarding Settings
         </h1>
+      </div>
       </div>
 
       {/* ── Body ── */}
@@ -242,6 +252,7 @@ export default function BoardingSettingsScreen() {
           paddingBottom: 96, // leaves room for the fixed Save footer
         }}
       >
+      <div style={webColumn(isWide)}>
         {/* Service description */}
         <div
           style={{
@@ -463,6 +474,7 @@ export default function BoardingSettingsScreen() {
           before they book.
         </Sublabel>
       </div>
+      </div>
 
       {/* ── Fixed Save footer ───────────────────────────────────────────── */}
       <div
@@ -475,12 +487,14 @@ export default function BoardingSettingsScreen() {
           background: colors.white,
           borderTop: `1px solid ${colors.border}`,
           display: 'flex',
-          justifyContent: 'flex-end',
+          justifyContent: 'center',
         }}
       >
-        <Button variant="primary" size="default" onClick={noop}>
-          Save
-        </Button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', ...webColumn(isWide) }}>
+          <Button variant="primary" size="default" onClick={noop}>
+            Save
+          </Button>
+        </div>
       </div>
     </div>
   )

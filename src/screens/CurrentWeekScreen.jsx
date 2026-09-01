@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { colors, typography, radius, shadows } from '../tokens'
+import { colors, typography, radius, shadows, layout } from '../tokens'
 import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../assets/icons'
-import { Button, PetAvatar, Chip, LockRatesToggleRow, LockRatesSheet, Snackbar } from '../components'
-import { getClient } from '../data/contacts'
-import { useLockedRates } from '../lib/useLockedRates'
-import { toggleLabelLedger, ledgerRowSitter } from '../data/lockedRatesCopy'
+import { Button, PetAvatar, Chip, WEB_NAV_BAR_HEIGHT } from '../components'
 import { OWNERS, PROTO_TODAY, getFullCurrentWeekSlots } from '../data/owners'
 import { useApp } from '../context/AppContext'
 import { useIsWide } from '../lib/useMediaQuery'
 
+
+// Page title. One constant so the narrow layout's nav bar and the wide
+// layout's page heading can never drift apart.
+const TITLE = 'Manage current week'
 
 const tx = (size, weight, color) => ({
   fontFamily: typography.fontFamily, fontSize: size, fontWeight: weight, color, margin: 0,
@@ -122,19 +123,17 @@ const CurrentWeekSnapshotCard = ({ days }) => {
 }
 
 // ── Pricing ledger ─────────────────────────────────────────────────────────────
+// No locked-rates control here. This screen is the *recurring* current week,
+// which is not a one-time booking, and `isLockableConversation` now refuses
+// recurring and ongoing conversations outright (lockableRates.js). It used to
+// force that gate open with a synthetic `{ serviceKey: 'dog_walking',
+// isPaid: true, isCancelled: false }` booking no gate change could reach.
+// Production suppresses the whole Rates component on a recurring stay anyway
+// (`shouldShowRatesComponent`, ModifyBookingForm.utils.ts:84-89) and prices
+// recurring sentinel requests `.without_locked_rates()`
+// (recurring/models.py:616-628), so a lock set here could never have applied to
+// these walks. See docs/ticket-locked-rates-gating.md item 1.
 const PricingLedger = ({ owner, days, baseDays }) => {
-  // Production puts the lock control directly in the price ledger (see the
-  // server-driven `ToggleOption` in conversations/.../price_ledger.py), below
-  // the subtotal. This screen is not a conversation, so it stands in for the
-  // recurring walking conversation behind it: paid, not cancelled, dog walking.
-  // The canonical `_get_lock_rates_toggle` has no recurring check, so the
-  // control is offered here — but production prices recurring sentinel requests
-  // `.without_locked_rates()` (recurring/models.py), so a lock set here would
-  // never *apply* to these walks. The placement is faithful; the effect is not.
-  const lr = useLockedRates(getClient(owner.id), {
-    serviceKey: 'dog_walking', isPaid: true, isCancelled: false,
-  })
-
   const currentWalks = days.reduce((sum, d) => sum + d.slots.length, 0)
   const prevWalks    = baseDays.reduce((sum, d) => sum + d.slots.length, 0)
   const { pets, addOns } = owner.pricing
@@ -183,35 +182,6 @@ const PricingLedger = ({ owner, days, baseDays }) => {
           <p style={{ ...tx(14, 400, colors.secondary), margin: 0 }}>{fmt(prevTotal)}</p>
         </div>
       </div>
-
-      {lr.available && (
-        <div style={{ padding: '4px 0', ...divider }}>
-          <LockRatesToggleRow
-            label={toggleLabelLedger(lr.ownerFirstName)}
-            ownerFirstName={lr.ownerFirstName}
-            checked={lr.locked}
-            onRequestChange={lr.requestChange}
-          />
-          {lr.locked && (
-            <p style={{ ...tx(14, 400, colors.secondary), margin: 0, paddingBottom: 12 }}>
-              {ledgerRowSitter(lr.ownerFirstName)}
-            </p>
-          )}
-        </div>
-      )}
-
-      {lr.sheetMode && (
-        <LockRatesSheet
-          mode={lr.sheetMode}
-          ownerFirstName={lr.ownerFirstName}
-          serviceName={lr.config.serviceName}
-          rates={lr.config.rates}
-          onConfirm={lr.confirm}
-          onClose={lr.closeSheet}
-        />
-      )}
-
-      <Snackbar message={lr.snackbar} onDone={lr.dismissSnackbar} />
 
       <div style={{ padding: '16px 0', ...divider }}>
         {diff === 0 && <>
@@ -533,7 +503,7 @@ export default function CurrentWeekScreen() {
   const panelHeader = (
     <div style={{ padding: '24px 16px 16px', borderBottom: `1px solid ${colors.border}`, flexShrink: 0 }}>
       <p style={{ ...tx(20, 700, colors.primary), lineHeight: 1.25, margin: '0 0 4px' }}>
-        Manage current week
+        {TITLE}
       </p>
       <p style={{ ...tx(14, 400, colors.secondary), lineHeight: 1.5, margin: 0 }}>
         {weekLabel} · Changes apply to this week only.
@@ -545,22 +515,28 @@ export default function CurrentWeekScreen() {
     <>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.bgSecondary }}>
 
-      {/* Nav header */}
-      <div style={{
-        background: colors.white, borderBottom: `1px solid ${colors.border}`,
-        boxShadow: shadows.headerShadow, padding: '0 16px',
-        display: 'flex', alignItems: 'center', gap: 8, height: 56, flexShrink: 0, zIndex: 3,
-      }}>
-        <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={onBack}>
-          <BackIcon />
+      {/* Nav header — app chrome, so it belongs to the narrow layout only. At
+          the wide breakpoint the web navbar is the navigation, so the bar and
+          its back arrow go and the browser's own back is the way out. */}
+      {!isDesktop && (
+        <div style={{
+          background: colors.white, borderBottom: `1px solid ${colors.border}`,
+          boxShadow: shadows.headerShadow, padding: '0 16px',
+          display: 'flex', alignItems: 'center', gap: 8, height: 56, flexShrink: 0, zIndex: 3,
+        }}>
+          <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={onBack}>
+            <BackIcon />
+          </div>
+          <p style={{ ...tx(16, 700, colors.primary), margin: 0 }}>{TITLE}</p>
         </div>
-        <p style={{ ...tx(16, 700, colors.primary), margin: 0 }}>Manage current week</p>
-      </div>
+      )}
 
+      {/* The wide layout needs no page heading of its own: the right panel's
+          own header already reads "{TITLE}". */}
       {isDesktop ? (
         <div className="hide-scrollbar" style={{
           flex: 1, overflowY: 'auto', display: 'flex', alignItems: 'flex-start',
-          maxWidth: 1140, margin: '0 auto', width: '100%',
+          maxWidth: layout.contentWidth, margin: '0 auto', width: '100%',
           gap: 24, padding: '24px 24px 0', boxSizing: 'border-box',
         }}>
           {/* Sidebar */}
@@ -572,7 +548,7 @@ export default function CurrentWeekScreen() {
           {/* Right panel — sticky */}
           <div style={{
             flex: 1, minWidth: 0, background: colors.white, borderRadius: radius.primary,
-            position: 'sticky', top: 0, height: 'calc(100vh - 56px)',
+            position: 'sticky', top: 0, height: `calc(100vh - ${WEB_NAV_BAR_HEIGHT}px)`,
             overflow: 'hidden', display: 'flex', flexDirection: 'column',
           }}>
             {panelHeader}

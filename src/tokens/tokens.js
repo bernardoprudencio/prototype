@@ -229,3 +229,12 @@ export const textStyles = {
   link500Semibold: { fontFamily: averta, fontWeight: 600, fontSize: 32, lineHeight: 1.25, letterSpacing: '-0.01em' },
   link600Semibold: { fontFamily: averta, fontWeight: 600, fontSize: 38, lineHeight: 1.25, letterSpacing: '-0.01em' },
 }
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
+// The web navbar caps its contents at 1140 (`NavBar.tsx:61-72`,
+// `patterns/Section/constants.ts:10`), so every page rendered below the bar
+// shares that column. Single source of truth — screens import this rather than
+// keeping their own copy of the number.
+export const layout = {
+  contentWidth: 1140,
+}

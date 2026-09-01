@@ -39,18 +39,6 @@ export const HUB_COPY = {
     scope: { family: 'pet_sitting', slot: 'services' },
   },
 
-  // Short-notice rates prompt. The pre-migration IA had two of these — a
-  // top-of-hub banner and an inline callout inside the services list. The
-  // migrated IA has one placement: inside the pet sitting section, above the
-  // Services row, which it badges "Review". Figma 4233:17449.
-  shortNoticeRateBanner: {
-    severity: 'info',
-    title: 'Review your short notice rates',
-    body: 'Set a short notice rate for each service to charge for last-minute bookings.',
-    ctaLabel: 'Review rates',
-    scope: { family: 'pet_sitting', slot: 'services' },
-  },
-
   resubmitButton: {
     label: 'Resubmit Profile',
   },

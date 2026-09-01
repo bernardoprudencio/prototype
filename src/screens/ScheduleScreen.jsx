@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { colors, typography, shadows, radius } from '../tokens'
+import { colors, typography, shadows, radius, layout, textStyles } from '../tokens'
 import { BackIcon, TrashIcon, CautionIcon, CloseSmIcon, SuccessIcon } from '../assets/icons'
-import { Button, PetAvatar, Chip } from '../components'
+import { Button, PetAvatar, Chip, WEB_NAV_BAR_HEIGHT } from '../components'
 import { OWNERS, PROTO_TODAY, getOwnerUpcomingWeeks, getOwnerCurrentWeek } from '../data/owners'
 import { useApp } from '../context/AppContext'
 import { useIsWide } from '../lib/useMediaQuery'
@@ -129,6 +129,10 @@ const calDateLabel = (date) => `${SHORT_MONTHS_CAL[date.getMonth()]} ${date.getD
 
 const cloneWeeks = (weeks) =>
   weeks.map(w => ({ ...w, days: w.days.map(d => ({ ...d, slots: d.slots.map(s => ({ ...s })) })) }))
+
+// Page title. One constant so the narrow layout's nav bar and the wide
+// layout's page heading can never drift apart.
+const TITLE = 'Modify schedule'
 
 // ── Shared text style helper ───────────────────────────────────────────────────
 const tx = (size, weight, color) => ({
@@ -1023,43 +1027,56 @@ export default function ScheduleScreen() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.bgSecondary }}>
-      {/* Nav header */}
-      <div style={{
-        background: colors.white, borderBottom: `1px solid ${colors.border}`,
-        boxShadow: shadows.headerShadow, padding: '0 16px',
-        display: 'flex', alignItems: 'center', gap: 8, height: 56, flexShrink: 0, zIndex: 3,
-      }}>
-        <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => onBack(savedChanges)}>
-          <BackIcon />
+      {/* Nav header — app chrome, so it belongs to the narrow layout only. At
+          the wide breakpoint the web navbar is the navigation and the title
+          becomes an in-column page heading instead (see below). */}
+      {!isDesktop && (
+        <div style={{
+          background: colors.white, borderBottom: `1px solid ${colors.border}`,
+          boxShadow: shadows.headerShadow, padding: '0 16px',
+          display: 'flex', alignItems: 'center', gap: 8, height: 56, flexShrink: 0, zIndex: 3,
+        }}>
+          <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => onBack(savedChanges)}>
+            <BackIcon />
+          </div>
+          <p style={{ ...tx(16, 700, colors.primary), margin: 0 }}>{TITLE}</p>
         </div>
-        <p style={{ ...tx(16, 700, colors.primary), margin: 0 }}>Modify schedule</p>
-      </div>
+      )}
 
       {isDesktop ? (
-        // ── Desktop: sidebar + right column ────────────────────────────
-        <div className="hide-scrollbar" style={{
-          flex: 1, overflowY: 'auto', display: 'flex', alignItems: 'flex-start',
-          maxWidth: 1140, margin: '0 auto', width: '100%',
-          gap: 24, padding: '24px 24px 0', boxSizing: 'border-box',
-        }}>
-          {/* Sidebar — scrolls with outer container */}
-          <div style={{ width: 360, flexShrink: 0, paddingBottom: 24 }}>
-            {sidebar}
-          </div>
-
-          {/* Right column — sticky, independent week scroll, banners floating */}
-          <div ref={panelRef} style={{
-            flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
-            background: colors.white, borderRadius: radius.primary,
-            overflow: 'hidden', position: 'sticky', top: 0,
-            height: 'calc(100vh - 56px - 24px)',
+        // ── Desktop: page heading, then sidebar + right column ─────────
+        <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{
+            maxWidth: layout.contentWidth, margin: '0 auto', width: '100%',
+            padding: '24px 24px 0', boxSizing: 'border-box',
           }}>
-            <div style={{ flexShrink: 0 }}>{upcomingHeader}</div>
-            <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
-              {weekGroups}
+            <h1 style={{ ...textStyles.display400, color: colors.primary, margin: '0 0 16px' }}>
+              {TITLE}
+            </h1>
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24 }}>
+              {/* Sidebar — scrolls with outer container */}
+              <div style={{ width: 360, flexShrink: 0, paddingBottom: 24 }}>
+                {sidebar}
+              </div>
+
+              {/* Right column — sticky, independent week scroll, banners floating.
+                  The viewport it can occupy is the pane below the web navbar, less
+                  this column's own 24px bottom breathing room. */}
+              <div ref={panelRef} style={{
+                flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
+                background: colors.white, borderRadius: radius.primary,
+                overflow: 'hidden', position: 'sticky', top: 0,
+                height: `calc(100vh - ${WEB_NAV_BAR_HEIGHT}px - 24px)`,
+              }}>
+                <div style={{ flexShrink: 0 }}>{upcomingHeader}</div>
+                <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
+                  {weekGroups}
+                </div>
+                {footer}
+                {floatingBanner}
+              </div>
             </div>
-            {footer}
-            {floatingBanner}
           </div>
         </div>
       ) : (

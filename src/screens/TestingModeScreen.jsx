@@ -1,8 +1,10 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { colors, typography } from '../tokens'
+import { colors, typography, textStyles } from '../tokens'
 import { BackIcon } from '../assets/icons'
 import { useApp } from '../context/AppContext'
+import { useIsWide } from '../lib/useMediaQuery'
+import { webColumn } from '../lib/webColumn'
 
 // Boolean flags ride the option-id API of ModeToggle (ServiceVariantConfigSheet.jsx:167-168).
 const boolToId = (v) => (v ? 'on' : 'off')
@@ -76,27 +78,39 @@ const VariantRow = ({ title, description, value, onChange, options }) => (
 
 export default function TestingModeScreen() {
   const navigate = useNavigate()
-  const { scheduleMode, setScheduleMode, altMonetizationRollout, setAltMonetizationRollout } = useApp()
+  const isWide = useIsWide()
+  const {
+    scheduleMode, setScheduleMode,
+    ratesMode, setRatesMode,
+    altMonetizationRollout, setAltMonetizationRollout,
+  } = useApp()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
-      {/* Header */}
+      {/* Header. Below 769px this is app chrome: a bordered bar with the back
+          arrow that is the screen's only way out. At and above it the web navbar
+          is the navigation, so the arrow goes and the title becomes a page
+          heading inside the navbar's content column. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '12px 16px',
-        borderBottom: `1px solid ${colors.border}`,
+        padding: isWide ? '24px 16px 16px' : '12px 16px',
+        borderBottom: isWide ? 'none' : `1px solid ${colors.border}`,
         flexShrink: 0,
       }}>
-        <div onClick={() => navigate(-1)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-          <BackIcon />
-        </div>
-        <h1 style={{
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...webColumn(isWide) }}>
+        {!isWide && (
+          <div onClick={() => navigate(-1)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            <BackIcon />
+          </div>
+        )}
+        <h1 style={isWide ? { ...textStyles.display400, color: colors.primary, margin: 0 } : {
           fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 20,
           lineHeight: 1.25, color: colors.primary, margin: 0,
         }}>Testing mode</h1>
       </div>
+      </div>
 
       <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={webColumn(isWide)}>
         <p style={{
           fontFamily: typography.fontFamily, fontWeight: 400, fontSize: 13,
           lineHeight: '18px', color: colors.tertiary,
@@ -117,6 +131,17 @@ export default function TestingModeScreen() {
         />
 
         <VariantRow
+          title="Locked rates"
+          description="Proposal is the granular per-rate model under test; Current is today's single lock switch."
+          value={ratesMode}
+          onChange={setRatesMode}
+          options={[
+            { id: 'granular', label: 'Proposal' },
+            { id: 'current',  label: 'Current' },
+          ]}
+        />
+
+        <VariantRow
           title="Graduated take rate"
           description="Client tiers, relationship progress and relationship-based fees."
           value={boolToId(altMonetizationRollout)}
@@ -126,6 +151,7 @@ export default function TestingModeScreen() {
             { id: 'on',  label: 'On'  },
           ]}
         />
+        </div>
       </div>
     </div>
   )

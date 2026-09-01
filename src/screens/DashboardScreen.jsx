@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { colors, spacing } from '../tokens'
+import { colors, layout, spacing } from '../tokens'
 import TabBar from '../components/TabBar'
 import { useIsWide } from '../lib/useMediaQuery'
 import { TAB_PATHS } from '../lib/tabPaths'
@@ -9,8 +9,6 @@ import {
   ProfileWidget, CalendarWidget, AltMonetizationWidget, WalletWidget,
   SitterResources, NewMessages, PromoteProfile,
 } from './dashboard'
-
-const CONTENT_WIDTH = 1140
 
 /**
  * The web dashboard — production's `/account/` for a logged-in sitter
@@ -54,7 +52,7 @@ export default function DashboardScreen() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.bgSecondary }}>
       <div className="hide-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <div style={{
-          maxWidth: CONTENT_WIDTH,
+          maxWidth: layout.contentWidth,
           margin: '0 auto',
           padding: isWide ? `${spacing.xl}px ${spacing.xl}px` : `${spacing.lg}px`,
           display: 'flex',

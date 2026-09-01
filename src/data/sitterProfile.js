@@ -109,13 +109,36 @@ export const BOARDING_SETTINGS = {
   baseRate: 45,
   baseRateUnit: 'night',
   autoUpdateAdditionalRates: true,
+  // Seven of the eight add-on rates boarding carries in production, all active.
+  // `ALLOWED_ADDITIONAL_RATES_FOR_SERVICE_TYPE` (services/constants.py:812-866)
+  // lists boarding as standard-rate + holiday-rate, additional-dog, puppy,
+  // additional-cat, extended-stay, bathing-grooming and pick-up-drop-off —
+  // eight rows once `lockableRates.js` prepends the base rate. Production's
+  // eighth add-on is omitted on purpose: that rate has not launched everywhere,
+  // so the prototype does not show it anywhere.
+  //
+  // Slugs match production's add-on types, which is why `bath` is
+  // `bathing-grooming` and `pickup-dropoff` is `pick-up-drop-off`. Bathing is no
+  // longer `isFree`: a free add-on maps to `defaultPrice: 0`, and
+  // `_get_lockable_add_ons()` drops zero-priced rows outside
+  // ZERO_PRICE_LOCKABLE_ADD_ON_TYPE_SLUGS, so a free bath would never reach the
+  // lock sheet. Puppy care is 15 rather than 10 because
+  // `minimum_service_add_on_prices` floors the boarding puppy rate at 15
+  // (i18n/configuration.py:1665-1717) and a default below its own minimum
+  // cannot be saved.
   additionalRates: [
-    { slug: 'additional-dog',   label: 'Additional dog',   price: 35, unit: 'night',   active: true,  isFree: false },
-    { slug: 'puppy',            label: 'Puppy care',       price: 10, unit: 'night',   active: true,  isFree: false },
-    { slug: 'holiday',          label: 'Holiday rate',     price: 15, unit: 'night',   active: false, isFree: false },
-    { slug: 'bath',             label: 'Bathing',          price: 20, unit: 'service', active: false, isFree: true  },
-    { slug: 'short-notice',     label: 'Short notice',     price: 10, unit: 'night',   active: false, isFree: false, isNew: true },
-    { slug: 'pickup-dropoff',   label: 'Pickup / dropoff', price: 25, unit: 'service', active: false, isFree: false },
+    { slug: 'additional-dog',      label: 'Additional dog',      price: 35, unit: 'night',   active: true, isFree: false },
+    { slug: 'cat-care',            label: 'Cat care',            price: 26, unit: 'night',   active: true, isFree: false },
+    { slug: 'puppy',               label: 'Puppy care',          price: 20, unit: 'night',   active: true, isFree: false },
+    { slug: 'additional-cat',      label: 'Additional cat',      price: 25, unit: 'night',   active: true, isFree: false },
+    // Puppy care and Holiday sit above the $15 country-config floor for boarding
+    // (MIN_ADD_ON_PRICE.boarding in lockableRates.js). At the floor there is no
+    // room between the sitter's rate and a legal locked price, so a locked client
+    // could not show a drift on those two rows at all.
+    { slug: 'holiday',             label: 'Holiday rate',        price: 25, unit: 'night',   active: true, isFree: false },
+    { slug: 'extended-stay',       label: 'Extended stay',       price: 55, unit: 'night',   active: true, isFree: false },
+    { slug: 'bathing-grooming',    label: 'Bathing / grooming',  price: 20, unit: 'service', active: true, isFree: false },
+    { slug: 'pick-up-drop-off',    label: 'Pick-up / drop-off',  price: 25, unit: 'service', active: true, isFree: false },
   ],
 
   // Availability

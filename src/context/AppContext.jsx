@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from 'react'
 import { DEFAULT_FAMILY_IN_GEO, DEFAULT_SERVICE_STATES } from '../data/sitterServices'
 import { mergeAvailabilityPatches } from '../lib/calendarUtils'
+import { lockedSeedFor, defaultAmountsFor } from '../data/lockableRates'
 
 const AppContext = createContext(null)
 
@@ -39,7 +40,6 @@ const SHOW_ADDITIONAL_PREFERENCES_MODAL_KEY = 'showAdditionalPreferencesModal'
 const SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY = 'showConfirmServiceDeactivation'
 const SHOW_SERVICE_SETTINGS_HELP_TIP_KEY   = 'showServiceSettingsHelpTip'
 const SHOW_REGIONAL_ALERT_CALIFORNIA_KEY   = 'showRegionalAlertCalifornia'
-const SHOW_SHORT_NOTICE_RATE_BANNER_KEY    = 'showShortNoticeRateBanner'
 const SHOW_HUB_FETCH_ERROR_KEY             = 'showHubFetchError'
 const SHOW_CIAF_MIGRATION_ONBOARDING_KEY        = 'showCiafMigrationOnboarding'
 const SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY      = 'showTrainingCredentialsUploadBanner'
@@ -50,6 +50,12 @@ const SHOW_GROOMING_PROFILE_REVIEW_KEY          = 'showGroomingProfileReviewBann
 const GROOMING_BANNER_VARIANT_KEY               = 'groomingBannerVariant'
 const SHOW_LOCKED_RATES_KEY                     = 'showLockedRates'
 const CALENDAR_SAVE_FAILS_KEY                   = 'calendarSaveFails'
+// Which locked-rates experience renders:
+//   'granular' — the POC proposal (per-rate amounts, one modal, review step)
+//   'current'  — today's binary lock switch + confirmation sheet
+// This branch exists to user-test the proposal, so 'granular' is the default and
+// 'current' is the comparison flip.
+const RATES_MODE_KEY                            = 'ratesMode'
 // Named after production's gate `is_rollout_alt_monetisation`
 // (roverdotcom/web :: RelationshipProgressScreenView, views.py:1011-1013).
 const ALT_MONETIZATION_ROLLOUT_KEY              = 'altMonetizationRollout'
@@ -82,7 +88,6 @@ const readInitialShowAdditionalPreferencesModal  = () => readInitialBool(SHOW_AD
 const readInitialShowConfirmServiceDeactivation  = () => readInitialBool(SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY, true)
 const readInitialShowServiceSettingsHelpTip      = () => readInitialBool(SHOW_SERVICE_SETTINGS_HELP_TIP_KEY,    false)
 const readInitialShowRegionalAlertCalifornia     = () => readInitialBool(SHOW_REGIONAL_ALERT_CALIFORNIA_KEY,    false)
-const readInitialShowShortNoticeRateBanner       = () => readInitialBool(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     false)
 const readInitialShowHubFetchError               = () => readInitialBool(SHOW_HUB_FETCH_ERROR_KEY,              false)
 const readInitialShowCiafMigrationOnboarding     = () => readInitialBool(SHOW_CIAF_MIGRATION_ONBOARDING_KEY,    false)
 const readInitialShowTrainingCredentialsUpload   = () => readInitialBool(SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY,  false)
@@ -90,6 +95,7 @@ const readInitialShowGroomingProfileReview       = () => readInitialBool(SHOW_GR
 const readInitialGroomingBannerVariant           = () => readInitialEnum(GROOMING_BANNER_VARIANT_KEY, 'review')
 const readInitialShowLockedRates                 = () => readInitialBool(SHOW_LOCKED_RATES_KEY,                 true)
 const readInitialCalendarSaveFails               = () => readInitialBool(CALENDAR_SAVE_FAILS_KEY,               false)
+const readInitialRatesMode                       = () => readInitialEnum(RATES_MODE_KEY, 'granular')
 const readInitialAltMonetizationRollout          = () => readInitialBool(ALT_MONETIZATION_ROLLOUT_KEY,          false)
 
 export function AppProvider({ children }) {
@@ -172,7 +178,6 @@ export function AppProvider({ children }) {
   const [showConfirmServiceDeactivation,  setShowConfirmServiceDeactivationRaw]  = useState(readInitialShowConfirmServiceDeactivation)
   const [showServiceSettingsHelpTip,      setShowServiceSettingsHelpTipRaw]      = useState(readInitialShowServiceSettingsHelpTip)
   const [showRegionalAlertCalifornia,     setShowRegionalAlertCaliforniaRaw]     = useState(readInitialShowRegionalAlertCalifornia)
-  const [showShortNoticeRateBanner,       setShowShortNoticeRateBannerRaw]       = useState(readInitialShowShortNoticeRateBanner)
   const [showHubFetchError,               setShowHubFetchErrorRaw]               = useState(readInitialShowHubFetchError)
   const [showCiafMigrationOnboarding,        setShowCiafMigrationOnboardingRaw]        = useState(readInitialShowCiafMigrationOnboarding)
   const [showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBannerRaw] = useState(readInitialShowTrainingCredentialsUpload)
@@ -199,6 +204,13 @@ export function AppProvider({ children }) {
   // Undefined means "not yet touched this session": read the seed from
   // client.lockedServices instead (see isRatesLocked below).
   const [lockedRatesByOwner, setLockedRatesByOwner] = useState({})  // { [`${ownerId}:${serviceKey}`]: bool }
+
+  const [ratesMode, setRatesModeRaw] = useState(readInitialRatesMode)
+
+  // The granular proposal's state: the same (owner x service) key, but carrying
+  // the per-rate amounts the sitter set and when the lock was taken. Undefined
+  // means untouched this session — read `lockedSeedFor` instead.
+  const [lockedAmountsByOwner, setLockedAmountsByOwner] = useState({})  // { [key]: { locked, amounts, lockedAt } }
 
   // Calendar availability edits, overlaying the derived fixtures in
   // `calendarData.js`. Month-keyed like the POC's optimistic patch map
@@ -254,7 +266,6 @@ export function AppProvider({ children }) {
   const setShowConfirmServiceDeactivation = (next) => persistJson(SHOW_CONFIRM_SERVICE_DEACTIVATION_KEY, next, setShowConfirmServiceDeactivationRaw)
   const setShowServiceSettingsHelpTip     = (next) => persistJson(SHOW_SERVICE_SETTINGS_HELP_TIP_KEY,    next, setShowServiceSettingsHelpTipRaw)
   const setShowRegionalAlertCalifornia    = (next) => persistJson(SHOW_REGIONAL_ALERT_CALIFORNIA_KEY,    next, setShowRegionalAlertCaliforniaRaw)
-  const setShowShortNoticeRateBanner      = (next) => persistJson(SHOW_SHORT_NOTICE_RATE_BANNER_KEY,     next, setShowShortNoticeRateBannerRaw)
   const setShowHubFetchError              = (next) => persistJson(SHOW_HUB_FETCH_ERROR_KEY,              next, setShowHubFetchErrorRaw)
   const setShowCiafMigrationOnboarding        = (next) => persistJson(SHOW_CIAF_MIGRATION_ONBOARDING_KEY,        next, setShowCiafMigrationOnboardingRaw)
   const setShowTrainingCredentialsUploadBanner = (next) => persistJson(SHOW_TRAINING_CREDENTIALS_UPLOAD_KEY,     next, setShowTrainingCredentialsUploadBannerRaw)
@@ -262,6 +273,7 @@ export function AppProvider({ children }) {
   const setGroomingBannerVariant              = (next) => persistEnum(GROOMING_BANNER_VARIANT_KEY,              next, setGroomingBannerVariantRaw)
   const setShowLockedRates                    = (next) => persistJson(SHOW_LOCKED_RATES_KEY,                    next, setShowLockedRatesRaw)
   const setCalendarSaveFails                  = (next) => persistJson(CALENDAR_SAVE_FAILS_KEY,                  next, setCalendarSaveFailsRaw)
+  const setRatesMode                          = (next) => persistEnum(RATES_MODE_KEY,                          next, setRatesModeRaw)
   const setAltMonetizationRollout             = (next) => persistJson(ALT_MONETIZATION_ROLLOUT_KEY,             next, setAltMonetizationRolloutRaw)
 
   // Keyed on (client x service), as production keys LockedServiceAddOn rows.
@@ -277,6 +289,34 @@ export function AppProvider({ children }) {
     const key = `${client.id}:${serviceKey}`
     setLockedRatesByOwner(prev => ({ ...prev, [key]: locked }))
   }
+
+  // ── Granular locked rates ─────────────────────────────────────────────────
+  // Session edits layered over the derived seed, so a client the sitter has not
+  // touched still reads its authored state and one that has been saved reads
+  // back exactly what was written.
+  const getRatesState = (client, serviceKey) => {
+    const seed = lockedSeedFor(client, serviceKey)
+    if (!seed) return null
+    const override = lockedAmountsByOwner[`${client.id}:${serviceKey}`]
+    if (!override) return seed
+    return { ...seed, ...override, amounts: { ...seed.amounts, ...override.amounts } }
+  }
+
+  // One save writes the whole set, as production's full-set replacement does.
+  // `lockedAt` moves to now on every lock or amount change and clears on unlock.
+  const commitRatesState = (client, serviceKey, { locked, amounts }) => {
+  if (!client || !serviceKey) return
+  const key = `${client.id}:${serviceKey}`
+  // On unlock, don't carry the old locked amounts forward — a future re-lock
+  // must seed from the sitter's defaults, not the discount just removed.
+  const nextAmounts = locked ? { ...amounts } : defaultAmountsFor(serviceKey)
+  setLockedAmountsByOwner(prev => ({
+    ...prev,
+    [key]: { locked, amounts: nextAmounts, lockedAt: locked ? new Date() : null },
+  }))
+  // Keep the binary flag in step so flipping to `current` mode is coherent.
+  setLockedRatesByOwner(prev => ({ ...prev, [key]: locked }))
+}
 
   return (
     <AppContext.Provider value={{
@@ -308,7 +348,6 @@ export function AppProvider({ children }) {
       showConfirmServiceDeactivation, setShowConfirmServiceDeactivation,
       showServiceSettingsHelpTip,     setShowServiceSettingsHelpTip,
       showRegionalAlertCalifornia,    setShowRegionalAlertCalifornia,
-      showShortNoticeRateBanner,      setShowShortNoticeRateBanner,
       showHubFetchError,              setShowHubFetchError,
       showCiafMigrationOnboarding,        setShowCiafMigrationOnboarding,
       showTrainingCredentialsUploadBanner, setShowTrainingCredentialsUploadBanner,
@@ -316,6 +355,8 @@ export function AppProvider({ children }) {
       groomingBannerVariant,              setGroomingBannerVariant,
       showLockedRates,                    setShowLockedRates,
       isRatesLocked,                      setRatesLocked,
+      ratesMode,                          setRatesMode,
+      getRatesState,                      commitRatesState,
       altMonetizationRollout,             setAltMonetizationRollout,
       // calendar
       calendarAvailability, patchCalendarAvailability,

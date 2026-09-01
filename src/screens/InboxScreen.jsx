@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { colors, spacing, textStyles, typography } from '../tokens'
+import { colors, spacing, textStyles, typography, layout } from '../tokens'
 import TabBar from '../components/TabBar'
 import Chip from '../components/Chip'
 import ThreadRow from '../components/ThreadRow'
@@ -9,6 +9,7 @@ import { getClient } from '../data/contacts'
 import { getInboxThreads } from '../data/threads'
 import { useAppContext } from '../context/AppContext'
 import { useIsWide } from '../lib/useMediaQuery'
+import { fmtClock } from '../lib/dateUtils'
 import { TAB_PATHS } from '../lib/tabPaths'
 
 // Filter definitions
@@ -65,7 +66,7 @@ export default function InboxScreen() {
       }}>
         {/* The rule stays full-bleed; only the title moves in to sit on the same
             left edge as the rail below it. */}
-        <div style={isDesktop ? { maxWidth: 1140, margin: '0 auto', padding: `0 ${spacing.xl}px` } : undefined}>
+        <div style={isDesktop ? { maxWidth: layout.contentWidth, margin: '0 auto', padding: `0 ${spacing.xl}px` } : undefined}>
           <h1 style={{
             fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26,
             lineHeight: 1.25, color: colors.primary, margin: 0,
@@ -173,8 +174,10 @@ export default function InboxScreen() {
 
           const ownerLiveEvents = !thread.bookingId ? (liveEvents[thread.ownerId] ?? []) : []
           const lastLive = [...ownerLiveEvents].reverse().find(e => e.type === 'message')
+          // A live message is the newest thing in the thread by definition, so it
+          // carries the label the activity column would show for right now.
           const displayMessage = lastLive
-            ? { text: lastLive.text, sender: 'you', timestamp: 'Today' }
+            ? { text: lastLive.text, sender: 'you', timestamp: 'Today', activityLabel: fmtClock(new Date()) }
             : thread.lastMessage
 
           return (
@@ -204,7 +207,7 @@ export default function InboxScreen() {
         {header}
         <div className="hide-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <div style={{
-            maxWidth: 1140, margin: '0 auto', padding: `${spacing.xl}px ${spacing.xl}px`,
+            maxWidth: layout.contentWidth, margin: '0 auto', padding: `${spacing.xl}px ${spacing.xl}px`,
             display: 'flex', alignItems: 'flex-start', gap: 56,
           }}>
             {chipRail}

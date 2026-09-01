@@ -1,0 +1,159 @@
+/**
+ * granularRatesCopy — every string the POC proposal's locked-rates surfaces use.
+ *
+ * Ported verbatim from the POC branch `locked-rates-client-management-poc`:
+ *   src/frontend/pages/src/account/lockedRates/rateCopy.ts
+ *   src/frontend/pages/src/account/lockedRates/serviceRateStates.ts
+ *   src/frontend/pages/src/account/conversations/details/ConversationRatesRow.tsx
+ *
+ * `lockedRatesCopy.js` is the CURRENT experience's copy and is deliberately left
+ * untouched — both live side by side behind the `ratesMode` flag.
+ *
+ * Apostrophes are the curly ones the POC ships (’), not ASCII. Sentences with a
+ * client name all have a nameless fallback, because production's row renders
+ * before the conversation's participant has resolved.
+ */
+
+// ── The conversation / booking-details rates row (ConversationRatesRow.tsx) ──
+// Two offers, decided by the saved lock state alone. The padlock renders on
+// `manage` only.
+//
+// The POC also shipped an `Update {name}’s locked rates` offer, taken when a
+// locked service's saved amounts no longer matched the booked ones. It is
+// deleted by product decision — not for lack of a production equivalent: a
+// booking's prices seed a lock only while the sitter is locking, so an
+// already-locked service always reads `manage`.
+export const ratesRowCopy = (offer, clientName, lockedAt, locale) => {
+  const name = clientName?.trim() || null
+  switch (offer) {
+    case 'manage':
+      return {
+        title: name ? `Manage ${name}’s locked rates` : 'Manage this client’s locked rates',
+        subtitle: lockedOnLine(lockedAt, locale),
+      }
+    case 'lock':
+    default:
+      return {
+        title: name ? `Lock these rates for ${name}` : 'Lock these rates for this client',
+        subtitle: name
+          ? `${name} will keep these rates, even if your default rates change.`
+          : 'This client will keep these rates, even if your default rates change.',
+      }
+  }
+}
+
+export const showsPadlock = (offer) => offer === 'manage'
+
+// ── Dates (serviceRateStates.ts formatLockedAt) ──────────────────────────────
+export const formatLockedAt = (lockedAt, locale) => {
+  if (!lockedAt) return null
+  const date = lockedAt instanceof Date ? lockedAt : new Date(lockedAt)
+  if (Number.isNaN(date.getTime())) return null
+  return new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric', year: 'numeric' }).format(date)
+}
+
+const lockedOnLine = (lockedAt, locale) => {
+  const on = formatLockedAt(lockedAt, locale)
+  return on ? `Locked on ${on}` : 'Rates locked for this client'
+}
+
+// ── Status lines (serviceRateStates.ts lockStatusLine) ───────────────────────
+// The saved state, never the staged switch.
+export const lockStatusLine = (isCustom, lockedAt, locale) => {
+  if (!isCustom) return 'Using default rates'
+  const on = formatLockedAt(lockedAt, locale)
+  return on ? `Rates locked ${on}` : 'Rates locked for this client'
+}
+
+export const INACTIVE_SERVICE = 'Inactive service'
+
+// ── The modal (ManageRatesModal.tsx + RatesModalTitleRow.tsx) ────────────────
+// The heading carries both the service and the client, so the sheet says whose
+// rates it is editing without the switch below having to repeat the name.
+export const modalTitle = (serviceName, clientName) =>
+  clientName ? `${serviceName} rates for ${clientName}` : `${serviceName} rates`
+
+// Deliberately nameless: the heading above already names the client, and the
+// note under the switch names them again in the sentence that matters.
+export const LOCK_TOGGLE_LABEL = 'Lock rates'
+
+export const lockToggleNote = (isOn, clientName) => {
+  const payer = clientName || 'This client'
+  return isOn
+    ? `${payer} will keep these rates, even if your default rates change. Turn it off to charge your default rates.`
+    : `${payer} will be charged your default rates. Turn it on to lock and charge custom rates.`
+}
+
+export const lockToggleAnnouncement = (isOn, clientName, serviceName, isEditable = true) => {
+  const who = clientName || 'this client'
+  const what = serviceName ? `${serviceName} rates` : 'rates'
+  if (!isOn) return `${what} for ${who} will unlock when you save.`
+  return isEditable
+    ? `${what} for ${who} will lock when you save. Every rate below is editable.`
+    : `${what} for ${who} will lock when you save.`
+}
+
+export const defaultRateHelper = (amount) => `Your default rate is ${amount}`
+// RateEditor.tsx:212-213 — replaces the helper line on a failed save attempt.
+export const AMOUNT_REQUIRED = 'Enter an amount for this rate.'
+// RateEditor.tsx:216-219 — the other half of the same switch. Bounds are per
+// rate (`minPrice` / `maxPrice`), and the caller passes them already formatted,
+// as `defaultRateHelper` does, so the money formatting stays in one place.
+export const amountOutOfRange = (min, max) => `Enter an amount between ${min} and ${max}.`
+// ManageRatesModal.tsx:359 — announced when Save is pressed with a bad amount.
+export const SOME_AMOUNTS_INVALID = 'Some amounts can’t be saved. Check the highlighted rates.'
+export const USE_DEFAULT = 'Use default'
+
+export const COL_DEFAULT_RATE = 'Default rate'
+export const COL_LOCKED_RATE  = 'Locked rate'
+export const COL_CURRENT_RATE = 'Current rate'
+
+export const SAVE   = 'Save rates'
+export const CANCEL = 'Cancel'
+
+// `unitAsSentence` matches lockedRatesCopy.js so both modes read the same.
+export const unitAsSentence = (unit) => `per ${unit}`
+
+// ── The review step (ReviewRatesStep.tsx) ────────────────────────────────────
+// The step's only heading. There is no separate title above it and no
+// subheading under it: the Figma frame (2365:19780) prints this one line in all
+// three intents, and no terminal period.
+export const reviewHeading = (intent, clientName) => {
+  const who = clientName || 'this client'
+  const verb = intent === 'unlocking' ? 'unlocking' : intent === 'updating' ? 'updating' : 'locking'
+  return `You are ${verb} ${who}’s rates`
+}
+
+export const wasAmount = (amount) => `Was ${amount}`
+export const CONFIRM = 'Confirm'
+export const GO_BACK = 'Go back'
+
+// ── The discard confirm (ManageRatesModal.tsx) ───────────────────────────────
+export const DISCARD_TITLE = 'Unsaved changes'
+export const DISCARD_BODY  = 'Your changes to these rates won’t be saved.'
+export const KEEP_EDITING  = 'Keep editing'
+export const DISCARD       = 'Discard changes'
+
+// ── Save reports (rateCopy.ts) ───────────────────────────────────────────────
+// Retained as `rateCopy.ts` provenance only — no live caller. The granular save
+// closes its sheet without a snackbar, since the row it returns to already
+// states the new locked state. (`ratesMode === 'current'` keeps its own toast
+// copy in lockedRatesCopy.js, which is a different, still-live set.)
+export const savedLockedReport = (clientName, serviceName) => serviceName
+  ? `Saved. ${clientName}’s ${serviceName} rates are locked.`
+  : `Saved. ${clientName}’s rates are locked.`
+
+export const savedUnlockedReport = (clientName, serviceName) => serviceName
+  ? `Saved. ${clientName}’s ${serviceName} rates follow your defaults again.`
+  : `Saved. ${clientName}’s rates follow your defaults again.`
+
+export const savedUpdatedReport = (clientName, serviceName) => serviceName
+  ? `Saved. ${clientName}’s ${serviceName} rates are locked at the new amounts.`
+  : `Saved. ${clientName}’s rates are locked at the new amounts.`
+
+// ── The relationship page rate sheet (RelationshipRatesContent + variants) ───
+export const RATES_SECTION_HEADING = 'Rates'
+export const GROUP_BOOKED     = 'Previously booked'
+export const GROUP_NOT_BOOKED = 'Not booked'
+export const NO_SERVICES = 'Add a service to your profile to customize rates for a client.'
+export const SERVICES_ERROR = 'We couldn’t load your services. Refresh to try again.'

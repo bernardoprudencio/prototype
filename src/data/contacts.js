@@ -88,9 +88,16 @@ export const CLIENTS = [
     id: 'owen',
     displayName: 'Owen O.',
     imageUrl: peopleImages.owen,
-    pets: [pet(1, 'Koni', petImages.koni), pet(2, 'Burley', petImages.burley)],
+    pets: [
+      pet(1, 'Koni',   petImages.koni,   { breeds: 'Siberian Husky', gender: 'Female', birthday: '4 years old', weight: '48 lbs' }),
+      pet(2, 'Burley', petImages.burley, { breeds: 'Labrador Retriever mix', gender: 'Male', birthday: '7 years old', weight: '72 lbs' }),
+    ],
     bookingCount: 12,
     gbv: 3580,
+    // Owen's boarding starts locked, so the "manage an existing lock" path has a
+    // demo on a client who also has a recurring relationship. His amounts are
+    // pinned in lockableRates.js LOCKED_PRICE_OVERRIDES rather than hash-derived.
+    lockedServices: ['boarding'],
     recurringSchedule: {
       service: 'Weekly 60 min walks',
       serviceDuration: 60,
@@ -102,10 +109,10 @@ export const CLIENTS = [
       ],
       pricing: {
         pets: [
-          { petName: 'Koni',   rateType: 'Standard rate',       ratePerWalk: 20 },
-          { petName: 'Burley', rateType: 'Additional dog rate', ratePerWalk: 10 },
+          { petName: 'Koni',   rateType: 'Standard rate',       ratePerWalk: 20, slug: 'standard-rate' },
+          { petName: 'Burley', rateType: 'Additional dog rate', ratePerWalk: 10, slug: 'additional-dog' },
         ],
-        addOns: [{ label: '60-min add-on', ratePerWalk: 10 }],
+        addOns: [{ label: '60-min add-on', ratePerWalk: 10, slug: 'long-walk' }],
       },
     },
   }),
@@ -113,7 +120,7 @@ export const CLIENTS = [
     id: 'james',
     displayName: 'James T.',
     imageUrl: peopleImages.james,
-    pets: [pet(1, 'Archie', petImages.archie)],
+    pets: [pet(1, 'Archie', petImages.archie, { breeds: 'Golden Retriever', gender: 'Male', birthday: '2 years old', weight: '65 lbs' })],
     bookingCount: 3,
     gbv: 320,
     hasUpcoming: false,
@@ -126,7 +133,7 @@ export const CLIENTS = [
         { day: 'Thursday', time: '2:00 PM' },
       ],
       pricing: {
-        pets: [{ petName: 'Archie', rateType: 'Standard rate', ratePerWalk: 20 }],
+        pets: [{ petName: 'Archie', rateType: 'Standard rate', ratePerWalk: 20, slug: 'standard-rate' }],
         addOns: [],
       },
     },
@@ -136,7 +143,7 @@ export const CLIENTS = [
     id: 'sarah',
     displayName: 'Sarah S.',
     imageUrl: peopleImages.sarah,
-    pets: [pet(1, 'Milo', petImages.milo)],
+    pets: [pet(1, 'Milo', petImages.milo, { breeds: 'Beagle', gender: 'Male', birthday: '6 years old', weight: '24 lbs' })],
     cancelledBookings: [
       { serviceKey: 'dog_walking', price: 25 },
       { serviceKey: 'dog_walking', price: 25 },
@@ -152,7 +159,7 @@ export const CLIENTS = [
         { day: 'Friday',    time: '4:00 PM' },
       ],
       pricing: {
-        pets: [{ petName: 'Milo', rateType: 'Standard rate', ratePerWalk: 20 }],
+        pets: [{ petName: 'Milo', rateType: 'Standard rate', ratePerWalk: 20, slug: 'standard-rate' }],
         addOns: [],
       },
     },
@@ -162,9 +169,9 @@ export const CLIENTS = [
     displayName: 'Marcus B.',
     imageUrl: peopleImages.marcus,
     pets: [
-      pet(1, 'Biscuit', petImages.biscuit),
-      pet(2, 'Pepper',  petImages.pepper),
-      pet(3, 'Luna',    petImages.luna),
+      pet(1, 'Biscuit', petImages.biscuit, { breeds: 'Cocker Spaniel', gender: 'Female', birthday: '5 years old', weight: '26 lbs' }),
+      pet(2, 'Pepper',  petImages.pepper,  { breeds: 'Miniature Schnauzer', gender: 'Female', birthday: '8 years old', weight: '15 lbs' }),
+      pet(3, 'Luna',    petImages.luna,    { breeds: 'Border Collie', gender: 'Female', birthday: '3 years old', weight: '38 lbs' }),
     ],
     cancelledBookings: [
       { serviceKey: 'dog_walking', price: 25 },
@@ -174,7 +181,7 @@ export const CLIENTS = [
     id: 'priya',
     displayName: 'Priya R.',
     imageUrl: peopleImages.priya,
-    pets: [pet(1, 'Pickle', petImages.pickle)],
+    pets: [pet(1, 'Pickle', petImages.pickle, { breeds: 'French Bulldog', gender: 'Male', birthday: '1 year old', weight: '22 lbs' })],
     cancelledBookings: [
       { serviceKey: 'dog_walking',    price: 25 },
       { serviceKey: 'drop_in_visits', price: 30 },
@@ -211,7 +218,7 @@ export const CLIENTS = [
     id: 'diego',
     displayName: 'Diego M.',
     imageUrl: null,
-    pets: [pet(1, 'Toby', petImages.toby)],
+    pets: [pet(1, 'Toby', petImages.toby, { breeds: 'Jack Russell Terrier', gender: 'Male', birthday: '9 years old', weight: '17 lbs' })],
     bookingCount: 4,
     gbv: 960,
   }),
@@ -219,7 +226,10 @@ export const CLIENTS = [
     id: 'amelia',
     displayName: 'Amelia W.',
     imageUrl: peopleImages.amelia,
-    pets: [pet(1, 'Olive', petImages.olive), pet(2, 'Henry', petImages.henry)],
+    pets: [
+      pet(1, 'Olive', petImages.olive, { breeds: 'Dachshund', gender: 'Female', birthday: '4 years old', weight: '12 lbs' }),
+      pet(2, 'Henry', petImages.henry, { breeds: 'Bernese Mountain Dog', gender: 'Male', birthday: '6 years old', weight: '88 lbs' }),
+    ],
     bookingCount: 8,
     gbv: 1920,
     hasUpcoming: false,
@@ -231,7 +241,7 @@ export const CLIENTS = [
     id: 'nora',
     displayName: 'Nora P.',
     imageUrl: peopleImages.nora,
-    pets: [pet(1, 'Bean', petImages.bean)],
+    pets: [pet(1, 'Bean', petImages.bean, { breeds: 'Chihuahua, Terrier mix', gender: 'Male', birthday: '11 years old', weight: '9 lbs' })],
     bookingCount: 5,
     gbv: 400,
   }),
@@ -239,9 +249,32 @@ export const CLIENTS = [
     id: 'takashi',
     displayName: 'Takashi I.',
     imageUrl: peopleImages.takashi,
-    pets: [pet(1, 'Sushi', petImages.sushi)],
+    pets: [pet(1, 'Sushi', petImages.sushi, { breeds: 'Shiba Inu', gender: 'Female', birthday: '2 years old', weight: '18 lbs' })],
     bookingCount: 2,
     gbv: 750,
+  }),
+  // The locked-rates user-testing persona. Over a year of history, drop-in
+  // visits most weeks and house sitting when she travels — her service pool is
+  // pinned to exactly those two in relationshipData.js PINNED_SERVICE_KEYS.
+  //
+  // Deliberately NO recurringSchedule: RECURRING_SERVICE_KEY is hardcoded
+  // `dog_walking` (relationshipData.js), so a recurring block would force dog
+  // walking into her pool and hand her a weekly-walks conversation. "Books
+  // drop-ins most weeks" is carried by her booking history instead.
+  client({
+    id: 'lauren',
+    displayName: 'Lauren M.',
+    imageUrl: peopleImages.lauren,
+    pets: [
+      pet(1, 'Juniper', petImages.juniper, { breeds: 'Border Collie', gender: 'Female', birthday: '5 years old', weight: '42 lbs' }),
+      pet(2, 'Fig',     petImages.fig,     { breeds: 'Cavalier King Charles Spaniel', gender: 'Male', birthday: '3 years old', weight: '18 lbs' }),
+    ],
+    bookingCount: 18,
+    gbv: 4200,
+    // "Their prices haven't changed since they started booking with you" — the
+    // drop-in rates she has always paid are already locked. House sitting is
+    // deliberately NOT locked: her new request is the thing under test.
+    lockedServices: ['drop_in_visits'],
   }),
 ]
 

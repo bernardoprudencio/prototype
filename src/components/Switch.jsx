@@ -12,7 +12,14 @@ import { colors, radius } from '../tokens'
  * Geometry and colours are the real Kibble values, not the guessed ones the
  * previous `OnOffSwitch` shipped:
  *   track  56x32, 2px solid border, borderRadius round   (SwitchFieldIcon.tsx:62-67)
- *   knob   24x24, top 2, left 4 -> 28                    (SwitchFieldIcon.tsx:87, 101-108)
+ *   knob   24x24, top 4, left 4 -> 28                    (SwitchFieldIcon.tsx:87, 101-108)
+ *          `top` is deliberately 4 here, NOT Kibble's 2. Kibble measures that
+ *          2 from inside the track's 2px border, because there the border is on
+ *          the knob's own positioning parent. This port puts the border on the
+ *          <input> sibling instead, so the knob's containing block is the full
+ *          56x32 outer span and the centred value is (32 - 24) / 2 = 4. The
+ *          literal is used rather than top:'50%' + translateY(-50%) because the
+ *          knob animates `left`, and a transform risks a compositing seam.
  *   motion `left 150ms ease-in-out`                      (SwitchFieldIcon.tsx:110,
  *                                       ANIMATION_DURATION_MS SwitchField.common.tsx:21)
  *   mt     -2px, to align the 32px control to the label  (SwitchFieldIcon.tsx:73)
@@ -116,7 +123,7 @@ export default function Switch({
         // Sits above the input in paint order, so it must not eat the click.
         style={{
           position: 'absolute',
-          top: 2,
+          top: 4,
           left: checked ? 28 : 4,
           width: 24, height: 24,
           borderRadius: '50%',

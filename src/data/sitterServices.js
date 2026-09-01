@@ -118,7 +118,7 @@ export const SERVICES = [
 // grooming available for sign-up.
 export const DEFAULT_SERVICE_STATES = {
   boarding:      SERVICE_STATE.ACTIVE,
-  house_sitting: SERVICE_STATE.INACTIVE,
+  house_sitting: SERVICE_STATE.ACTIVE,
   doggy_daycare: SERVICE_STATE.ACTIVE,
   drop_in:       SERVICE_STATE.ACTIVE,
   dog_walking:   SERVICE_STATE.INACTIVE,

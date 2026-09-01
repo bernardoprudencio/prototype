@@ -8,6 +8,8 @@ import { Button, PetAvatar, UserAvatar, TabBar, Row } from '../components'
 import { getTodayWalks } from '../data/owners'
 import { getIncompleteCards } from '../data/scheduleData'
 import { TAB_PATHS } from '../lib/tabPaths'
+import { useIsWide } from '../lib/useMediaQuery'
+import { webColumn } from '../lib/webColumn'
 
 const INCOMPLETE_CARDS = getIncompleteCards()
 import { useApp } from '../context/AppContext'
@@ -34,14 +36,16 @@ export default function HomeScreen({ onOpenActionSheet, onOpenReviewSheet, onOpe
   const onNavigateToCard = (card) =>
     navigate(`/conversation/${card.clientKey}`, { state: { type: 'incomplete', cardId: card.id, card } })
 
+  const isWide = useIsWide()
   const visibleCards = INCOMPLETE_CARDS.filter(c => !resolvedCards[c.id])
   const hasIncomplete = visibleCards.length > 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.white }}>
       {/* ─── Header ─── */}
+      {/* The rule stays full-bleed; the row on it joins the navbar's column. */}
       <div style={{ borderBottom: `1px solid ${colors.border}`, padding: '24px 16px 16px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', ...webColumn(isWide) }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ fontFamily: typography.displayFamily, fontWeight: 600, fontSize: 26, lineHeight: 1.25, color: colors.primary, margin: 0 }}>Your name</h1>
             <p style={{ fontFamily: typography.fontFamily, fontSize: 14, lineHeight: 1.5, color: colors.primary, margin: '2px 0 0' }}>{formatHeaderDate()}</p>
@@ -54,7 +58,8 @@ export default function HomeScreen({ onOpenActionSheet, onOpenReviewSheet, onOpe
       </div>
 
       {/* ─── Scroll Content ─── */}
-      <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '24px 16px' }}>
+      <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '24px 16px', boxSizing: 'border-box', ...webColumn(isWide) }}>
         <p style={{ fontFamily: typography.fontFamily, fontSize: 14, color: colors.tertiary, margin: '0 0 8px' }}>Updated at {loadTime}</p>
 
         {/* ─── Incomplete section ─── */}
@@ -139,6 +144,7 @@ export default function HomeScreen({ onOpenActionSheet, onOpenReviewSheet, onOpe
               </div>
             </div>
           ))}
+        </div>
         </div>
       </div>
 
